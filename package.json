@@ -47,10 +47,6 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
-      "installerHeader": "assets/installerHeader.png",
-      "installerHeaderIcon": "assets/icon.ico",
-      "installerSidebar": "assets/installerSidebar.png",
-      "uninstallerSidebar": "assets/installerSidebar.png",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DevsFTP"
