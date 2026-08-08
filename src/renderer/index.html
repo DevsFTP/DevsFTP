@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevsFTP — Remote Development Workspace</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/icon.svg">
+  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Application Menu Bar -->
+    <nav class="top-menu-bar">
+      <div class="menu-item-dropdown" id="menu-file">
+        <button class="menu-item-btn">File</button>
+        <div class="menu-dropdown-content">
+          <div class="dropdown-action" id="menu-file-new">➕ New Connection...</div>
+          <div class="dropdown-action" id="menu-file-disconnect">🔌 Disconnect Session</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-action" id="menu-file-exit">❌ Exit</div>
+        </div>
+      </div>
+
+      <button class="menu-item-btn" id="menu-settings-btn">Settings</button>
+
+      <div class="menu-item-dropdown" id="menu-tools">
+        <button class="menu-item-btn">Tools</button>
+        <div class="menu-dropdown-content">
+          <div class="dropdown-action" id="menu-tools-cache">🧹 Clear Temp Cache</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-action" id="menu-tools-export">📤 Export Profiles (JSON)</div>
+          <div class="dropdown-action" id="menu-tools-import">📥 Import Profiles (JSON)</div>
+        </div>
+      </div>
+
+      <div class="menu-item-dropdown" id="menu-help">
+        <button class="menu-item-btn">Help</button>
+        <div class="menu-dropdown-content">
+          <div class="dropdown-action" id="menu-help-docs">📖 Documentation</div>
+          <div class="dropdown-action" id="menu-help-issue">💬 Report Issue</div>
+          <div class="dropdown-action" id="menu-help-update">🔄 Check for Updates...</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-action" id="menu-help-about">ℹ️ About DevsFTP</div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Top Header Navigation & Quick Connection Toolbar -->
+    <header class="top-header">
+      <div class="brand-section">
+        <div class="brand-logo" title="DevsFTP Workspace (Connecting Local Tools to Remote Servers)">
+          <svg width="24" height="24" viewBox="0 0 512 512" fill="none" class="devsftp-logo-svg">
+            <defs>
+              <linearGradient id="dMetalDark" x1="120" y1="96" x2="392" y2="416" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#FAFAFA"/>
+                <stop offset="42%" stop-color="#D7DBE0"/>
+                <stop offset="100%" stop-color="#AEB5BC"/>
+              </linearGradient>
+              <linearGradient id="dMetalLight" x1="120" y1="96" x2="392" y2="416" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#1A202C"/>
+                <stop offset="42%" stop-color="#2D3748"/>
+                <stop offset="100%" stop-color="#4A5568"/>
+              </linearGradient>
+            </defs>
+
+            <!-- Connection Bridge & Remote Node (BEHIND D) -->
+            <path d="M150 256H426" class="logo-node-accent" stroke-width="18" stroke-linecap="round"/>
+            <circle cx="454" cy="256" r="18" class="logo-node-accent-fill"/>
+
+            <!-- Main D -->
+            <path d="M150 112 H240 C334 112 388 170 388 256 C388 342 334 400 240 400 H150" class="logo-d-stroke" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+
+            <!-- Chevron -->
+            <path d="M154 176 L214 256 L154 336" class="logo-d-stroke" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="brand-title">DevsFTP</span>
+        <span id="active-profile-badge" class="tag-badge profile-badge" style="display: none;">
+          <span class="profile-dot" id="active-profile-dot"></span>
+          <span id="active-profile-name">No Profile</span>
+        </span>
+      </div>
+
+      <div class="connection-toolbar">
+        <button id="btn-dir-compare" class="btn" title="Compare active local and remote directory contents">🔍 Compare</button>
+        <button id="btn-header-new-session" class="btn btn-primary">⚡ New Session</button>
+        <button id="btn-open-preferences" class="btn">⚙️ Preferences</button>
+        <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙</button>
+      </div>
+    </header>
+
+    <!-- Session Tab Bar (FR-001 Multi-Tab Workspace Sessions) -->
+    <div class="session-tab-bar" id="session-tab-bar">
+      <div class="session-tabs-container" id="session-tabs-container"></div>
+      <button id="btn-new-session-tab" class="btn-new-tab" title="Open New Session Tab">➕ New Tab</button>
+    </div>
+
+    <!-- Directory Comparison Summary Bar -->
+    <div id="dir-compare-bar" class="dir-compare-bar" style="display: none; align-items: center; justify-content: space-between; padding: 6px 16px; background: hsl(var(--bg-secondary)); border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 11px;">
+      <div id="dir-compare-text" style="display: flex; align-items: center; gap: 8px;">
+        <!-- Comparison results rendered here -->
+      </div>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <span style="color: hsl(var(--text-muted)); font-weight: 600;">Filter:</span>
+        <button class="btn diff-filter-btn active" data-filter="all" onclick="window.DirectoryCompare.setFilter('all')" style="padding: 2px 8px; font-size: 10px;">Show All</button>
+        <button class="btn diff-filter-btn" data-filter="diff_only" onclick="window.DirectoryCompare.setFilter('diff_only')" style="padding: 2px 8px; font-size: 10px;">Show Differences Only</button>
+        <button class="btn btn-danger" onclick="window.DirectoryCompare.clear()" style="padding: 2px 8px; font-size: 10px;">✕ Close Diff</button>
+      </div>
+    </div>
+
+    <!-- Main Workspace (Dual File Panes) -->
+    <main class="workspace-main" id="workspace-main">
+      
+      <!-- Local File System Pane -->
+      <section class="file-pane" id="local-pane">
+        <div class="pane-header">
+          <div class="pane-title-group">
+            <span>💻 Local System</span>
+            <select id="local-drive-select" class="select-control" style="font-size: 11px;">
+              <option value="C:\">C:\ Drive</option>
+            </select>
+          </div>
+          <button id="btn-local-refresh" class="btn" style="padding: 2px 8px; font-size: 11px;">🔄 Refresh</button>
+        </div>
+
+        <div class="breadcrumb-bar">
+          <button id="btn-local-up" class="btn" style="padding: 2px 6px; font-size: 11px;">⬆ Parent</button>
+          <input type="text" id="local-path-input" class="path-input" value="C:\">
+        </div>
+
+        <div class="filter-bar">
+          <input type="text" id="local-filter" class="search-input" placeholder="Filter local files...">
+        </div>
+
+        <div class="file-list-container" id="local-file-list-container" tabindex="0">
+          <table class="file-table" id="local-file-table">
+            <thead>
+              <tr>
+                <th style="width: 50%;">Name</th>
+                <th style="width: 25%;">Size</th>
+                <th style="width: 25%;">Modified</th>
+              </tr>
+            </thead>
+            <tbody id="local-file-tbody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Remote File System Pane -->
+      <section class="file-pane" id="remote-pane">
+        <div class="pane-header">
+          <div class="pane-title-group">
+            <span>🌐 Remote Server</span>
+            <span id="remote-tag" class="tag-badge" style="display: none;">SFTP</span>
+          </div>
+          <button id="btn-remote-refresh" class="btn" style="padding: 2px 8px; font-size: 11px;">🔄 Refresh</button>
+        </div>
+
+        <div class="breadcrumb-bar">
+          <button id="btn-remote-up" class="btn" style="padding: 2px 6px; font-size: 11px;">⬆ Parent</button>
+          <input type="text" id="remote-path-input" class="path-input" value="/" placeholder="Not connected">
+        </div>
+
+        <div class="filter-bar">
+          <input type="text" id="remote-filter" class="search-input" placeholder="Filter remote files...">
+        </div>
+
+        <div class="file-list-container" id="remote-file-list-container" tabindex="0">
+          <table class="file-table" id="remote-file-table">
+            <thead>
+              <tr>
+                <th style="width: 40%;">Name</th>
+                <th style="width: 20%;">Size</th>
+                <th style="width: 20%;">Permissions</th>
+                <th style="width: 20%;">Modified</th>
+              </tr>
+            </thead>
+            <tbody id="remote-file-tbody">
+              <tr><td colspan="4" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Select a profile and click Connect.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Draggable Resizer Splitter -->
+    <div class="splitter-bar" id="workspace-splitter" title="Drag to resize workspace panel height (Double click to toggle collapse)"></div>
+
+    <!-- Bottom Drawer (Terminal / Queue / Logs) -->
+    <div class="bottom-drawer" id="bottom-drawer">
+      <div class="drawer-tab-bar">
+        <div class="tab-group">
+          <button class="drawer-tab active" data-tab="tab-terminal">🖥️ SSH Terminal</button>
+          <button class="drawer-tab" data-tab="tab-queue">📊 Transfer Queue <span id="queue-badge" class="tag-badge">0</span></button>
+          <button class="drawer-tab" data-tab="tab-schedules">⏰ Scheduled Jobs <span id="jobs-badge" class="tag-badge">0</span></button>
+          <button class="drawer-tab" data-tab="tab-tunnels" id="drawer-tab-tunnels">🔀 SSH Tunnels <span id="tunnels-badge" class="tag-badge">0</span></button>
+          <button class="drawer-tab" data-tab="tab-logs">📜 Protocol Logs</button>
+          <button class="drawer-tab" data-tab="tab-editor-debug">🐞 Editor Debug</button>
+        </div>
+        <button id="btn-toggle-drawer" class="btn" style="padding: 2px 8px; font-size: 11px;">▼ Minimize</button>
+      </div>
+
+      <div class="drawer-content">
+        <!-- SSH Terminal Panel -->
+        <div class="drawer-panel active" id="tab-terminal">
+          <div id="terminal-container"></div>
+        </div>
+
+        <!-- Transfer Queue Panel -->
+        <div class="drawer-panel" id="tab-queue">
+          <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="btn-queue-pause-all" class="btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">⏸️ Pause All</button>
+              <button id="btn-queue-resume-all" class="btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">▶️ Resume All</button>
+              <button id="btn-queue-cancel-all" class="btn btn-danger" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">⏹️ Cancel All</button>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="btn-clear-queue" class="btn" style="padding: 3px 10px; font-size: 11px;">🧹 Clear Completed</button>
+            </div>
+          </div>
+          <div style="flex: 1; overflow-y: auto;">
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th>Direction</th>
+                  <th>Source File</th>
+                  <th>Destination</th>
+                  <th>Progress</th>
+                  <th>Speed</th>
+                  <th>Status</th>
+                  <th style="text-align: center; width: 140px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="queue-tbody">
+                <tr><td colspan="7" style="text-align: center; color: hsl(var(--text-muted)); padding: 16px;">Queue is empty.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Scheduled Jobs Drawer Panel -->
+        <div class="drawer-panel" id="tab-schedules">
+          <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="btn-create-job-drawer" class="btn btn-primary" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">➕ Create Scheduled Job</button>
+              <button id="btn-jobs-run-all" class="btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">▶️ Run All Active</button>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">Automated Sync Daemon Active</span>
+            </div>
+          </div>
+          <div style="flex: 1; overflow-y: auto;">
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th>Job Name</th>
+                  <th>Profile</th>
+                  <th>Direction</th>
+                  <th>Schedule</th>
+                  <th>Next Run</th>
+                  <th>Last Status</th>
+                  <th style="text-align: center; width: 160px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="jobs-tbody">
+                <tr><td colspan="7" style="text-align: center; color: hsl(var(--text-muted)); padding: 16px;">No scheduled jobs configured. Click "+ Create Scheduled Job" to automate transfers.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SSH Tunnels & Port Forwarding Panel -->
+        <div class="drawer-panel" id="tab-tunnels">
+          <div style="padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button id="btn-create-tunnel-drawer" class="btn btn-primary" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">➕ Add SSH Tunnel Rule</button>
+              <button id="btn-tunnels-refresh" class="btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">🔄 Refresh Tunnels</button>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <span style="font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">Port Forwarding Engine Active</span>
+            </div>
+          </div>
+          <div style="flex: 1; overflow-y: auto;">
+            <table class="queue-table">
+              <thead>
+                <tr>
+                  <th>Rule Name</th>
+                  <th>Type</th>
+                  <th>Local Port</th>
+                  <th>Target Destination</th>
+                  <th>SSH Profile</th>
+                  <th>Traffic (In/Out)</th>
+                  <th>Status</th>
+                  <th style="text-align: center; width: 160px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tunnels-tbody">
+                <tr><td colspan="8" style="text-align: center; color: hsl(var(--text-muted)); padding: 16px;">No SSH Tunnels active. Click "+ Add SSH Tunnel Rule" to forward local/remote ports.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Protocol Logs Panel -->
+        <div class="drawer-panel" id="tab-logs">
+          <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <span style="font-size: 11px; font-weight: 700; color: hsl(var(--text-secondary));">📜 Protocol & Diagnostic Log Stream</span>
+            <div style="display: flex; gap: 6px;">
+              <button id="btn-copy-logs" class="btn" style="padding: 2px 8px; font-size: 10px;">📋 Copy Logs</button>
+              <button id="btn-clear-logs" class="btn" style="padding: 2px 8px; font-size: 10px;">Clear Logs</button>
+            </div>
+          </div>
+          <div class="log-stream" id="log-container" style="flex: 1; overflow-y: auto;">
+            <div class="log-entry info">[00:00:00] DevsFTP ready. Select a profile to initiate session.</div>
+          </div>
+        </div>
+
+        <!-- Live Editor Sync Debug Panel -->
+        <div class="drawer-panel" id="tab-editor-debug">
+          <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <span style="font-size: 11px; font-weight: 700; color: #F59E0B;">🐞 Remote Editor & Live Save Diagnostic Console</span>
+            <div style="display: flex; gap: 6px;">
+              <button id="btn-copy-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">📋 Copy Debug Log</button>
+              <button id="btn-clear-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">Clear Debug Log</button>
+            </div>
+          </div>
+          <div class="log-stream" id="editor-debug-stream" style="flex: 1; overflow-y: auto; padding: 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; background: rgba(0,0,0,0.25);">
+            <div class="log-entry info" style="color: hsl(var(--text-muted));">[READY] Editor Debug panel ready. Double-click or edit a file to view real-time diagnostics.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span id="status-dot" class="status-indicator"></span>
+        <span id="status-text">Disconnected</span>
+      </div>
+      <div>
+        <span id="speed-indicator">▲ 0 KB/s | ▼ 0 KB/s</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Selection-Aware Context Menu -->
+  <div id="context-menu" class="context-menu">
+    <div class="context-menu-item" id="ctx-new-file">📄 New File</div>
+    <div class="context-menu-item" id="ctx-mkdir">📁 New Directory</div>
+    <div class="context-menu-item" id="ctx-open">📂 Open</div>
+    <div class="context-menu-item" id="ctx-edit">✏️ Edit in Default Editor</div>
+    <div class="context-menu-item" id="ctx-download">⬇ Download</div>
+    <div class="context-menu-item" id="ctx-upload">⬆ Upload</div>
+    <div class="context-menu-item" id="ctx-copy-path">📋 Copy Path</div>
+    <div class="context-menu-item" id="ctx-chmod">🔐 Permissions (chmod)</div>
+    <div class="context-menu-item" id="ctx-rename">✏️ Rename</div>
+    <div class="context-menu-item" id="ctx-delete" style="color: hsl(var(--status-danger));">🗑 Delete</div>
+  </div>
+
+  <!-- Queue Row Context Menu -->
+  <div id="queue-context-menu" class="context-menu">
+    <div class="context-menu-item" id="qctx-pause">⏸️ Pause</div>
+    <div class="context-menu-item" id="qctx-resume">▶️ Resume</div>
+    <div class="context-menu-item" id="qctx-cancel" style="color: hsl(var(--status-danger));">⏹️ Cancel</div>
+    <div class="context-menu-item" id="qctx-retry">🔄 Retry</div>
+    <div class="context-menu-item" id="qctx-move-up">▲ Move Up</div>
+    <div class="context-menu-item" id="qctx-move-down">▼ Move Down</div>
+    <div class="context-menu-item" id="qctx-remove">🗑 Remove from Queue</div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- New Item Creation Modal (Matches Preferences & Detail Dialog Architecture) -->
+  <!-- ========================================================================= -->
+  <div id="new-item-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="new-item-modal-title">📄 Create New File</span>
+        <button id="btn-new-item-cancel-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="form-group">
+          <label class="form-label" for="new-item-name-input">Item Name</label>
+          <input type="text" id="new-item-name-input" class="form-control" placeholder="e.g. index.html" style="width: 100%;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="chmod-preset-select">Permissions Preset</label>
+          <select id="chmod-preset-select" class="form-control" style="width: 100%;">
+            <option value="0644">0644 (Standard File Permission)</option>
+            <option value="0755" selected>0755 (Directory & Executable Permission)</option>
+            <option value="0777">0777 (Full Access Permission)</option>
+            <option value="custom">Custom Configuration</option>
+          </select>
+        </div>
+
+        <!-- CHMOD Section -->
+        <div id="chmod-section" class="form-group">
+          <label class="form-label">🔐 CHMOD Permission Matrix</label>
+          
+          <div class="chmod-card-grid">
+            <!-- Owner -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Owner</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-cb" data-target="owner" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-cb" data-target="owner" data-val="2" checked></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-cb" data-target="owner" data-val="1" checked></label>
+            </div>
+            <!-- Group -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Group</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-cb" data-target="group" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-cb" data-target="group" data-val="2"></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-cb" data-target="group" data-val="1" checked></label>
+            </div>
+            <!-- Others -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Others</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-cb" data-target="others" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-cb" data-target="others" data-val="2"></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-cb" data-target="others" data-val="1" checked></label>
+            </div>
+          </div>
+
+          <div class="detail-item" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 14px;">
+            <span class="detail-label">Calculated Octal Mode</span>
+            <span class="detail-value" id="chmod-octal-val" style="color: var(--accent-primary-hex, #F59E0B); font-size: 15px; font-family: var(--font-mono);">0755</span>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+          <button id="btn-new-item-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Create Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Standalone CHMOD Permissions Dialog for Existing Remote Files / Folders  -->
+  <!-- ========================================================================= -->
+  <div id="chmod-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="chmod-modal-title">🔐 File Permissions (CHMOD)</span>
+        <button id="btn-chmod-close-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Target Item</span>
+          <span class="detail-value" id="chmod-modal-target-path" style="font-size: 12px; word-break: break-all;">/path/to/item</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="chmod-edit-preset-select">Permissions Preset</label>
+          <select id="chmod-edit-preset-select" class="form-control" style="width: 100%;">
+            <option value="0644">0644 (Standard File Permission - rw-r--r--)</option>
+            <option value="0755">0755 (Executable / Directory - rwxr-xr-x)</option>
+            <option value="0777">0777 (Full Access Permission - rwxrwxrwx)</option>
+            <option value="custom" selected>Custom Configuration</option>
+          </select>
+        </div>
+
+        <!-- CHMOD Matrix -->
+        <div class="form-group">
+          <label class="form-label">🔐 CHMOD Permission Matrix</label>
+          
+          <div class="chmod-card-grid">
+            <!-- Owner -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Owner</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-edit-cb" data-target="owner" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-edit-cb" data-target="owner" data-val="2" checked></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-edit-cb" data-target="owner" data-val="1" checked></label>
+            </div>
+            <!-- Group -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Group</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-edit-cb" data-target="group" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-cb" data-target="group" data-val="2"></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-edit-cb" data-target="group" data-val="1" checked></label>
+            </div>
+            <!-- Others -->
+            <div class="detail-item">
+              <span class="detail-label" style="text-align: center; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 4px; margin-bottom: 4px;">Others</span>
+              <label class="chmod-checkbox-label"><span>Read</span><span class="chmod-val-tag">4</span><input type="checkbox" class="chmod-edit-cb" data-target="others" data-val="4" checked></label>
+              <label class="chmod-checkbox-label"><span>Write</span><span class="chmod-val-tag">2</span><input type="checkbox" class="chmod-edit-cb" data-target="others" data-val="2"></label>
+              <label class="chmod-checkbox-label"><span>Exec</span><span class="chmod-val-tag">1</span><input type="checkbox" class="chmod-edit-cb" data-target="others" data-val="1" checked></label>
+            </div>
+          </div>
+
+          <div class="detail-item" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 14px;">
+            <span class="detail-label">Calculated Octal Mode</span>
+            <span class="detail-value" id="chmod-edit-octal-val" style="color: var(--accent-primary-hex, #F59E0B); font-size: 15px; font-family: var(--font-mono);">0755</span>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+          <button id="btn-chmod-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Apply Permissions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Operation Error Dialog (#error-modal)                                    -->
+  <!-- ========================================================================= -->
+  <div id="error-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 500px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="error-modal-title">⚠️ Operation Error</span>
+        <button id="btn-error-close-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Attempted Target</span>
+          <span class="detail-value" id="error-modal-target" style="font-size: 12px; word-break: break-all; color: var(--accent-primary-hex, #F59E0B); font-family: var(--font-mono); font-weight: 600;">C:\file.ext</span>
+        </div>
+
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Error Cause</span>
+          <span class="detail-value" id="error-modal-cause" style="font-size: 12px; line-height: 1.4;">Windows prevents applications from writing directly to system root 'C:\' without Administrator rights.</span>
+        </div>
+
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Recommended Action</span>
+          <span class="detail-value" id="error-modal-action" style="font-size: 12px; line-height: 1.4;">Please navigate your left file manager to a writable directory (e.g. Downloads or project folder) or launch DevsFTP using 'Run as Administrator'.</span>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+          <button id="btn-error-ok" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">Okay</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Profile Delete Confirmation Modal (#delete-modal)                         -->
+  <!-- ========================================================================= -->
+  <div id="delete-modal" class="modal-overlay modal-priority" style="z-index: 99999 !important;">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+
+
+      <div class="pref-modal-header">
+        <span class="modal-title" id="delete-modal-title">🗑 Delete Connection Profile</span>
+        <button id="btn-delete-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Target Profile</span>
+          <span class="detail-value" id="delete-modal-profile-name" style="font-size: 13px; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">Profile Name</span>
+        </div>
+
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Warning</span>
+          <span class="detail-value" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">Are you sure you want to delete this saved connection profile? This action cannot be undone.</span>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-delete-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-delete-modal-confirm" class="btn btn-danger" style="padding: 8px 20px; font-weight: 600;">🗑 Delete Profile</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Rename File/Folder Modal (#rename-modal)                                 -->
+  <!-- ========================================================================= -->
+  <div id="rename-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="rename-modal-title">✏️ Rename Item</span>
+        <button id="btn-rename-modal-close" class="btn" type="button" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Current Path</span>
+          <span class="detail-value" id="rename-modal-target-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: hsl(var(--text-muted));">/path/to/item</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="rename-item-name-input">New Name</label>
+          <input type="text" id="rename-item-name-input" class="form-control" placeholder="Enter new item name" style="width: 100%;">
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-rename-cancel" class="btn" type="button" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-rename-submit" class="btn btn-primary" type="button" style="padding: 8px 24px; font-weight: 600;">⚡ Rename Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- File/Folder Delete Confirmation Modal (#confirm-delete-modal)             -->
+  <!-- ========================================================================= -->
+  <div id="confirm-delete-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="confirm-delete-modal-title">🗑 Delete Item</span>
+        <button id="btn-confirm-delete-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Target Path</span>
+          <span class="detail-value" id="confirm-delete-modal-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: var(--accent-primary-hex, #F59E0B);">/path/to/item</span>
+        </div>
+
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Warning</span>
+          <span class="detail-value" id="confirm-delete-modal-warning" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary));">Are you sure you want to delete this item? This action cannot be undone.</span>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-confirm-delete-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-confirm-delete-submit" class="btn btn-danger" style="padding: 8px 24px; font-weight: 600;">🗑 Delete Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Create / Edit Scheduled Job Modal (#schedule-job-modal)                   -->
+  <!-- ========================================================================= -->
+  <div id="schedule-job-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 580px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="job-modal-title">⏰ Configure Scheduled Job</span>
+        <button id="btn-job-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+        <input type="hidden" id="job-edit-id" value="">
+
+        <div class="form-group">
+          <label class="form-label" for="job-name-input">Job Name</label>
+          <input type="text" id="job-name-input" class="form-control" placeholder="e.g. Daily Production Assets Backup" style="width: 100%;">
+        </div>
+
+        <div class="form-row-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" for="job-profile-select">Target Server Profile</label>
+            <select id="job-profile-select" class="form-control" style="width: 100%;">
+              <option value="">Loading profiles...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="job-type-select">Action / Direction</label>
+            <select id="job-type-select" class="form-control" style="width: 100%;">
+              <option value="upload">⬆ Upload (Local -> Remote)</option>
+              <option value="download">⬇ Download (Remote -> Local)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Source Path Field with Quick-Picks & OS Browse -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="form-label" id="job-src-label" for="job-source-path" style="margin: 0;">Source Path (Local or Remote)</label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" id="btn-job-browse-src-os" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Open Windows Native File/Folder Explorer">📂 Browse OS...</button>
+              <button type="button" id="btn-job-pick-src-local" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Use active local file manager directory">📍 Active Local</button>
+              <button type="button" id="btn-job-pick-src-remote" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Use active remote server tab directory">📍 Active Remote</button>
+            </div>
+          </div>
+          <input type="text" id="job-source-path" class="form-control" placeholder="e.g. C:\xampp\htdocs\project or /var/www/html/backup.tar.gz" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+        </div>
+
+        <!-- Destination Path Field with Quick-Picks & OS Browse -->
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label class="form-label" id="job-dest-label" for="job-dest-path" style="margin: 0;">Destination Path (Remote or Local)</label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" id="btn-job-browse-dst-os" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Open Windows Native File/Folder Explorer">📂 Browse OS...</button>
+              <button type="button" id="btn-job-pick-dst-local" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Use active local file manager directory">📍 Active Local</button>
+              <button type="button" id="btn-job-pick-dst-remote" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Use active remote server tab directory">📍 Active Remote</button>
+            </div>
+          </div>
+          <input type="text" id="job-dest-path" class="form-control" placeholder="e.g. /backups/daily or C:\backups\daily" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="job-frequency-select">Schedule Frequency</label>
+          <select id="job-frequency-select" class="form-control" style="width: 100%;">
+            <option value="startup" selected>🚀 On Application Startup</option>
+            <option value="interval">⏱️ Recurring Interval</option>
+            <option value="daily">📅 Daily at Target Time</option>
+          </select>
+        </div>
+
+        <!-- Interval Minutes Selector -->
+        <div class="form-group" id="job-interval-container" style="display: none;">
+          <label class="form-label" for="job-interval-select">Interval Frequency</label>
+          <select id="job-interval-select" class="form-control" style="width: 100%;">
+            <option value="1">⏱️ 1 Minute (Fast Sync / Testing)</option>
+            <option value="5">⏱️ 5 Minutes</option>
+            <option value="15">⏱️ 15 Minutes</option>
+            <option value="30">⏱️ 30 Minutes</option>
+            <option value="60" selected>⏱️ 1 Hour (60 Minutes)</option>
+            <option value="120">⏱️ 2 Hours (120 Minutes)</option>
+            <option value="360">⏱️ 6 Hours (360 Minutes)</option>
+            <option value="720">⏱️ 12 Hours (720 Minutes)</option>
+            <option value="1440">⏱️ 24 Hours (1440 Minutes)</option>
+          </select>
+        </div>
+
+        <!-- Daily Target Time Selector -->
+        <div id="job-daily-container" style="display: none; flex-direction: column; gap: 6px;">
+          <label class="form-label">Daily Target Time</label>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label" style="font-size: 11px; color: hsl(var(--text-muted));">Hour</label>
+              <select id="job-daily-hour" class="form-control" style="width: 100%;">
+                <option value="0">00:00 (12:00 AM)</option>
+                <option value="1">01:00 (1:00 AM)</option>
+                <option value="2">02:00 (2:00 AM)</option>
+                <option value="3" selected>03:00 (3:00 AM)</option>
+                <option value="4">04:00 (4:00 AM)</option>
+                <option value="5">05:00 (5:00 AM)</option>
+                <option value="6">06:00 (6:00 AM)</option>
+                <option value="7">07:00 (7:00 AM)</option>
+                <option value="8">08:00 (8:00 AM)</option>
+                <option value="9">09:00 (9:00 AM)</option>
+                <option value="10">10:00 (10:00 AM)</option>
+                <option value="11">11:00 (11:00 AM)</option>
+                <option value="12">12:00 (12:00 PM)</option>
+                <option value="13">13:00 (1:00 PM)</option>
+                <option value="14">14:00 (2:00 PM)</option>
+                <option value="15">15:00 (3:00 PM)</option>
+                <option value="16">16:00 (4:00 PM)</option>
+                <option value="17">17:00 (5:00 PM)</option>
+                <option value="18">18:00 (6:00 PM)</option>
+                <option value="19">19:00 (7:00 PM)</option>
+                <option value="20">20:00 (8:00 PM)</option>
+                <option value="21">21:00 (9:00 PM)</option>
+                <option value="22">22:00 (10:00 PM)</option>
+                <option value="23">23:00 (11:00 PM)</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label class="form-label" style="font-size: 11px; color: hsl(var(--text-muted));">Minute</label>
+              <select id="job-daily-minute" class="form-control" style="width: 100%;">
+                <option value="0" selected>:00</option>
+                <option value="5">:05</option>
+                <option value="10">:10</option>
+                <option value="15">:15</option>
+                <option value="20">:20</option>
+                <option value="25">:25</option>
+                <option value="30">:30</option>
+                <option value="35">:35</option>
+                <option value="40">:40</option>
+                <option value="45">:45</option>
+                <option value="50">:50</option>
+                <option value="55">:55</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-job-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-job-modal-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Save Scheduled Job</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Delete Scheduled Job Confirmation Modal (#delete-job-modal)              -->
+  <!-- ========================================================================= -->
+  <div id="delete-job-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title">🗑️ Delete Scheduled Job</span>
+        <button id="btn-delete-job-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; align-items: flex-start; gap: 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 14px;">
+          <span style="font-size: 28px;">⚠️</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: #FCA5A5; margin-bottom: 2px;">Are you sure you want to delete this scheduled job?</div>
+            <div style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4;">This action cannot be undone. The automated schedule will be removed permanently from DevsFTP.</div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 12px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Job Name:</span> <strong id="del-job-val-name" style="color: hsl(var(--text-primary));">Scheduled Job</strong></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Target Profile:</span> <span id="del-job-val-profile" style="font-family: var(--font-mono);">Profile</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Frequency:</span> <span id="del-job-val-freq" style="color: var(--accent-primary-hex, #F59E0B); font-weight: 600;">Startup</span></div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-delete-job-cancel" class="btn" style="padding: 8px 16px;">✕ Keep Job</button>
+          <button id="btn-delete-job-confirm" class="btn btn-danger" style="padding: 8px 22px; font-weight: 700; background-color: #EF4444; border-color: #DC2626; color: #FFFFFF;">🗑 Delete Job</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Configure SSH Tunnel Rule Modal (#tunnel-config-modal)                    -->
+  <!-- ========================================================================= -->
+  <div id="tunnel-config-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 560px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="tunnel-modal-title">🔀 Configure SSH Tunnel Rule</span>
+        <button id="btn-tunnel-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+        <input type="hidden" id="tunnel-edit-id" value="">
+
+        <div class="form-group">
+          <label class="form-label" for="tunnel-name-input">Rule Name</label>
+          <input type="text" id="tunnel-name-input" class="form-control" placeholder="e.g. Local DB Tunnel to Remote Postgres" style="width: 100%;">
+        </div>
+
+        <div class="form-row-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" for="tunnel-type-select">Tunnel Type</label>
+            <select id="tunnel-type-select" class="form-control" style="width: 100%;">
+              <option value="local">Local Forwarding (Local Port ➔ SSH ➔ Remote Target)</option>
+              <option value="remote">Remote Forwarding (Remote Port ➔ SSH ➔ Local Service)</option>
+              <option value="dynamic">Dynamic SOCKS5 Proxy (Local SOCKS5 ➔ SSH Outbound)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tunnel-profile-select">SSH Connection Profile</label>
+            <select id="tunnel-profile-select" class="form-control" style="width: 100%;">
+              <!-- Populated dynamically with SSH profiles -->
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" for="tunnel-local-host">Local Bind Address</label>
+            <input type="text" id="tunnel-local-host" class="form-control" value="127.0.0.1" placeholder="127.0.0.1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tunnel-local-port">Local Port</label>
+            <input type="text" inputmode="numeric" id="tunnel-local-port" class="form-control" value="9090" placeholder="e.g. 8080, 9090, 5432">
+          </div>
+        </div>
+
+        <div id="tunnel-remote-target-container" class="form-row-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label" for="tunnel-remote-host">Target Remote Host</label>
+            <input type="text" id="tunnel-remote-host" class="form-control" value="127.0.0.1" placeholder="127.0.0.1 or internal.host">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tunnel-remote-port">Target Remote Port</label>
+            <input type="text" inputmode="numeric" id="tunnel-remote-port" class="form-control" value="80" placeholder="e.g. 80, 5432, 3306">
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-tunnel-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-tunnel-modal-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Start SSH Tunnel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Delete SSH Tunnel Confirmation Modal (#confirm-delete-tunnel-modal)       -->
+  <!-- ========================================================================= -->
+  <div id="confirm-delete-tunnel-modal" class="modal-overlay modal-priority" style="z-index: 99999 !important;">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title">🗑 Delete SSH Tunnel Rule</span>
+        <button id="btn-delete-tunnel-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Tunnel Rule</span>
+          <span class="detail-value" id="delete-tunnel-modal-name" style="font-size: 13px; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">Rule Name</span>
+        </div>
+
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Warning</span>
+          <span class="detail-value" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">Are you sure you want to delete this SSH Tunnel rule? Active connections will be terminated immediately.</span>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-delete-tunnel-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-delete-tunnel-confirm" class="btn btn-danger" style="padding: 8px 20px; font-weight: 600;">🗑 Delete Tunnel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ========================================================================= -->
+  <div id="interrupted-transfer-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title">⚠️ Interrupted Transfers Detected</span>
+        <button id="btn-interrupted-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="detail-item" style="padding: 12px 16px;">
+          <span class="detail-label">Session Summary</span>
+          <span class="detail-value" id="interrupted-modal-msg" style="font-size: 13px; line-height: 1.5; color: hsl(var(--text-primary));">
+            One or more file transfers were interrupted during a previous session. They are currently saved in "Waiting to Resume" state in your Transfer Queue.
+          </span>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-interrupted-dismiss" class="btn" style="padding: 8px 16px;">Dismiss</button>
+          <button id="btn-interrupted-goto-queue" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">📊 Go to Transfers Queue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Directory Comparison Analysis Modal (#dir-compare-modal)                  -->
+  <!-- ========================================================================= -->
+  <div id="dir-compare-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 680px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="dir-compare-modal-title">🔍 Directory Comparison Analysis</span>
+        <button id="btn-dir-compare-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+        <div id="dir-compare-modal-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+          <!-- Summary cards populated dynamically -->
+        </div>
+
+        <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; max-height: 420px; overflow-y: auto;">
+          <table class="queue-table" style="margin: 0;">
+            <thead style="position: sticky; top: 0; background: hsl(var(--bg-secondary)); z-index: 2;">
+              <tr>
+                <th style="width: 36px; text-align: center;"><input type="checkbox" id="dir-compare-select-all" checked title="Select / Deselect All"></th>
+                <th>File Name</th>
+                <th>Status / Category</th>
+                <th>Local Detail</th>
+                <th>Remote Detail</th>
+              </tr>
+            </thead>
+            <tbody id="dir-compare-modal-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-dir-compare-modal-ok" class="btn" style="padding: 8px 16px;">✕ Close</button>
+          <button id="btn-dir-compare-modal-sync" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Sync Selected Files</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Batch Startup Background Upload Modal (#batch-upload-modal)               -->
+  <!-- ========================================================================= -->
+  <div id="batch-upload-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 560px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="batch-upload-modal-title">⚡ Unsaved Remote Edits Detected</span>
+        <button id="btn-batch-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Background Sync Summary</span>
+          <span class="detail-value" id="batch-upload-summary" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">The following modified files were saved while DevsFTP was closed. Would you like to sync them back to their remote servers in the background?</span>
+        </div>
+
+        <div id="batch-modal-file-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 8px; background-color: hsl(var(--bg-primary));">
+          <!-- Populated dynamically -->
+        </div>
+
+        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-batch-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-batch-modal-confirm" class="btn btn-primary" style="padding: 8px 20px; font-weight: 600;">⚡ Upload All in Background</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Session Connection Dialog & Unified Profile Manager                       -->
+  <!-- ========================================================================= -->
+  <div id="connection-modal" class="modal-overlay">
+    <div class="modal-card connection-modal-card">
+      <div class="pref-modal-header">
+        <span class="modal-title">⚡ Session Launcher & Profile Manager</span>
+        <button id="btn-conn-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div class="connection-dialog-layout">
+        <!-- Left Sidebar: Profile Cards -->
+        <div class="connection-sidebar">
+          <div class="sidebar-title-row" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>Saved Profiles</span>
+            <div style="display: flex; gap: 4px;">
+              <button id="btn-import-ssh-config" class="btn" style="padding: 2px 6px; font-size: 10px;" title="Import hosts from ~/.ssh/config">📥 SSH Config</button>
+            </div>
+          </div>
+          <div class="connection-profile-list" id="conn-profile-list">
+            <!-- Dynamically populated with profile cards -->
+          </div>
+        </div>
+
+        <!-- Right Panel: Integrated Profile Editor & Actions -->
+        <div class="connection-main-panel">
+          <div class="pref-section-header" style="padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid hsl(var(--border-subtle));">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="prof-hex-dot" class="profile-dot" style="width: 14px; height: 14px; background-color: #68a063;"></span>
+              <h3 id="conn-editor-title" style="font-size: 14px; font-weight: 700; margin: 0; color: hsl(var(--text-primary));">Create or Edit Connection Profile</h3>
+            </div>
+            <div class="profile-toolbar-actions">
+              <button id="btn-conn-new-profile" class="btn" style="padding: 4px 10px; font-size: 11px;">➕ New Profile</button>
+              <button id="btn-prof-del" class="btn btn-danger" style="padding: 4px 10px; font-size: 11px;">🗑 Delete</button>
+            </div>
+          </div>
+
+          <div class="profile-editor-form" style="flex: 1; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label">Profile Name</label>
+              <input type="text" id="prof-name" class="form-control" placeholder="e.g. Appvark Production">
+            </div>
+
+            <div class="form-row-grid">
+              <div class="form-group" style="min-width: 0;">
+                <label class="form-label">Protocol</label>
+                <select id="prof-protocol" class="form-control">
+                  <option value="sftp">SFTP (SSH)</option>
+                  <option value="ftp">FTP (Plain)</option>
+                  <option value="ftps">FTPS (Explicit)</option>
+                  <option value="webdav">WebDAV (HTTP / HTTPS)</option>
+                </select>
+              </div>
+              <div class="form-group" id="group-host" style="min-width: 0;">
+                <label class="form-label">Host / IP Address</label>
+                <input type="text" id="prof-host" class="form-control" placeholder="appvark.com or 192.168.1.100">
+              </div>
+              <div class="form-group" id="group-port" style="min-width: 0;">
+                <label class="form-label">Port</label>
+                <input type="text" inputmode="numeric" id="prof-port" class="form-control port-input-field" value="22" placeholder="22" maxlength="5">
+              </div>
+            </div>
+
+            <div class="form-row-grid-2">
+              <div class="form-group" style="min-width: 0;">
+                <label class="form-label">Username</label>
+                <input type="text" id="prof-username" class="form-control" placeholder="root or ubuntu">
+              </div>
+              <div class="form-group" style="min-width: 0;">
+                <label class="form-label">Auth Method</label>
+                <select id="prof-authtype" class="form-control">
+                  <option value="password">Password</option>
+                  <option value="key">SSH Private Key File (.pem, .ppk, id_rsa)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group" id="group-password">
+              <label class="form-label">Password</label>
+              <input type="password" id="prof-password" class="form-control" placeholder="••••••••">
+            </div>
+
+            <!-- WebDAV Remote Path / Subpath Field (shown only when WebDAV protocol is selected) -->
+            <div class="form-group" id="group-webdav-path" style="display: none;">
+              <label class="form-label">WebDAV Remote Path / Endpoint (Optional)</label>
+              <input type="text" id="prof-webdav-path" class="form-control" placeholder="/webdav/ or /remote.php/dav/files/username/">
+              <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-top: 4px; display: block;">Remote path/subpath for WebDAV. Defaults to / or /webdav/. Nextcloud: /remote.php/dav/files/&lt;username&gt;/</span>
+            </div>
+
+            <div class="form-group" id="group-key" style="display: none;">
+              <label class="form-label">Private Key File (.pem, .ppk, id_rsa)</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="prof-keypath" class="form-control" placeholder="C:\Users\...\.ssh\id_rsa" readonly>
+                <button id="btn-browse-key" class="btn">Browse...</button>
+              </div>
+            </div>
+
+
+            <!-- Workspace Identity Accent System Selector -->
+            <div class="form-group">
+              <label class="form-label">Workspace Identity Accent Color</label>
+              <div class="swatch-palette" id="swatch-palette">
+                <button type="button" class="swatch-btn active" data-color="#68a063" title="Brand Green (Default)" style="background-color: #68a063;"></button>
+                <button type="button" class="swatch-btn" data-color="#4e8b49" title="Forest Green" style="background-color: #4e8b49;"></button>
+                <button type="button" class="swatch-btn" data-color="#ff8a2a" title="Orange" style="background-color: #ff8a2a;"></button>
+                <button type="button" class="swatch-btn" data-color="#f26a21" title="Deep Orange" style="background-color: #f26a21;"></button>
+                <button type="button" class="swatch-btn" data-color="#2f7dff" title="Electric Blue" style="background-color: #2f7dff;"></button>
+                <button type="button" class="swatch-btn" data-color="#7ea9da" title="Sky Blue" style="background-color: #7ea9da;"></button>
+                <button type="button" class="swatch-btn" data-color="#d98a5a" title="Terracotta" style="background-color: #d98a5a;"></button>
+                <button type="button" class="swatch-btn" data-color="#c96f6f" title="Crimson Soft" style="background-color: #c96f6f;"></button>
+                <button type="button" class="swatch-btn" data-color="#b94747" title="Ruby Red" style="background-color: #b94747;"></button>
+                <button type="button" class="swatch-btn" data-color="#d884a8" title="Mauve Pink" style="background-color: #d884a8;"></button>
+                <button type="button" class="swatch-btn" data-color="#cf4ca6" title="Magenta" style="background-color: #cf4ca6;"></button>
+                <button type="button" class="swatch-btn" data-color="#8a4fff" title="Violet" style="background-color: #8a4fff;"></button>
+                <button type="button" class="swatch-btn" data-color="#8f79d6" title="Purple Soft" style="background-color: #8f79d6;"></button>
+                <button type="button" class="swatch-btn" data-color="#e1a600" title="Gold" style="background-color: #e1a600;"></button>
+                <button type="button" class="swatch-btn" data-color="#ccb75a" title="Sage Gold" style="background-color: #ccb75a;"></button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <label class="form-label" style="font-size: 11px;">Custom HEX:</label>
+                <input type="text" id="prof-hex-input" class="form-control" style="width: 110px; font-family: var(--font-mono); font-size: 11px; padding: 4px 8px;" value="#68a063">
+              </div>
+            </div>
+
+            <!-- Proxy & Bastion Host Settings (Standard Visible Section) -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 12px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--accent-primary-hex, #F59E0B); text-transform: uppercase; letter-spacing: 0.5px;">🛡️ Proxy & Bastion Host Settings (Optional)</span>
+
+              <div class="form-row-grid-2">
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" style="font-size: 11px;">Proxy / Tunnel Type</label>
+                  <select id="prof-proxy-type" class="form-control" style="font-size: 11px; padding: 4px 8px;">
+                    <option value="none">None (Direct Connection)</option>
+                    <option value="socks5">SOCKS5 Proxy</option>
+                    <option value="socks4">SOCKS4 Proxy</option>
+                    <option value="bastion">SSH ProxyJump (Bastion Host)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" style="font-size: 11px;">Proxy / Bastion Host</label>
+                  <input type="text" id="prof-proxy-host" class="form-control" placeholder="e.g. 127.0.0.1 or bastion.domain.com" style="font-size: 11px; padding: 4px 8px;">
+                </div>
+              </div>
+
+              <div class="form-row-grid-2">
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" style="font-size: 11px;">Proxy / Bastion Port</label>
+                  <input type="number" id="prof-proxy-port" class="form-control" placeholder="1080 (SOCKS) / 22 (SSH)" value="1080" style="font-size: 11px; padding: 4px 8px;">
+                </div>
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" style="font-size: 11px;">Proxy / Bastion User (Opt)</label>
+                  <input type="text" id="prof-proxy-user" class="form-control" placeholder="Username" style="font-size: 11px; padding: 4px 8px;">
+                </div>
+              </div>
+
+              <div class="form-group" style="min-width: 0;">
+                <label class="form-label" style="font-size: 11px;">Proxy / Bastion Password / Passphrase (Opt)</label>
+                <input type="password" id="prof-proxy-pass" class="form-control" placeholder="Password or Key Passphrase" style="font-size: 11px; padding: 4px 8px;">
+              </div>
+            </div>
+          </div>
+
+          <div class="conn-action-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid hsl(var(--border-subtle));">
+            <button id="btn-prof-save" class="btn">💾 Save Profile</button>
+            <button id="btn-conn-connect" class="btn btn-primary" style="padding: 8px 20px; font-size: 13px; font-weight: 600;">⚡ Connect & Open Tab</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- DevsFTP Preferences Window (Global App Settings)                         -->
+  <!-- ========================================================================= -->
+  <div id="preferences-modal" class="modal-overlay">
+    <div class="modal-card pref-modal-card">
+      <div class="pref-modal-header">
+        <span class="modal-title">DevsFTP Preferences</span>
+        <button id="btn-pref-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div class="pref-layout">
+        <!-- Sidebar Navigation -->
+        <nav class="pref-sidebar">
+          <button class="pref-nav-btn active" data-section="general" id="nav-item-general">
+            <span class="nav-icon">⚙️</span> General Settings
+          </button>
+          <button class="pref-nav-btn" data-section="workspace" id="nav-item-workspace">
+            <span class="nav-icon">🖥️</span> Workspace & Session
+          </button>
+          <button class="pref-nav-btn" data-section="terminal" id="nav-item-terminal">
+            <span class="nav-icon">💻</span> SSH Terminal
+          </button>
+          <button class="pref-nav-btn" data-section="transfers" id="nav-item-transfers">
+            <span class="nav-icon">📊</span> Transfers
+          </button>
+          <button class="pref-nav-btn" data-section="security" id="nav-item-security">
+            <span class="nav-icon">🔐</span> Security
+          </button>
+          <button class="pref-nav-btn" data-section="about" id="nav-item-about">
+            <span class="nav-icon">ℹ️</span> About
+          </button>
+        </nav>
+
+        <!-- Right Content Area -->
+        <div class="pref-content-area">
+          
+          <!-- SECTION 1: General Settings -->
+          <div class="pref-section active" id="pref-section-general">
+            <div class="pref-section-header">
+              <h3>General Settings</h3>
+            </div>
+            
+            <!-- Card 1: Application Theme & Visual Mode -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🌓</span>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700;">Application Theme & Visual Mode</div>
+                  <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Switch UI theme mode. Workspace accent colors update automatically per connection profile.</div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <select id="pref-theme" class="form-control" style="width: 100%;">
+                  <option value="dark" selected>Dark Mode (Charcoal Developer Palette)</option>
+                  <option value="light">Light Mode</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Card 2: Desktop Notifications & Sound Alerts -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🔔</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Desktop System Notifications & Alerts</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Send native OS desktop notifications and play sound chimes when operations complete.</div>
+                  </div>
+                </div>
+                <span id="general-notify-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-transfers" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Show Native OS Notifications on Completed Queue Transfers</span>
+                  </span>
+                </label>
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-chime" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Play Notification Sound Chimes</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card 3: Automatic Updates & Startup -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🚀</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Automatic Updates & Application Startup</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically check for DevsFTP software releases when launching the workspace.</div>
+                  </div>
+                </div>
+                <span id="general-autoupdate-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-autoupdate" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Automatically Check for Updates on Startup</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 2: Workspace & Session Restore -->
+          <div class="pref-section" id="pref-section-workspace">
+            <div class="pref-section-header">
+              <h3>Workspace & Session Restore Settings</h3>
+            </div>
+
+            <!-- Card 1: Restore Connection Tabs -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🖥️</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Restore Open Connection Tabs & Working Paths</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically re-opens previously open connection tabs and restores working paths when launching DevsFTP.</div>
+                  </div>
+                </div>
+                <span id="restore-tabs-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-restore-tabs">
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Enable Automatic Tab & Directory Session Restore</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card 2: Bottom Drawer Layout Persistence -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">📐</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Remember Bottom Drawer Panel Layout</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Persists panel height and active tab (Terminal / Queue / Logs) across application restarts.</div>
+                  </div>
+                </div>
+                <span id="restore-drawer-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-restore-bottom-drawer" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Remember Bottom Panel Height & Tab Selection</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Card 3: Saved Workspace Session Storage -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🧹</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Saved Workspace Session Storage</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears all saved session restoration data from local storage.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                <button id="btn-clear-saved-sessions" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Saved Sessions Storage</button>
+                <span id="clear-sessions-msg" style="font-size: 11px; color: #10B981; display: none; font-weight: 600;">✓ Saved session storage cleared!</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 3: SSH Terminal -->
+          <div class="pref-section" id="pref-section-terminal">
+            <div class="pref-section-header">
+              <h3>SSH Terminal Settings</h3>
+            </div>
+
+            <!-- Card 1: Font & Typography -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🔤</span>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700;">Terminal Font & Typography</div>
+                  <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Font family and size for rendering code, shell commands, and ANSI output.</div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+                <div class="form-group" style="margin: 0;">
+                  <label class="form-label" style="font-size: 11px; font-weight: 600;">Font Family</label>
+                  <select id="pref-term-font" class="form-control" style="width: 100%;">
+                    <option value="Cascadia Code, Consolas, monospace" selected>Cascadia Code / Consolas</option>
+                    <option value="JetBrains Mono, monospace">JetBrains Mono</option>
+                    <option value="Fira Code, monospace">Fira Code</option>
+                    <option value="Source Code Pro, monospace">Source Code Pro</option>
+                    <option value="Courier New, monospace">Courier New</option>
+                    <option value="Monaco, monospace">Monaco</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label class="form-label" style="font-size: 11px; font-weight: 600;">Font Size</label>
+                  <select id="pref-term-fontsize" class="form-control" style="width: 100%;">
+                    <option value="10">10px</option>
+                    <option value="11">11px</option>
+                    <option value="12">12px</option>
+                    <option value="13" selected>13px (Default)</option>
+                    <option value="14">14px</option>
+                    <option value="15">15px</option>
+                    <option value="16">16px</option>
+                    <option value="18">18px</option>
+                    <option value="20">20px</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2: Cursor Style & Blinking Animation -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🖱️</span>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700;">Cursor Style & Blinking Animation</div>
+                  <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Appearance of terminal prompt cursor and blinking animation.</div>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center;">
+                <div class="form-group" style="margin: 0;">
+                  <label class="form-label" style="font-size: 11px; font-weight: 600;">Cursor Shape</label>
+                  <select id="pref-term-cursor-style" class="form-control" style="width: 100%;">
+                    <option value="block" selected>Block (█)</option>
+                    <option value="underline">Underline (_)</option>
+                    <option value="bar">Bar (|)</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin: 0; padding-top: 14px;">
+                  <label class="upload-save-checkbox" style="cursor: pointer;">
+                    <input type="checkbox" id="pref-term-cursor-blink" checked>
+                    <span class="upload-save-checkbox-copy">
+                      <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Enable Cursor Blinking</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 3: Scrollback History Buffer -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">📜</span>
+                <div>
+                  <div style="font-size: 13px; font-weight: 700;">Scrollback History Buffer</div>
+                  <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Maximum number of output lines retained in terminal history buffer.</div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label class="form-label" style="font-size: 11px; font-weight: 600;">Max Buffer Lines</label>
+                <input type="number" id="pref-term-scrollback" class="form-control" value="5000" min="500" max="50000" step="500" style="width: 100%;">
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 4: Transfers -->
+          <div class="pref-section" id="pref-section-transfers">
+            <div class="pref-section-header">
+              <h3>Transfer Queue & Live Edit Settings</h3>
+            </div>
+
+            <!-- Card 1: File Conflict Policy -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">⚠️</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">File Overwrite & Conflict Resolution</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Behavior when downloading or uploading items that already exist at target destination.</div>
+                  </div>
+                </div>
+                <span id="conflict-policy-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <select id="pref-conflict-policy" class="form-control" style="width: 100%;">
+                  <option value="prompt" selected>Prompt for confirmation on existing files (Recommended)</option>
+                  <option value="overwrite">Always overwrite destination files</option>
+                  <option value="newer">Overwrite only if source file is newer</option>
+                  <option value="skip">Always skip existing files</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Card 2: Live Editor Auto-Upload -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">📝</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Remote Live Edit Auto-Upload Behavior</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Action taken when remote files edited in external desktop applications are saved to disk.</div>
+                  </div>
+                </div>
+                <span id="autoupload-policy-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <select id="pref-autoupload" class="form-control" style="width: 100%;">
+                  <option value="prompt" selected>Prompt for confirmation before auto-uploading</option>
+                  <option value="auto">Auto-upload instantly on save without prompting</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Card 3: Default Local Navigation Directory -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">📁</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Default Local Start Directory</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Initial folder path loaded in the left local file browser pane when launching DevsFTP.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <input type="text" id="pref-local-dir" class="form-control" value="C:\" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 5: Security -->
+          <div class="pref-section" id="pref-section-security">
+            <div class="pref-section-header">
+              <h3>Security & Credential Storage Vault</h3>
+            </div>
+
+            <!-- Card 1: Master Password Protection -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🔐</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;" id="master-status-title">Master Password Protection: Disabled</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;" id="master-status-desc">Saved profile credentials are currently protected by local key auto-encryption.</div>
+                  </div>
+                </div>
+                <span id="master-status-badge" class="tag-badge" style="background: rgba(100, 116, 139, 0.2); color: #94A3B8; font-weight: 600;">Disabled</span>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 4px;" id="master-action-buttons">
+                <button id="btn-master-enable" class="btn btn-primary" style="font-weight: 600;">🔒 Enable Master Password...</button>
+                <button id="btn-master-change" class="btn" style="display: none;">🔑 Change Master Password...</button>
+                <button id="btn-master-disable" class="btn btn-danger" style="display: none;">🔓 Disable Master Password</button>
+              </div>
+
+              <div style="font-size: 10px; color: hsl(var(--text-muted)); border-top: 1px solid hsl(var(--border-subtle)); padding-top: 8px; margin-top: 4px; display: flex; gap: 12px;">
+                <span>🔒 Encryption: <strong>AES-256-GCM</strong></span>
+                <span>🔑 Derivation: <strong>PBKDF2 (100k rounds)</strong></span>
+              </div>
+            </div>
+
+            <!-- Card 2: Local Remote-File Cache & Privacy -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🧹</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Local Remote-File Cache & Storage</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears cached temporary local copies of remote files edited in external desktop applications.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 4px;">
+                <button id="btn-tools-cache-clear" class="btn" style="font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
+              </div>
+            </div>
+
+            <!-- Card 3: SSH Host Key & Fingerprint Verification -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🛡️</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">SSH Host Key & Fingerprint Verification</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Strict host key checking warns on fingerprint mismatches to prevent Man-in-the-Middle (MitM) attacks.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 6: About -->
+          <div class="pref-section" id="pref-section-about">
+            <div style="text-align: center; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+              <div class="brand-logo" style="width: 56px; height: 56px; margin: 0 auto; border-radius: 14px;">
+                <svg width="36" height="36" viewBox="0 0 512 512" fill="none" class="devsftp-logo-svg">
+                  <!-- Connection Bridge & Remote Node (BEHIND D) -->
+                  <path d="M150 256H426" class="logo-node-accent" stroke-width="18" stroke-linecap="round"/>
+                  <circle cx="454" cy="256" r="18" class="logo-node-accent-fill"/>
+
+                  <!-- Main D -->
+                  <path d="M150 112 H240 C334 112 388 170 388 256 C388 342 334 400 240 400 H150" class="logo-d-stroke" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+
+                  <!-- Chevron -->
+                  <path d="M154 176 L214 256 L154 336" class="logo-d-stroke" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <h2 style="font-size: 22px; font-weight: 700; margin-top: 4px;">DevsFTP</h2>
+                <p style="font-size: 13px; color: var(--accent-primary-hex, #F59E0B); font-weight: 600; margin-top: 2px;">v1.0.0 (Production Workspace Release)</p>
+              </div>
+
+              <p style="font-size: 12px; color: hsl(var(--text-secondary)); max-width: 440px; margin: 0 auto; line-height: 1.5;">
+                Cross-protocol remote development workspace — SFTP, SSH terminal, live file editing, automated job runner, and server identity management in one application.
+              </p>
+
+              <!-- Action Buttons Card in About Tab -->
+              <div style="display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 6px; flex-wrap: wrap;">
+                <button id="btn-about-tab-visit-website" class="btn btn-primary" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">🌐 Visit Website (DevsFTP.com)</button>
+                <button id="btn-about-tab-check-updates" class="btn" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">🔄 Check for Updates...</button>
+              </div>
+
+              <div id="about-tab-update-status" style="font-size: 11px; font-weight: 600; display: none;"></div>
+
+              <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 14px; line-height: 1.6; border-top: 1px solid hsl(var(--border-subtle)); padding-top: 14px; width: 100%; max-width: 440px;">
+                Built with Electron, Node.js, ssh2, basic-ftp, and Xterm.js.<br>
+                Licensed under <strong>GNU General Public License v3.0 (GPL-3.0)</strong><br>
+                Copyright © 2026 <a href="#" id="about-tab-website-link" style="color: #38BDF8; text-decoration: underline;">DevsFTP.com</a>. All rights reserved.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Upload Confirmation Dialog (Theme-Aware Live Edit Prompt)                 -->
+  <!-- ========================================================================= -->
+  <div id="upload-save-modal" class="modal-overlay upload-save-modal" aria-hidden="true">
+    <div class="modal-card upload-save-card" role="dialog" aria-modal="true" aria-labelledby="upload-save-modal-title">
+      <div class="upload-save-header">
+          <div class="upload-save-headline">
+            <div class="upload-save-icon" aria-hidden="true">⬆</div>
+            <div class="upload-save-title-group">
+              <div class="modal-title" id="upload-save-modal-title">Upload Saved Changes?</div>
+            </div>
+          </div>
+        <button id="btn-upload-save-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div class="upload-save-body">
+        <div class="upload-save-details">
+          <div class="upload-save-row">
+            <span class="upload-save-label">File</span>
+            <span class="upload-save-value" id="upload-save-modal-file">cached file</span>
+          </div>
+          <div class="upload-save-row">
+            <span class="upload-save-label">Remote Path</span>
+            <span class="upload-save-value" id="upload-save-modal-remote">/</span>
+          </div>
+        </div>
+
+        <label class="upload-save-checkbox">
+          <input type="checkbox" id="upload-save-modal-dont-show-again">
+          <span class="upload-save-checkbox-copy">
+            <span class="upload-save-checkbox-title">Don't show this again</span>
+          </span>
+        </label>
+      </div>
+
+      <div class="modal-footer upload-save-footer">
+        <button id="btn-upload-save-cancel" class="btn" type="button">Not Now</button>
+        <button id="btn-upload-save-confirm" class="btn btn-primary" type="button">Upload Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Host Key Verification Dialog (AES-256-GCM Encrypted Host Fingerprints)    -->
+  <!-- ========================================================================= -->
+  <div id="host-key-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="max-width: 500px;" role="dialog">
+      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
+        <span class="modal-title" id="host-key-modal-title">🔐 SSH Host Key Verification</span>
+        <button id="btn-host-key-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Cancel</button>
+      </div>
+
+      <div style="padding: 16px;">
+        <div id="host-key-warning-alert" style="display: none; padding: 10px; margin-bottom: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 6px; color: #FCA5A5; font-size: 12px; line-height: 1.4;">
+          <strong>⚠️ WARNING: POTENTIAL SECURITY RISK!</strong><br>
+          The host key for this server has changed since your last connection. This could indicate a Man-in-the-Middle attack or a server re-configuration.
+        </div>
+
+        <p id="host-key-modal-msg" style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 12px; line-height: 1.5;">
+          The authenticity of host <strong id="host-key-val-host" style="color: hsl(var(--text-primary));">host</strong> cannot be established.
+        </p>
+
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-family: var(--font-mono); font-size: 11px; margin-bottom: 16px;">
+          <div style="margin-bottom: 6px;"><span style="color: hsl(var(--text-muted));">Host/Port:</span> <span id="host-key-val-endpoint" style="color: hsl(var(--text-primary));">127.0.0.1:22</span></div>
+          <div style="margin-bottom: 6px;"><span style="color: hsl(var(--text-muted));">SHA-256 Fingerprint:</span></div>
+          <div id="host-key-val-fingerprint" style="word-break: break-all; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">SHA256:...</div>
+          <div id="host-key-stored-container" style="display: none; margin-top: 6px; border-top: 1px dashed hsl(var(--border-subtle)); padding-top: 6px;">
+            <span style="color: #F87171;">Previously Stored Fingerprint:</span>
+            <div id="host-key-val-stored" style="word-break: break-all; color: #FCA5A5;">SHA256:...</div>
+          </div>
+        </div>
+
+        <p style="font-size: 11px; color: hsl(var(--text-muted)); margin: 0 0 16px 0;">
+          Do you want to trust this host key and proceed with the SSH connection?
+        </p>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button id="btn-host-key-reject" class="btn" style="padding: 6px 12px; font-size: 12px;">✕ Cancel</button>
+          <button id="btn-host-key-trust-once" class="btn" style="padding: 6px 12px; font-size: 12px;">Connect Once</button>
+          <button id="btn-host-key-trust-save" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">🔐 Trust & Encrypt Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- File Conflict Resolution Dialog                                          -->
+  <!-- ========================================================================= -->
+  <div id="file-conflict-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="max-width: 520px;" role="dialog">
+      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
+        <span class="modal-title">⚠️ File Overwrite Conflict</span>
+        <button id="btn-conflict-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Skip</button>
+      </div>
+
+      <div style="padding: 16px;">
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 12px;">
+          The destination file already exists. Choose how to resolve this conflict:
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-size: 11px;">
+          <div>
+            <div style="font-weight: 700; color: #38BDF8; margin-bottom: 4px;">Source File</div>
+            <div id="conflict-src-name" style="font-weight: 600; color: hsl(var(--text-primary));">file.txt</div>
+            <div id="conflict-src-size" style="color: hsl(var(--text-muted));">Size: 0 B</div>
+            <div id="conflict-src-mtime" style="color: hsl(var(--text-muted));">Modified: -</div>
+          </div>
+          <div>
+            <div style="font-weight: 700; color: #F59E0B; margin-bottom: 4px;">Existing Destination File</div>
+            <div id="conflict-dst-name" style="font-weight: 600; color: hsl(var(--text-primary));">file.txt</div>
+            <div id="conflict-dst-size" style="color: hsl(var(--text-muted));">Size: 0 B</div>
+            <div id="conflict-dst-mtime" style="color: hsl(var(--text-muted));">Modified: -</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="upload-save-checkbox">
+            <input type="checkbox" id="conflict-apply-batch">
+            <span class="upload-save-checkbox-copy">
+              <span class="upload-save-checkbox-title" style="font-size: 11px;">Apply this choice to all remaining conflicts in current transfer</span>
+            </span>
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+          <button id="btn-conflict-skip" class="btn" style="padding: 6px 12px; font-size: 11px;">⏭️ Skip File</button>
+          <button id="btn-conflict-newer" class="btn" style="padding: 6px 12px; font-size: 11px;">🕒 Overwrite If Newer</button>
+          <button id="btn-conflict-rename" class="btn" style="padding: 6px 12px; font-size: 11px;">✏️ Auto-Rename</button>
+          <button id="btn-conflict-overwrite" class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">⚡ Overwrite</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Import Notification & Error Modal (Theme-Aware Dialog)                   -->
+  <!-- ========================================================================= -->
+  <div id="import-error-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="max-width: 480px; padding: 0;" role="dialog">
+      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle)); padding: 12px 16px;">
+        <span class="modal-title" id="import-modal-title">📥 SSH Config Import</span>
+        <button id="btn-import-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 16px;">
+        <div id="import-modal-badge" style="display: flex; align-items: center; gap: 8px; padding: 10px; margin-bottom: 12px; border-radius: 6px; font-size: 12px; line-height: 1.4; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; color: #FCA5A5;">
+          <span id="import-modal-icon" style="font-size: 16px;">⚠️</span>
+          <span id="import-modal-headline" style="font-weight: 600;">Import Status</span>
+        </div>
+
+        <p id="import-modal-body" style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 16px; line-height: 1.5; word-break: break-word;">
+          Status details...
+        </p>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button id="btn-import-modal-ok" class="btn btn-primary" style="padding: 6px 16px; font-size: 12px; font-weight: 600;">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/errorHandler.js"></script>
+  <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+
+  <script src="js/logViewer.js"></script>
+  <script src="js/transferQueue.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/sessionManager.js"></script>
+  <script src="js/directoryCompare.js"></script>
+  <script src="js/fileBrowser.js"></script>
+  <script src="js/connectionDialog.js"></script>
+  <script src="js/scheduledJobs.js"></script>
+  <script src="js/tunnelManager.js"></script>
+  <script src="js/app.js"></script>
+  <!-- ========================================================================= -->
+  <!-- Startup Master Password Unlock Modal (#master-unlock-modal)                -->
+  <!-- ========================================================================= -->
+  <div id="master-unlock-modal" class="modal-overlay" style="z-index: 10000;">
+    <div class="modal-card" style="width: 440px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header" style="background: hsl(var(--bg-primary));">
+        <span class="modal-title">🔒 Unlock DevsFTP Workspace</span>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="text-align: center; padding-bottom: 8px;">
+          <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
+          <div style="font-size: 14px; font-weight: 700; color: hsl(var(--text-primary));">Master Password Required</div>
+          <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 4px;">Enter your Master Password to decrypt and unlock your saved server profiles.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="master-unlock-password">Master Password</label>
+          <input type="password" id="master-unlock-password" class="form-control" placeholder="••••••••" style="width: 100%; font-size: 14px;">
+          <div id="master-unlock-error" style="color: #EF4444; font-size: 11px; margin-top: 4px; display: none;">⚠️ Incorrect Master Password. Please try again.</div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end;">
+          <button id="btn-master-unlock-submit" class="btn btn-primary" style="width: 100%; padding: 10px; font-weight: 700; font-size: 13px;">⚡ Unlock Workspace</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Master Password Configuration Modal (#master-config-modal)                -->
+  <!-- ========================================================================= -->
+  <div id="master-config-modal" class="modal-overlay" style="z-index: 9500;">
+    <div class="modal-card" style="width: 460px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="master-config-title">🔒 Enable Master Password</span>
+        <button id="btn-master-config-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div id="master-config-mode-enable">
+          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin-bottom: 12px;">
+            Creating a Master Password encrypts all server passwords and SSH keys with PBKDF2-SHA256 (100,000 rounds). You will be prompted to unlock DevsFTP whenever you open the application.
+          </p>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="master-cfg-new-pass">New Master Password</label>
+            <input type="password" id="master-cfg-new-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="master-cfg-confirm-pass">Confirm Master Password</label>
+            <input type="password" id="master-cfg-confirm-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+          </div>
+        </div>
+
+        <div id="master-config-mode-auth" style="display: none;">
+          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin-bottom: 12px;" id="master-config-auth-desc">
+            Enter your current Master Password to confirm this change.
+          </p>
+          <div class="form-group">
+            <label class="form-label" for="master-cfg-current-pass">Current Master Password</label>
+            <input type="password" id="master-cfg-current-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+          </div>
+        </div>
+
+        <div id="master-config-error" style="color: #EF4444; font-size: 11px; display: none;">⚠️ Passwords do not match.</div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-master-config-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-master-config-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Apply Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

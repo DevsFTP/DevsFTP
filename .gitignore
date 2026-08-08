@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Build & Packaging Outputs
+dist/
+build/
+out/
+Do not touch/
+*.exe
+*.app
+*.dmg
+*.deb
+*.snap
+
+# Runtime Data & Debug Logs
+devsftp-debug.log
+.devs_userData/
+*.log
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Environment & Master Key Overrides
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

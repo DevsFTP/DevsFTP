@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 512 512"
+     width="512"
+     height="512"
+     fill="none">
+
+  <defs>
+    <linearGradient id="metal"
+      x1="120"
+      y1="96"
+      x2="392"
+      y2="416"
+      gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FAFAFA"/>
+      <stop offset="42%" stop-color="#D7DBE0"/>
+      <stop offset="100%" stop-color="#AEB5BC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Green Bridge (BEHIND D) -->
+  <path
+    d="M150 256H426"
+    stroke="#68A063"
+    stroke-width="18"
+    stroke-linecap="round"/>
+
+  <!-- Remote -->
+  <circle
+    cx="454"
+    cy="256"
+    r="18"
+    fill="#68A063"/>
+
+  <!-- Main D -->
+  <path
+    d="M150 112
+       H240
+       C334 112 388 170 388 256
+       C388 342 334 400 240 400
+       H150"
+    stroke="url(#metal)"
+    stroke-width="34"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Chevron -->
+  <path
+    d="M154 176
+       L214 256
+       L154 336"
+    stroke="url(#metal)"
+    stroke-width="34"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+</svg>

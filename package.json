@@ -1,0 +1,67 @@
+{
+  "name": "devsftp",
+  "version": "1.0.0",
+  "description": "DevsFTP — Remote Development Workspace (SFTP, SSH Terminal & Live Editing)",
+  "main": "src/main/main.js",
+  "author": "DevsFTP Development Team",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test tests/**/*.test.js",
+    "package:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist --overwrite",
+    "build:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist/win-unpacked --icon=assets/icon.ico --ignore=\"(back-up|scratch)\" --overwrite && node scratch/sync_dist.js",
+    "dist:win": "electron-builder --win"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "basic-ftp": "^5.0.5",
+    "chokidar": "^4.0.3",
+    "socks": "^2.8.9",
+    "ssh2": "^1.15.0",
+    "webdav": "^5.10.0",
+    "webdav-server": "^2.6.3"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.4.2",
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8",
+    "rcedit": "^5.0.2"
+  },
+  "build": {
+    "appId": "com.devsftp.app",
+    "productName": "DevsFTP",
+    "win": {
+      "icon": "assets/icon.ico",
+      "forceCodeSigning": false,
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis",
+        "portable",
+        "dir"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeader": "assets/installerHeader.png",
+      "installerHeaderIcon": "assets/icon.ico",
+      "installerSidebar": "assets/installerSidebar.png",
+      "uninstallerSidebar": "assets/installerSidebar.png",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DevsFTP"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

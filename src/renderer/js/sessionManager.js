@@ -1,0 +1,388 @@
+/**
+ * DevsFTP Session Manager (FR-001 Phase 1)
+ * Manages multi-tab workspace sessions, per-session remote path history,
+ * file table state, connection state, and workspace identity accent updates.
+ */
+
+window.SessionManager = {
+  sessions: [],
+  activeSessionId: null,
+
+  init() {
+    this.tabContainer = document.getElementById('session-tabs-container');
+    this.btnNewTab = document.getElementById('btn-new-session-tab');
+
+    if (this.btnNewTab) {
+      this.btnNewTab.addEventListener('click', () => {
+        if (window.ConnectionDialog) {
+          window.ConnectionDialog.openConnectionDialog();
+        }
+      });
+    }
+
+    const btnHeaderNewSession = document.getElementById('btn-header-new-session');
+    if (btnHeaderNewSession) {
+      btnHeaderNewSession.addEventListener('click', () => {
+        if (window.ConnectionDialog) {
+          window.ConnectionDialog.openConnectionDialog();
+        }
+      });
+    }
+
+    // Listen for Auto-Reconnect network status updates
+    const api = window.devsFTP || window.pulseFTP;
+    if (api && api.onReconnectStatus) {
+      api.onReconnectStatus((data) => {
+        const sess = this.getSession(data.sessionId);
+        if (sess) {
+          if (data.status === 'reconnecting') {
+            sess.connectionState = 'reconnecting';
+            sess.reconnectAttempts = data.attempts;
+          } else if (data.status === 'connected') {
+            sess.connectionState = 'connected';
+            sess.reconnectAttempts = 0;
+            if (window.FileBrowser && this.activeSessionId === data.sessionId) {
+              window.FileBrowser.refreshRemote(sess.remotePath || '/');
+            }
+          } else if (data.status === 'failed') {
+            sess.connectionState = 'disconnected';
+            sess.reconnectAttempts = 0;
+          }
+          this.setActiveSession(this.activeSessionId);
+        }
+      });
+    }
+
+    // Set restore lock guard during initialization to prevent startup renderTabs from wiping storage
+    this.isRestoring = true;
+    this.createDefaultSession();
+    setTimeout(() => {
+      this.restoreWorkspaceSessionState();
+    }, 150);
+  },
+
+  createDefaultSession() {
+    const defaultProfile = {
+      id: 'default',
+      name: 'Local Workspace',
+      protocol: 'sftp',
+      host: 'localhost',
+      accentColor: '#F59E0B',
+      remotePath: '/',
+      localPath: 'C:\\'
+    };
+    this.createSession(defaultProfile, false);
+  },
+
+  createSession(profile, isConnected = false) {
+    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const session = {
+      sessionId,
+      profileId: profile.id || 'default',
+      profile: { ...profile },
+      connectionState: isConnected ? 'connected' : 'disconnected',
+      remotePath: profile.remotePath || '/',
+      remoteFiles: [],
+      accentColor: profile.accentColor || '#F59E0B'
+    };
+
+    this.sessions.push(session);
+    this.setActiveSession(sessionId);
+    return session;
+  },
+
+  getActiveSession() {
+    return this.sessions.find(s => s.sessionId === this.activeSessionId) || null;
+  },
+
+  getSession(sessionId) {
+    return this.sessions.find(s => s.sessionId === sessionId) || null;
+  },
+
+  setActiveSession(sessionId) {
+    const session = this.getSession(sessionId);
+    if (!session) return;
+
+    this.activeSessionId = sessionId;
+
+    // 1. Update Profile Identity Accent via window.DevsApp.applyWorkspaceIdentityAccent
+    // Only connected sessions update active workspace identity accent; disconnected tabs revert to neutral slate
+    if (window.DevsApp) {
+      const activeColor = session.connectionState === 'connected' ? session.accentColor : '#7D838C';
+      window.DevsApp.applyWorkspaceIdentityAccent(activeColor);
+    }
+
+    // 2. Update Profile badge in top header
+    const profileDot = document.getElementById('active-profile-dot');
+    const profileName = document.getElementById('active-profile-name');
+    const profileBadge = document.getElementById('active-profile-badge');
+
+    if (profileBadge) {
+      if (session.connectionState === 'connected') {
+        profileBadge.style.display = 'inline-flex';
+        if (profileDot) profileDot.style.backgroundColor = session.accentColor;
+        if (profileName) profileName.textContent = session.profile.name || 'Session';
+      } else {
+        profileBadge.style.display = 'none';
+      }
+    }
+
+    // 3. Update Remote Workspace Display & Breadcrumb
+    if (window.FileBrowser) {
+      window.FileBrowser.setRemoteState(session.remoteFiles, session.remotePath);
+    }
+
+    // 4. Update status indicator text
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const remoteTag = document.getElementById('remote-tag');
+
+    if (session.connectionState === 'connected') {
+      if (statusDot) {
+        statusDot.className = 'status-indicator online';
+        statusDot.style.backgroundColor = '';
+      }
+      if (statusText) statusText.textContent = `Connected (${session.profile.protocol.toUpperCase()})`;
+      if (remoteTag) {
+        remoteTag.style.display = 'inline-block';
+        remoteTag.textContent = session.profile.protocol.toUpperCase();
+      }
+    } else if (session.connectionState === 'reconnecting') {
+      if (statusDot) {
+        statusDot.className = 'status-indicator online';
+        statusDot.style.backgroundColor = '#F59E0B';
+      }
+      if (statusText) statusText.textContent = `🔄 Reconnecting (${session.reconnectAttempts || 1}/5)...`;
+      if (remoteTag) {
+        remoteTag.style.display = 'inline-block';
+        remoteTag.textContent = 'RECONNECTING';
+      }
+    } else {
+      if (statusDot) {
+        statusDot.className = 'status-indicator';
+        statusDot.style.backgroundColor = '';
+      }
+      if (statusText) statusText.textContent = 'Disconnected';
+      if (remoteTag) remoteTag.style.display = 'none';
+    }
+
+    // 5. Render Tab Bar
+    this.renderTabs();
+  },
+
+  updateActiveSessionRemoteState(remoteFiles, remotePath) {
+    const active = this.getActiveSession();
+    if (active) {
+      active.remoteFiles = remoteFiles || [];
+      active.remotePath = remotePath || '/';
+    }
+  },
+
+  updateActiveSessionConnectionState(isConnected, profile = null) {
+    const active = this.getActiveSession();
+    if (active) {
+      active.connectionState = isConnected ? 'connected' : 'disconnected';
+      if (profile) {
+        active.profile = { ...profile };
+        active.profileId = profile.id;
+        active.accentColor = profile.accentColor || '#F59E0B';
+      }
+      this.setActiveSession(active.sessionId);
+    }
+  },
+
+  closeSession(sessionId) {
+    const index = this.sessions.findIndex(s => s.sessionId === sessionId);
+    if (index === -1) return;
+
+    // Disconnect backend SSH/SFTP connection for closed tab
+    const getApi = () => window.devsFTP || window.pulseFTP;
+    const api = getApi();
+    if (api && api.disconnect) {
+      api.disconnect(sessionId);
+    }
+
+    this.sessions.splice(index, 1);
+
+    if (this.sessions.length === 0) {
+      this.createDefaultSession();
+    } else if (this.activeSessionId === sessionId) {
+      const nextSession = this.sessions[Math.max(0, index - 1)];
+      this.setActiveSession(nextSession.sessionId);
+    } else {
+      this.renderTabs();
+    }
+
+    // Immediately update saved workspace session storage
+    this.saveWorkspaceSessionState();
+  },
+
+  renderTabs() {
+    if (!this.tabContainer) return;
+    this.tabContainer.innerHTML = '';
+
+    this.sessions.forEach(session => {
+      const tab = document.createElement('div');
+      tab.className = `session-tab ${session.sessionId === this.activeSessionId ? 'active' : ''}`;
+      
+      const proto = (session.profile.protocol || 'SFTP').toUpperCase();
+      const name = session.profile.name || 'Session';
+      const host = session.profile.host || 'localhost';
+
+      tab.innerHTML = `
+        <span class="session-tab-dot" style="background-color: ${session.accentColor};"></span>
+        <span class="session-tab-proto">${proto}</span>
+        <span class="session-tab-title" title="${name} (${host})">${name}</span>
+        <button class="session-tab-close" title="Close Session">✕</button>
+      `;
+
+      tab.addEventListener('click', (e) => {
+        if (e.target.classList.contains('session-tab-close')) {
+          e.stopPropagation();
+          this.closeSession(session.sessionId);
+        } else {
+          this.setActiveSession(session.sessionId);
+        }
+      });
+
+      this.tabContainer.appendChild(tab);
+    });
+
+    this.saveWorkspaceSessionState();
+  },
+
+  saveWorkspaceSessionState() {
+    if (this.isRestoring) return; // DO NOT OVERWRITE STORAGE DURING STARTUP RESTORE INITIALIZATION
+    try {
+      const validSessions = this.sessions.filter(s => 
+        s && s.profile && s.profile.host && 
+        s.profile.host !== 'localhost' && 
+        s.profileId !== 'default' && 
+        s.profile.name !== 'Local Workspace'
+      );
+      if (validSessions.length === 0) return;
+
+      const savedState = validSessions.map(s => ({
+        profileId: s.profileId || (s.profile ? s.profile.id : null),
+        profile: s.profile,
+        remotePath: s.remotePath || (s.profile ? s.profile.remotePath : '/'),
+        localPath: s.localPath || (s.profile ? s.profile.localPath : 'C:\\'),
+        accentColor: s.accentColor
+      }));
+      const jsonStr = JSON.stringify(savedState);
+      localStorage.setItem('devsftp_workspace_saved_tabs', jsonStr);
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('info', `[Workspace Save] Saved ${validSessions.length} remote session tab(s) to local storage (${jsonStr.length} bytes).`);
+      }
+    } catch (e) {
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('error', `[Workspace Save Error] ${e.message}`);
+      }
+    }
+  },
+
+  async restoreWorkspaceSessionState() {
+    this.isRestoring = true;
+    const log = (type, msg) => {
+      console.log(`[Workspace Restore] ${msg}`);
+      if (window.LogViewer) window.LogViewer.addEntry(type, `[Workspace Restore] ${msg}`);
+    };
+
+    try {
+      log('info', 'Phase 1: Initializing Workspace Session Restore engine on startup...');
+
+      const prefRestore = localStorage.getItem('devsftp_pref_restore_tabs');
+      const shouldRestore = prefRestore === null || prefRestore === 'true';
+      log('info', `Phase 2: Preference 'devsftp_pref_restore_tabs' = "${prefRestore}" (shouldRestore = ${shouldRestore})`);
+      
+      if (!shouldRestore) {
+        log('warning', 'Phase 2: Restore is DISABLED in Preferences (devsftp_pref_restore_tabs is "false"). Session restore skipped.');
+        return;
+      }
+
+      const raw = localStorage.getItem('devsftp_workspace_saved_tabs');
+      log('info', `Phase 3: Reading 'devsftp_workspace_saved_tabs' raw storage data = ${raw ? `${raw.length} bytes` : 'NULL/EMPTY'}`);
+
+      if (!raw) {
+        log('warning', 'Phase 3: No saved workspace session tabs found in storage. Restore skipped.');
+        return;
+      }
+
+      const savedTabs = JSON.parse(raw);
+      log('info', `Phase 4: Parsed saved tabs array containing ${Array.isArray(savedTabs) ? savedTabs.length : 0} tab(s).`);
+
+      if (!Array.isArray(savedTabs) || savedTabs.length === 0) {
+        log('warning', 'Phase 4: Saved tabs array is empty. Restore skipped.');
+        return;
+      }
+
+      const getApi = () => window.devsFTP || window.pulseFTP;
+      const api = getApi();
+      if (!api || !api.profiles || !api.profiles.getAll) {
+        log('error', 'Phase 5: IPC API (devsFTP/pulseFTP) not ready. Restore skipped.');
+        return;
+      }
+
+      const allProfiles = await api.profiles.getAll();
+      log('info', `Phase 5: Loaded ${Array.isArray(allProfiles) ? allProfiles.length : 0} profile(s) from store.`);
+
+      const validSavedTabs = savedTabs.filter(t => 
+        t && t.profile && t.profile.host && 
+        t.profile.host !== 'localhost' && 
+        t.profileId !== 'default' && 
+        t.profile.name !== 'Local Workspace'
+      );
+
+      if (validSavedTabs.length === 0) {
+        log('warning', 'Phase 5: No remote server tabs to restore. Keeping default local workspace.');
+        return;
+      }
+
+      // Clear existing default session if we have valid remote server tabs to restore
+      this.sessions = [];
+
+      for (let i = 0; i < validSavedTabs.length; i++) {
+        const tabData = validSavedTabs[i];
+        if (!tabData) continue;
+
+        let prof = tabData.profile;
+        if ((!prof || !prof.password) && tabData.profileId) {
+          const found = allProfiles.find(p => p.id === tabData.profileId);
+          if (found) prof = found;
+        }
+
+        if (prof && prof.host && prof.host !== 'localhost') {
+          log('info', `Phase 6 [Tab ${i + 1}/${validSavedTabs.length}]: Restoring remote server tab "${prof.name || prof.host}" (${prof.username || 'user'}@${prof.host}:${prof.port || 22})...`);
+          
+          const restoredSess = this.createSession(prof, false);
+          if (tabData.remotePath) restoredSess.remotePath = tabData.remotePath;
+          if (tabData.localPath) restoredSess.localPath = tabData.localPath;
+
+          try {
+            if (window.connectToProfileSession) {
+              await window.connectToProfileSession(prof, restoredSess.sessionId, true, tabData.remotePath, tabData.localPath);
+              log('info', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: ✓ Connection established cleanly for restored tab [${restoredSess.sessionId}].`);
+            }
+          } catch (err) {
+            log('error', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: Connection failed for restored tab [${restoredSess.sessionId}]: ${err.message}`);
+            this.closeSession(restoredSess.sessionId);
+          }
+        } else {
+          log('warning', `Phase 6 [Tab ${i + 1}/${validSavedTabs.length}]: Skipping invalid saved tab data (missing host/profile).`);
+        }
+      }
+
+      if (this.sessions.length > 0) {
+        log('info', `Phase 9: Switching active view to restored session tab [${this.sessions[0].sessionId}].`);
+        this.setActiveSession(this.sessions[0].sessionId);
+      } else {
+        log('warning', 'Phase 9: Creating default empty workspace session.');
+        this.createDefaultSession();
+      }
+    } catch (e) {
+      log('error', `Workspace Session Restore exception: ${e.message}`);
+    } finally {
+      this.isRestoring = false;
+    }
+  }
+};

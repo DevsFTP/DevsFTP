@@ -1,0 +1,15 @@
+appId: com.devsftp.app
+productName: DevsFTP
+directories:
+  output: dist
+files:
+  - "src/**/*"
+  - "package.json"
+win:
+  forceCodeSigning: false
+  signAndEditExecutable: false
+  target:
+    - target: dir
+      arch:
+        - x64
+  icon: assets/icon.ico
