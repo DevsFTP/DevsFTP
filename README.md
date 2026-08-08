@@ -1,11 +1,13 @@
-# DevsFTP — Remote Development Workspace
+# DevsFTP — The SFTP & FTP Client for Windows
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Electron Version](https://img.shields.io/badge/Electron-v34.2-47848F?logo=electron)](https://www.electronjs.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)](https://www.microsoft.com/windows)
 [![Version](https://img.shields.io/badge/Version-1.0.0-emerald)](#)
 
-**DevsFTP** is a high-performance, modern cross-protocol remote development workspace designed for developers, system administrators, and web teams. It bridges the gap between manual file managers and background automation by embedding **SFTP/FTP/FTPS file management, live-edit file watching, interactive SSH terminal console, visual directory comparison, and autonomous background job scheduling** into a single sleek application.
+> **The SFTP & FTP client for Windows that works with you, instead of against you.**
+
+**DevsFTP** is a fast, reliable SFTP, FTP, FTPS, and WebDAV client built specifically for Windows. Instead of fighting session disconnects, forced browser launches, or clunky upload steps, DevsFTP works seamlessly alongside your workflow with **smart code editor live sync, persistent anti-disconnect keepalives, integrated SSH terminal, and automated job scheduling**.
 
 Website: [DevsFTP.com](https://devsftp.com)
 

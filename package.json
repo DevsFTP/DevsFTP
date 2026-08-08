@@ -1,7 +1,7 @@
 {
   "name": "devsftp",
   "version": "1.0.0",
-  "description": "DevsFTP — Remote Development Workspace (SFTP, SSH Terminal & Live Editing)",
+  "description": "DevsFTP — The SFTP & FTP client for Windows that works with you, instead of against you.",
   "main": "src/main/main.js",
   "author": "DevsFTP Development Team",
   "license": "GPL-3.0-or-later",
