@@ -36,7 +36,7 @@ Please be respectful and constructive in all discussions, issues, and code revie
 3. Ensure all new JavaScript source files include the standard **GNU GPL-3.0 header notice**:
    ```javascript
    /**
-    * DevsFTP — Remote Development Workspace
+     * DevsFTP — The SFTP & FTP Client for Windows
     * Copyright (C) 2026 DevsFTP.com
     *
     * This program is free software: you can redistribute it and/or modify
