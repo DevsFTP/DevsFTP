@@ -1,3 +1,4 @@
+<!-- DevsFTP — The SFTP & FTP Client for Windows -->
 # Security Policy & Cryptographic Architecture
 
 ## Supported Versions
