@@ -76,12 +76,14 @@ window.SessionManager = {
 
   createSession(profile, isConnected = false) {
     const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const defaultLocal = (window.FileBrowser && window.FileBrowser.localPath) ? window.FileBrowser.localPath : 'C:\\';
     const session = {
       sessionId,
       profileId: profile.id || 'default',
       profile: { ...profile },
       connectionState: isConnected ? 'connected' : 'disconnected',
       remotePath: profile.remotePath || '/',
+      localPath: profile.localPath || defaultLocal,
       remoteFiles: [],
       accentColor: profile.accentColor || '#F59E0B'
     };
@@ -97,6 +99,14 @@ window.SessionManager = {
 
   getSession(sessionId) {
     return this.sessions.find(s => s.sessionId === sessionId) || null;
+  },
+
+  updateActiveSessionLocalPath(localPath) {
+    const active = this.getActiveSession();
+    if (active && localPath) {
+      active.localPath = localPath;
+      this.saveWorkspaceSessionState();
+    }
   },
 
   setActiveSession(sessionId) {
@@ -127,9 +137,12 @@ window.SessionManager = {
       }
     }
 
-    // 3. Update Remote Workspace Display & Breadcrumb
+    // 3. Update Remote Workspace Display & Breadcrumb + Restore Tab Local Directory
     if (window.FileBrowser) {
       window.FileBrowser.setRemoteState(session.remoteFiles, session.remotePath);
+      if (session.localPath && window.FileBrowser.localPath !== session.localPath) {
+        window.FileBrowser.refreshLocal(session.localPath);
+      }
     }
 
     // 4. Update status indicator text

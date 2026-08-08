@@ -907,17 +907,8 @@ window.FileBrowser = {
       document.getElementById('local-path-input').value = this.localPath;
       this.renderLocalTable(this.localFiles);
 
-      const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
-      if (activeSess && activeSess.profile && activeSess.profile.id && activeSess.profile.id !== 'default') {
-        if (activeSess.profile.localPath !== this.localPath) {
-          activeSess.profile.localPath = this.localPath;
-          if (api.profiles && api.profiles.upsert) {
-            api.profiles.upsert(activeSess.profile).catch(() => {});
-          }
-        }
-      }
       if (window.SessionManager) {
-        window.SessionManager.saveWorkspaceSessionState();
+        window.SessionManager.updateActiveSessionLocalPath(this.localPath);
       }
     } catch (err) {
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read local directory: ${err.message}`);
