@@ -10,7 +10,7 @@
     "dev": "electron .",
     "test": "node --test tests/**/*.test.js",
     "package:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist --overwrite",
-    "build:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist/win-unpacked --icon=assets/icon.ico --ignore=\"(back-up|scratch)\" --overwrite && node scratch/sync_dist.js",
+    "build:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist/win-unpacked --icon=assets/icon.ico --overwrite",
     "dist:win": "electron-builder --win"
   },
   "dependencies": {

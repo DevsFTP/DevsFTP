@@ -7,6 +7,8 @@ package-lock.json
 
 # Build & Packaging Outputs
 dist/
+DevsWWW/
+BACK UP/
 build/
 out/
 Do not touch/
