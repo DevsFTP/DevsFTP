@@ -272,7 +272,7 @@ function createSystemTray() {
   try {
     const trayImg = nativeImage.createFromPath(trayPath);
     appTray = new Tray(trayImg);
-    appTray.setToolTip('DevsFTP — Remote Development Workspace');
+    appTray.setToolTip('DevsFTP — The SFTP & FTP Client for Windows');
 
     const contextMenu = Menu.buildFromTemplate([
       {
@@ -396,7 +396,7 @@ function createWindow() {
     height: 880,
     minWidth: 1020,
     minHeight: 680,
-    title: 'DevsFTP — Remote Development Workspace',
+    title: 'DevsFTP — The SFTP & FTP Client for Windows',
     icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
