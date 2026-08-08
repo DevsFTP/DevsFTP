@@ -10,6 +10,7 @@ dist/
 build/
 out/
 Do not touch/
+www/
 *.exe
 *.app
 *.dmg
