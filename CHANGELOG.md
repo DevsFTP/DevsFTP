@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 - **Multi-Protocol Driver Support**: Full SFTP (SSH2) and FTP/FTPS (Explicit & Implicit TLS/SSL) connection drivers.
-- **Multi-Session Tabbed Workspace**: Concurrent multi-server tab management with workspace tab state auto-restoration on launch.
+- **Multi-Session Tabbed Client**: Concurrent multi-server tab management with tab state auto-restoration on launch.
 - **Live Remote File Edit & Cache Watcher**: Isolated file caching, system default editor launching (`shell.openPath`), chokidar file save watching with SHA-256 hash detection, orphan watcher recovery, and automatic 7-day TTL garbage collection.
 - **Autonomous Scheduled Tasks Daemon**: Background Job Runner Service (`jobRunnerService.js`) with frequency options (App Startup, Interval 1m-24h, Daily at target time), direction-aware path pickers (`📂 Browse OS...`, `📍 Active Local`, `📍 Active Remote`), real-time path validation, Windows Toast notifications, and theme-aware Delete Job modal (`#delete-job-modal`).
 - **Interactive SSH Terminal**: Embedded `xterm.js` terminal connected to active server profiles.
