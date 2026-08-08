@@ -40,12 +40,24 @@ process.on('unhandledRejection', (reason) => {
   console.error('Main Process Unhandled Rejection:', reason);
 });
 
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Tray, Menu, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Tray, Menu, Notification, nativeTheme } = require('electron');
 app.setName('DevsFTP');
 if (process.platform === 'win32') {
   app.setAppUserModelId('DevsFTP');
 }
 let appTray = null;
+
+nativeTheme.on('updated', () => {
+  try {
+    const updatedIconPath = getAppIconPath();
+    if (updatedIconPath && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setIcon(updatedIconPath);
+    }
+    if (updatedIconPath && appTray && !appTray.isDestroyed()) {
+      appTray.setImage(updatedIconPath);
+    }
+  } catch (e) {}
+});
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -354,8 +366,17 @@ function sendOSNotification(title, body) {
 
 function getAppIconPath() {
   try {
-    const resIco = path.join(process.resourcesPath, 'assets/icon.ico');
-    if (fs.existsSync(resIco)) return resIco;
+    const isDark = nativeTheme ? nativeTheme.shouldUseDarkColors : true;
+    // Dark OS Theme -> use icon_light.png (Bright mark)
+    // Light OS Theme -> use icon_dark.png (Dark mark)
+    const iconName = isDark ? 'icon_light.png' : 'icon_dark.png';
+
+    const resPng = path.join(process.resourcesPath, 'assets/branding', iconName);
+    if (fs.existsSync(resPng)) return resPng;
+
+    const devPng = path.join(__dirname, '../../assets/branding', iconName);
+    if (fs.existsSync(devPng)) return devPng;
+
     const devIco = path.join(__dirname, '../../assets/icon.ico');
     if (fs.existsSync(devIco)) return devIco;
   } catch (e) {}
