@@ -20,7 +20,9 @@
     "basic-ftp": "^5.0.5",
     "chokidar": "^3.6.0",
     "node-webdav": "^0.1.7",
-    "ssh2": "^1.16.0"
+    "socks": "^2.8.9",
+    "ssh2": "^1.16.0",
+    "webdav": "^5.7.0"
   },
   "devDependencies": {
     "electron": "^34.5.8",
