@@ -10,22 +10,20 @@
     "dev": "electron .",
     "test": "node --test tests/**/*.test.js",
     "package:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist --overwrite",
-    "build:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist/win-unpacked --icon=assets/icon.ico --overwrite",
-    "dist:win": "electron-builder --win"
+    "build:win": "node scripts/build_clean_exe.js",
+    "dist:win": "node scripts/build_clean_exe.js"
   },
   "dependencies": {
+    "@electron/asar": "^3.3.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "basic-ftp": "^5.0.5",
-    "chokidar": "^4.0.3",
-    "socks": "^2.8.9",
-    "ssh2": "^1.15.0",
-    "webdav": "^5.10.0",
-    "webdav-server": "^2.6.3"
+    "chokidar": "^3.6.0",
+    "node-webdav": "^0.1.7",
+    "ssh2": "^1.16.0"
   },
   "devDependencies": {
-    "@electron/packager": "^18.4.2",
-    "electron": "^34.2.0",
+    "electron": "^34.5.8",
     "electron-builder": "^25.1.8",
     "rcedit": "^5.0.2"
   },
