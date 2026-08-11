@@ -153,6 +153,11 @@ window.SessionManager = {
       }
     }
 
+    // Update Transfer Queue display for the active profile (Option A)
+    if (window.TransferQueue && window.TransferQueue.render) {
+      window.TransferQueue.render();
+    }
+
     // 4. Update status indicator text and drawer tab visibility based on active session protocol
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');

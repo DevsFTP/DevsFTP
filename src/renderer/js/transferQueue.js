@@ -100,7 +100,10 @@ window.TransferQueue = {
   },
 
   checkAndShowInterruptedModal() {
-    const pending = this.queue.filter(q => q.status === 'Waiting to Resume');
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
+    const pending = this.queue.filter(q => q.status === 'Waiting to Resume' && (q.profileId || 'default') === activeProfileId);
     if (pending.length === 0) return;
 
     const modal = document.getElementById('interrupted-transfer-modal');
@@ -108,7 +111,7 @@ window.TransferQueue = {
     if (!modal) return;
 
     if (msg) {
-      msg.textContent = `${pending.length} file transfer(s) were interrupted during a previous session. They are currently saved in "Waiting to Resume" state in your Transfer Queue.`;
+      msg.textContent = `${pending.length} file transfer(s) were interrupted during a previous session for this profile. They are currently saved in "Waiting to Resume" state in your Transfer Queue.`;
     }
 
     modal.classList.add('active');
@@ -120,8 +123,11 @@ window.TransferQueue = {
   },
 
   async dismissInterrupted() {
-    const count = this.queue.filter(q => q.status === 'Waiting to Resume').length;
-    this.queue = this.queue.filter(q => q.status !== 'Waiting to Resume');
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
+    const count = this.queue.filter(q => q.status === 'Waiting to Resume' && (q.profileId || 'default') === activeProfileId).length;
+    this.queue = this.queue.filter(q => !((q.profileId || 'default') === activeProfileId && q.status === 'Waiting to Resume'));
     this.render();
     this.closeInterruptedModal();
     if (count > 0 && window.LogViewer) {
@@ -151,11 +157,14 @@ window.TransferQueue = {
   },
 
   autoResumeInterrupted() {
-    const pending = this.queue.filter(q => q.status === 'Waiting to Resume');
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
+    const pending = this.queue.filter(q => q.status === 'Waiting to Resume' && (q.profileId || 'default') === activeProfileId);
     if (pending.length === 0) return;
 
     if (window.LogViewer) {
-      window.LogViewer.addEntry('info', `⏳ Auto-resuming ${pending.length} interrupted transfer(s) from previous session...`);
+      window.LogViewer.addEntry('info', `⏳ Auto-resuming ${pending.length} interrupted transfer(s) for this profile...`);
     }
 
     pending.forEach(item => {
@@ -169,7 +178,7 @@ window.TransferQueue = {
     });
   },
 
-  addTransfer(type, sourcePath, destPath) {
+  addTransfer(type, sourcePath, destPath, profileId = null) {
     this.resetCancellationState();
     const existing = this.queue.find(q => q.source === sourcePath && q.dest === destPath && q.status !== 'Completed');
     if (existing) {
@@ -177,12 +186,20 @@ window.TransferQueue = {
       this.render();
       return existing.id;
     }
+
+    let targetProfileId = profileId;
+    if (!targetProfileId) {
+      const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      targetProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+    }
+
     const id = 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     const item = {
       id,
       type, // 'download' or 'upload'
       source: sourcePath,
       dest: destPath,
+      profileId: targetProfileId,
       percentage: 0,
       transferred: 0,
       total: 1,
@@ -309,49 +326,72 @@ window.TransferQueue = {
   },
 
   pauseAll() {
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
     let count = 0;
     this.queue.forEach(item => {
-      if (item.status === 'In Progress' || item.status === 'Queued') {
-        item.status = 'Paused';
-        item.speed = '0 KB/s';
-        count++;
+      if ((item.profileId || 'default') === activeProfileId) {
+        if (item.status === 'In Progress' || item.status === 'Queued') {
+          item.status = 'Paused';
+          item.speed = '0 KB/s';
+          count++;
+        }
       }
     });
-    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('warning', `⏸️ Paused ${count} active transfer(s).`);
+    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('warning', `⏸️ Paused ${count} active transfer(s) for this profile.`);
     this.render();
     this.syncQueue();
   },
 
   resumeAll() {
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
     let count = 0;
     this.queue.forEach(item => {
-      if (item.status === 'Paused' || item.status === 'Waiting to Resume') {
-        this.resumeTransfer(item.id);
-        count++;
+      if ((item.profileId || 'default') === activeProfileId) {
+        if (item.status === 'Paused' || item.status === 'Waiting to Resume') {
+          this.resumeTransfer(item.id);
+          count++;
+        }
       }
     });
-    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('info', `▶️ Resumed ${count} paused transfer(s).`);
+    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('info', `▶️ Resumed ${count} paused transfer(s) for this profile.`);
     this.syncQueue();
   },
 
   cancelAll() {
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
     let count = 0;
     this.batchCancelled = true;
     this.queue.forEach(item => {
-      if (item.status === 'In Progress' || item.status === 'Paused' || item.status === 'Queued' || item.status === 'Waiting to Resume') {
-        item.status = 'Cancelled';
-        item.speed = '0 KB/s';
-        this.cancelledIds.add(item.id);
-        count++;
+      if ((item.profileId || 'default') === activeProfileId) {
+        if (item.status === 'In Progress' || item.status === 'Paused' || item.status === 'Queued' || item.status === 'Waiting to Resume') {
+          item.status = 'Cancelled';
+          item.speed = '0 KB/s';
+          this.cancelledIds.add(item.id);
+          count++;
+        }
       }
     });
-    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('error', `⏹️ Cancelled ${count} transfer task(s).`);
+    if (count > 0 && window.LogViewer) window.LogViewer.addEntry('error', `⏹️ Cancelled ${count} transfer task(s) for this profile.`);
     this.render();
     this.syncQueue();
   },
 
   async clearCompleted() {
-    this.queue = this.queue.filter(q => q.status === 'In Progress' || q.status === 'Paused' || q.status === 'Queued' || q.status === 'Waiting to Resume');
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
+    this.queue = this.queue.filter(q => {
+      if ((q.profileId || 'default') === activeProfileId) {
+        return q.status === 'In Progress' || q.status === 'Paused' || q.status === 'Queued' || q.status === 'Waiting to Resume';
+      }
+      return true;
+    });
     const api = window.devsFTP || window.pulseFTP;
     if (api && api.clearCompletedQueue) {
       await api.clearCompletedQueue();
@@ -505,11 +545,22 @@ window.TransferQueue = {
   render() {
     if (!this.tbody) return;
 
-    const activeCount = this.queue.filter(q => q.status === 'In Progress' || q.status === 'Queued' || q.status === 'Waiting to Resume').length;
+    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+
+    // Filter queue to show only tasks belonging to the active profile/session (Option A)
+    const filteredQueue = this.queue.filter(q => {
+      const taskProfileId = q.profileId || 'default';
+      return taskProfileId === activeProfileId;
+    });
+
+    const activeCount = filteredQueue.filter(q => q.status === 'In Progress' || q.status === 'Queued' || q.status === 'Waiting to Resume').length;
     if (this.badge) this.badge.textContent = activeCount;
 
-    if (this.queue.length === 0) {
-      this.tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: hsl(var(--text-muted)); padding: 16px;">Queue is empty.</td></tr>';
+    if (filteredQueue.length === 0) {
+      // Clean up any remaining rows in the DOM
+      Array.from(this.tbody.children).forEach(tr => tr.remove());
+      this.tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: hsl(var(--text-muted)); padding: 16px;">Queue is empty for this profile.</td></tr>';
       if (this.speedIndicator) this.speedIndicator.textContent = '▲ 0 KB/s | ▼ 0 KB/s';
       return;
     }
@@ -520,8 +571,8 @@ window.TransferQueue = {
       this.tbody.innerHTML = '';
     }
 
-    // Update bottom status bar total transfer speed metrics
-    const totalSpeedBps = this.queue
+    // Update bottom status bar total transfer speed metrics for this profile
+    const totalSpeedBps = filteredQueue
       .filter(q => q.status === 'In Progress')
       .reduce((sum, item) => {
         if (item.speed.includes('MB/s')) return sum + parseFloat(item.speed) * 1024 * 1024;
@@ -531,13 +582,13 @@ window.TransferQueue = {
 
     const formattedTotalSpeed = this.formatSpeed(totalSpeedBps);
     if (this.speedIndicator) {
-      const isUpload = this.queue.some(q => q.type === 'upload' && q.status === 'In Progress');
+      const isUpload = filteredQueue.some(q => q.type === 'upload' && q.status === 'In Progress');
       this.speedIndicator.textContent = isUpload ? `▲ ${formattedTotalSpeed} | ▼ 0 KB/s` : `▲ 0 KB/s | ▼ ${formattedTotalSpeed}`;
     }
 
-    const currentItemIds = new Set(this.queue.map(q => q.id));
+    const currentItemIds = new Set(filteredQueue.map(q => q.id));
 
-    // Remove rows no longer in queue
+    // Remove rows no longer in active profile's queue
     Array.from(this.tbody.children).forEach(tr => {
       const id = tr.getAttribute('data-id');
       if (id && !currentItemIds.has(id)) {
@@ -546,7 +597,7 @@ window.TransferQueue = {
     });
 
     // Targeted DOM updates per row (prevents action button hover strobing)
-    this.queue.forEach(item => {
+    filteredQueue.forEach(item => {
       let tr = this.tbody.querySelector(`tr[data-id="${item.id}"]`);
       const arrow = item.type === 'download' ? '⬇' : '⬆';
 
