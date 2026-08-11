@@ -360,10 +360,16 @@ window.TransferQueue = {
   },
 
   handleProgress(data) {
-    const item = this.queue.find(q => 
-      (q.source === data.remotePath || q.source === data.localPath || q.dest === data.localPath || q.dest === data.remotePath) &&
-      (q.status === 'In Progress' || q.status === 'Running' || q.status === 'Waiting to Resume')
-    );
+    let item = null;
+    if (data.taskId) {
+      item = this.queue.find(q => q.id === data.taskId);
+    }
+    if (!item) {
+      item = this.queue.find(q => 
+        (q.source === data.remotePath || q.source === data.localPath || q.dest === data.localPath || q.dest === data.remotePath) &&
+        (q.status === 'In Progress' || q.status === 'Running' || q.status === 'Waiting to Resume')
+      );
+    }
 
     if (item) {
       item.status = 'In Progress';
@@ -610,8 +616,12 @@ window.TransferQueue = {
   },
 
   resetCancellationState() {
-    this.batchCancelled = false;
-    this.cancelledIds.clear();
+    // Only reset if we don't have any in-progress or queued tasks (Issue 12.2)
+    const hasActiveTasks = this.queue.some(q => q.status === 'In Progress' || q.status === 'Running' || q.status === 'Queued');
+    if (!hasActiveTasks) {
+      this.batchCancelled = false;
+      this.cancelledIds.clear();
+    }
   },
 
   notifyCompletion(item) {

@@ -234,22 +234,51 @@ class WebDAVService {
     }
 
     try {
-      const content = await this.client.getFileContents(remotePath);
-      const totalBytes = content.length || 1;
-
       // Ensure local directory exists
       const localDir = path.dirname(localPath);
       if (!fs.existsSync(localDir)) {
         fs.mkdirSync(localDir, { recursive: true });
       }
 
-      fs.writeFileSync(localPath, content);
+      // Fetch remote stats to determine total file size for progress updates
+      let totalBytes = 1;
+      try {
+        const stats = await this.client.stat(remotePath);
+        totalBytes = stats.size || 1;
+      } catch (e) {}
 
-      if (onProgress) {
-        onProgress({ transferred: totalBytes, total: totalBytes, percentage: 100 });
-      }
+      return new Promise((resolve, reject) => {
+        const writeStream = fs.createWriteStream(localPath);
+        const readStream = this.client.createReadStream(remotePath); // Stream download (Issue 11.1)
 
-      return true;
+        let bytesRead = 0;
+        readStream.on('data', (chunk) => {
+          bytesRead += chunk.length;
+          if (onProgress) {
+            onProgress({
+              transferred: bytesRead,
+              total: totalBytes,
+              percentage: Math.min(100, Math.round((bytesRead / totalBytes) * 100))
+            });
+          }
+        });
+
+        readStream.on('error', (err) => {
+          writeStream.destroy();
+          reject(err);
+        });
+
+        writeStream.on('error', (err) => {
+          readStream.destroy();
+          reject(err);
+        });
+
+        writeStream.on('finish', () => {
+          resolve(true);
+        });
+
+        readStream.pipe(writeStream);
+      });
     } catch (err) {
       throw new Error(`WebDAV download failed for "${remotePath}": ${err.message}`);
     }
@@ -287,13 +316,17 @@ class WebDAVService {
   async mkdir(remotePath) {
     if (!this.connected || !this.client) throw new Error('WebDAV client is not connected.');
     try {
+      // Stat path first to avoid swallowing real authorization/creation errors (Issue 11.3)
+      try {
+        const stat = await this.client.stat(remotePath);
+        if (stat && stat.type === 'directory') {
+          return true;
+        }
+      } catch (statErr) {}
+
       await this.client.createDirectory(remotePath);
       return true;
     } catch (err) {
-      // Ignore "already exists" errors (405 Method Not Allowed or 409 Conflict)
-      if (err.message && (err.message.includes('405') || err.message.includes('409'))) {
-        return true;
-      }
       throw new Error(`WebDAV mkdir failed for "${remotePath}": ${err.message}`);
     }
   }
@@ -304,7 +337,9 @@ class WebDAVService {
   async delete(remotePath, isDirectory = false) {
     if (!this.connected || !this.client) throw new Error('WebDAV client is not connected.');
     try {
-      await this.client.deleteFile(remotePath);
+      // Support strict servers by supplying Depth header for directory deletes (Issue 11.2)
+      const options = isDirectory ? { headers: { 'Depth': 'infinity' } } : {};
+      await this.client.deleteFile(remotePath, options);
       return true;
     } catch (err) {
       throw new Error(`WebDAV delete failed for "${remotePath}": ${err.message}`);

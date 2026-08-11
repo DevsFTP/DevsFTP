@@ -18,6 +18,7 @@ class SFTPService {
     this.currentConfig = null;
     this.isManualDisconnect = false;
     this.onUnexpectedClose = null;
+    this.bastionClient = null;
   }
 
   connect(config, onLog, verifyHostKeyFn) {
@@ -42,14 +43,31 @@ class SFTPService {
       });
 
       this.sshClient.on('error', (err) => {
+        const wasConnected = this.connected;
         this.connected = false;
+        if (this.bastionClient) {
+          try { this.bastionClient.end(); } catch (e) {}
+          this.bastionClient = null;
+        }
         if (onLog) onLog('error', `SSH Connection error: ${err.message}`);
-        reject(err);
+        
+        if (wasConnected) {
+          // Trigger unexpected close instead of rejecting the settled promise (Issue 10.1)
+          if (!this.isManualDisconnect && typeof this.onUnexpectedClose === 'function') {
+            this.onUnexpectedClose();
+          }
+        } else {
+          reject(err);
+        }
       });
 
       this.sshClient.on('close', () => {
         const wasConnected = this.connected;
         this.connected = false;
+        if (this.bastionClient) {
+          try { this.bastionClient.end(); } catch (e) {}
+          this.bastionClient = null;
+        }
         if (onLog) onLog('warning', 'SSH Connection closed.');
         if (wasConnected && !this.isManualDisconnect && typeof this.onUnexpectedClose === 'function') {
           this.onUnexpectedClose();
@@ -126,6 +144,7 @@ class SFTPService {
           bastionClient.forwardOut('127.0.0.1', 0, config.host, connectOpts.port, (err, stream) => {
             if (err) {
               bastionClient.end();
+              this.bastionClient = null;
               if (onLog) onLog('error', `Bastion ProxyJump forwardOut failed: ${err.message}`);
               return reject(err);
             }
@@ -137,9 +156,11 @@ class SFTPService {
 
         bastionClient.on('error', (err) => {
           if (onLog) onLog('error', `Bastion Host connection error: ${err.message}`);
+          this.bastionClient = null;
           reject(err);
         });
 
+        this.bastionClient = bastionClient;
         bastionClient.connect(bastionOpts);
       } else if (proxyType !== 'none' && (proxyType === 'socks5' || proxyType === 'socks4') && config.proxyHost) {
         const type = proxyType === 'socks4' ? 4 : 5;
@@ -200,15 +221,15 @@ class SFTPService {
       }
 
       const normalizedPath = normalizePOSIXPath(remoteDir);
-      this.sftp.readdir(normalizedPath, (err, list) => {
+      this.sftp.readdir(normalizedPath, async (err, list) => {
         if (err) return reject(err);
 
-        const items = list.map(item => {
+        const itemsPromises = list.map(item => {
           const isDir = (item.attrs.mode & 0o040000) === 0o040000 || item.longname.startsWith('d');
           const isLink = (item.attrs.mode & 0o120000) === 0o120000 || item.longname.startsWith('l');
           const type = isDir ? 'd' : (isLink ? 'l' : '-');
           
-          return {
+          const entry = {
             name: item.filename,
             path: normalizePOSIXPath(`${normalizedPath}/${item.filename}`),
             type: type,
@@ -218,7 +239,26 @@ class SFTPService {
             permissions: formatPermissions(item.attrs.mode),
             mode: item.attrs.mode
           };
+
+          // Resolve symbolic link target types (Issue 10.3)
+          if (isLink) {
+            return new Promise((resResolve) => {
+              this.sftp.stat(entry.path, (statErr, stats) => {
+                if (!statErr && stats) {
+                  entry.isDir = (stats.mode & 0o040000) === 0o040000;
+                  if (entry.isDir) {
+                    entry.type = 'd';
+                  }
+                }
+                resResolve(entry);
+              });
+            });
+          }
+
+          return Promise.resolve(entry);
         });
+
+        const items = await Promise.all(itemsPromises);
 
         // Sort directories first, then files alphabetically
         items.sort((a, b) => {
@@ -405,9 +445,26 @@ class SFTPService {
       }
 
       return new Promise((resolve, reject) => {
-        this.sftp.rmdir(normPath, (err) => {
-          if (err) return reject(err);
-          resolve(true);
+        this.sftp.rmdir(normPath, async (err) => {
+          if (err) {
+            // Retry directory deletion once in case of non-atomic file additions (Issue 10.2)
+            try {
+              const retryRes = await this.list(normPath);
+              const retryItems = (retryRes && retryRes.files) ? retryRes.files : [];
+              for (const item of retryItems) {
+                const itemPath = `${normPath === '/' ? '' : normPath}/${item.name}`;
+                await this.delete(itemPath, item.isDir);
+              }
+              this.sftp.rmdir(normPath, (retryErr) => {
+                if (retryErr) return reject(retryErr);
+                resolve(true);
+              });
+            } catch (retryFailed) {
+              return reject(err);
+            }
+          } else {
+            resolve(true);
+          }
         });
       });
     } else {
@@ -446,6 +503,12 @@ class SFTPService {
       try {
         this.sshClient.end();
       } catch (e) {}
+    }
+    if (this.bastionClient) {
+      try {
+        this.bastionClient.end();
+      } catch (e) {}
+      this.bastionClient = null;
     }
     this.sshClient = null;
     this.sftp = null;

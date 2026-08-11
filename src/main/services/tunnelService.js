@@ -40,7 +40,8 @@ class TunnelService {
       bytesRead: 0,
       bytesWritten: 0,
       startTime: Date.now(),
-      error: null
+      error: null,
+      activeSockets: new Set() // Track active sockets for graceful draining (Issue 8.1)
     };
 
     this.tunnels.set(tunnelId, tunnelObj);
@@ -127,6 +128,9 @@ class TunnelService {
 
     const localServer = net.createServer((socket) => {
       tunnelObj.activeConnections++;
+      tunnelObj.activeSockets.add(socket);
+      socket.statsCleanedUp = false;
+
       onLog('info', `[SSH Tunnel] Local connection received on ${localHost}:${localPort}. Forwarding to ${targetHost}:${targetPort}...`);
 
       sshClient.forwardOut(
@@ -138,7 +142,11 @@ class TunnelService {
           if (err) {
             onLog('error', `[SSH Tunnel] ForwardOut error for ${targetHost}:${targetPort}: ${err.message}`);
             socket.destroy();
-            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            if (!socket.statsCleanedUp) {
+              socket.statsCleanedUp = true;
+              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+              tunnelObj.activeSockets.delete(socket);
+            }
             return;
           }
 
@@ -149,7 +157,11 @@ class TunnelService {
           stream.pipe(socket);
 
           const cleanup = () => {
-            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            if (!socket.statsCleanedUp) {
+              socket.statsCleanedUp = true;
+              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+              tunnelObj.activeSockets.delete(socket);
+            }
           };
 
           socket.on('close', cleanup);
@@ -207,17 +219,33 @@ class TunnelService {
         tunnelObj.activeConnections++;
         onLog('info', `[SSH Tunnel] Incoming remote connection from ${info.srcIP}:${info.srcPort}. Connecting to local ${targetLocalHost}:${targetLocalPort}...`);
 
+        let localSocket = null; // Declare before attachment to avoid temporal dead zone (TDZ) ReferenceError (Issue 5)
         const remoteStream = accept();
-        const localSocket = net.connect(targetLocalPort, targetLocalHost, () => {
+        // Prevent socket leak on remote stream errors (Issue 8.2)
+        remoteStream.on('error', (err) => {
+          onLog('error', `[SSH Tunnel Remote Stream Error] ${err.message}`);
+          if (localSocket) {
+            try { localSocket.destroy(); } catch (e) {}
+          }
+        });
+
+        localSocket = net.connect(targetLocalPort, targetLocalHost, () => {
           remoteStream.pipe(localSocket);
           localSocket.pipe(remoteStream);
         });
+
+        tunnelObj.activeSockets.add(localSocket);
+        localSocket.statsCleanedUp = false;
 
         localSocket.on('data', (chunk) => { tunnelObj.bytesWritten += chunk.length; });
         remoteStream.on('data', (chunk) => { tunnelObj.bytesRead += chunk.length; });
 
         const cleanup = () => {
-          tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+          if (!localSocket.statsCleanedUp) {
+            localSocket.statsCleanedUp = true;
+            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            tunnelObj.activeSockets.delete(localSocket);
+          }
         };
 
         localSocket.on('close', cleanup);
@@ -247,12 +275,18 @@ class TunnelService {
 
     const socksServer = net.createServer((socket) => {
       tunnelObj.activeConnections++;
+      tunnelObj.activeSockets.add(socket);
+      socket.statsCleanedUp = false;
       
       // SOCKS5 Handshake & Proxy Tunnel Implementation
       socket.once('data', (data) => {
         if (data[0] !== 0x05) {
           socket.destroy();
-          tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+          if (!socket.statsCleanedUp) {
+            socket.statsCleanedUp = true;
+            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            tunnelObj.activeSockets.delete(socket);
+          }
           return;
         }
 
@@ -263,7 +297,11 @@ class TunnelService {
           if (request[0] !== 0x05 || request[1] !== 0x01) { // 0x01 = CONNECT
             socket.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0])); // Command not supported
             socket.destroy();
-            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            if (!socket.statsCleanedUp) {
+              socket.statsCleanedUp = true;
+              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+              tunnelObj.activeSockets.delete(socket);
+            }
             return;
           }
 
@@ -282,7 +320,11 @@ class TunnelService {
           } else if (addrType === 0x04) { // IPv6
             socket.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0]));
             socket.destroy();
-            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+            if (!socket.statsCleanedUp) {
+              socket.statsCleanedUp = true;
+              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+              tunnelObj.activeSockets.delete(socket);
+            }
             return;
           }
 
@@ -298,7 +340,11 @@ class TunnelService {
                 onLog('error', `[SOCKS5 Error] Failed to forward to ${destHost}:${destPort}: ${err.message}`);
                 socket.write(Buffer.from([0x05, 0x04, 0x00, 0x01, 0,0,0,0, 0,0])); // Host unreachable
                 socket.destroy();
-                tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+                if (!socket.statsCleanedUp) {
+                  socket.statsCleanedUp = true;
+                  tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+                  tunnelObj.activeSockets.delete(socket);
+                }
                 return;
               }
 
@@ -312,7 +358,11 @@ class TunnelService {
               stream.pipe(socket);
 
               const cleanup = () => {
-                tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+                if (!socket.statsCleanedUp) {
+                  socket.statsCleanedUp = true;
+                  tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+                  tunnelObj.activeSockets.delete(socket);
+                }
               };
 
               socket.on('close', cleanup);
@@ -360,6 +410,19 @@ class TunnelService {
         tunnelObj.localServer.close();
       } catch (e) {}
       tunnelObj.localServer = null;
+    }
+
+    // Gracefully drain/destroy active client sockets (Issue 8.1)
+    if (tunnelObj.activeSockets && tunnelObj.activeSockets.size > 0) {
+      for (const socket of tunnelObj.activeSockets) {
+        try {
+          socket.end();
+          setTimeout(() => {
+            try { socket.destroy(); } catch (e) {}
+          }, 1000);
+        } catch (e) {}
+      }
+      tunnelObj.activeSockets.clear();
     }
 
     if (tunnelObj.sshClient) {

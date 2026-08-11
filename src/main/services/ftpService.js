@@ -13,6 +13,7 @@ class FTPService {
     this.client.ftp.verbose = false;
     this.connected = false;
     this.currentConfig = null;
+    this.onUnexpectedClose = null;
   }
 
   async connect(config, onLog) {
@@ -37,6 +38,25 @@ class FTPService {
 
       await this.client.access(options);
       this.connected = true;
+
+      // Monitor control socket connection drops for auto-reconnect support
+      if (this.client.ftp && this.client.ftp.socket) {
+        const socket = this.client.ftp.socket;
+        const handleClose = () => {
+          if (this.connected) {
+            this.connected = false;
+            if (onLog) onLog('warning', 'FTP Control connection closed unexpectedly.');
+            if (typeof this.onUnexpectedClose === 'function') {
+              this.onUnexpectedClose();
+            }
+          }
+        };
+        socket.on('close', handleClose);
+        socket.on('error', () => {
+          // Socket error will lead to a close event, handled above
+        });
+      }
+
       if (onLog) onLog('info', 'FTP/FTPS Session established successfully.');
       return true;
     } catch (err) {
@@ -49,13 +69,28 @@ class FTPService {
   async list(remoteDir = '/') {
     if (!this.connected) throw new Error('FTP client is not connected.');
     const normalizedPath = normalizePOSIXPath(remoteDir);
-    await this.client.cd(normalizedPath);
-    const list = await this.client.list();
+    const list = await this.client.list(normalizedPath); // Avoid cd() side effects (Issues 9.1 & 9.3)
 
     const items = list.map(item => {
       const isDir = item.isDirectory;
       const isLink = item.isSymbolicLink;
       const type = isDir ? 'd' : (isLink ? 'l' : '-');
+
+      // Robust modification time parsing with year fallback (Issue 9.4)
+      let modifyTimeDate = new Date();
+      if (item.modifiedAt instanceof Date && !isNaN(item.modifiedAt)) {
+        modifyTimeDate = item.modifiedAt;
+      } else if (item.rawModifiedAt) {
+        modifyTimeDate = new Date(item.rawModifiedAt);
+        if (!isNaN(modifyTimeDate)) {
+          const now = new Date();
+          if (modifyTimeDate.getTime() - now.getTime() > 86400000) {
+            modifyTimeDate.setFullYear(now.getFullYear() - 1);
+          }
+        } else {
+          modifyTimeDate = new Date();
+        }
+      }
 
       return {
         name: item.name,
@@ -63,7 +98,7 @@ class FTPService {
         type: type,
         isDir: isDir,
         size: item.size || 0,
-        modifyTime: item.rawModifiedAt ? new Date(item.rawModifiedAt).toISOString() : new Date().toISOString(),
+        modifyTime: modifyTimeDate.toISOString(),
         permissions: formatPermissions(item.rights ? item.rights.user : null),
         mode: item.rights
       };
@@ -91,8 +126,11 @@ class FTPService {
       }
     });
 
-    await this.client.downloadTo(localPath, remotePath);
-    this.client.trackProgress(); // clear tracker
+    try {
+      await this.client.downloadTo(localPath, remotePath);
+    } finally {
+      this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
+    }
     return true;
   }
 
@@ -109,8 +147,11 @@ class FTPService {
       }
     });
 
-    await this.client.uploadFrom(localPath, remotePath);
-    this.client.trackProgress(); // clear tracker
+    try {
+      await this.client.uploadFrom(localPath, remotePath);
+    } finally {
+      this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
+    }
     return true;
   }
 
@@ -171,12 +212,12 @@ class FTPService {
   }
 
   disconnect() {
+    this.connected = false;
     if (this.client) {
       try {
         this.client.close();
       } catch (e) {}
     }
-    this.connected = false;
   }
 }
 

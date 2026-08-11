@@ -51,7 +51,9 @@ class ProfileStore {
   _saveMasterConfig() {
     try {
       if (this.masterConfig) {
-        fs.writeFileSync(this.masterConfigPath, JSON.stringify(this.masterConfig, null, 2), 'utf8');
+        const tempPath = `${this.masterConfigPath}.tmp`;
+        fs.writeFileSync(tempPath, JSON.stringify(this.masterConfig, null, 2), 'utf8');
+        fs.renameSync(tempPath, this.masterConfigPath);
       } else if (fs.existsSync(this.masterConfigPath)) {
         fs.unlinkSync(this.masterConfigPath);
       }
@@ -87,7 +89,9 @@ class ProfileStore {
     if (!encryptedText || !key) return '';
     try {
       const parts = encryptedText.split(':');
-      if (parts.length !== 3) return encryptedText; // Legacy unencrypted fallback
+      if (parts.length !== 3) {
+        return encryptedText.includes(':') ? '' : encryptedText; // Legacy unencrypted fallback (Issue 5.3)
+      }
       const [ivHex, authTagHex, encrypted] = parts;
       const iv = Buffer.from(ivHex, 'hex');
       const authTag = Buffer.from(authTagHex, 'hex');
@@ -137,7 +141,17 @@ class ProfileStore {
       password: this._encrypt(p.password),
       passphrase: this._encrypt(p.passphrase)
     }));
-    fs.writeFileSync(this.filePath, JSON.stringify(serialized, null, 2), 'utf8');
+    const tempPath = this.filePath + '.tmp';
+    try {
+      fs.writeFileSync(tempPath, JSON.stringify(serialized, null, 2), 'utf8');
+      fs.renameSync(tempPath, this.filePath);
+    } catch (e) {
+      console.error('Error writing profiles file:', e);
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch (e2) {}
+      throw e;
+    }
   }
 
   // --- Master Password Public API ---
@@ -155,20 +169,25 @@ class ProfileStore {
       return true;
     }
 
-    const key = this._deriveKey(password, this.masterConfig.salt);
-    const verifierResult = this._decryptWithKey(this.masterConfig.verifier, key);
+    try {
+      const key = this._deriveKey(password, this.masterConfig.salt);
+      const verifierResult = this._decryptWithKey(this.masterConfig.verifier, key);
 
-    if (verifierResult === 'DEVFTP_MASTER_VERIFIER') {
-      this.encryptionKey = key;
-      this.isUnlocked = true;
-      this.profiles = this._load();
-      return true;
+      if (verifierResult === 'DEVFTP_MASTER_VERIFIER') {
+        this.encryptionKey = key;
+        this.isUnlocked = true;
+        this.profiles = this._load();
+        return true;
+      }
+    } catch (e) {
+      console.error('Master key verification/derivation failed:', e);
     }
 
     return false;
   }
 
   enableMasterPassword(password) {
+    if (!this.isUnlocked) throw new Error('Vault is locked. Unlock before enabling/migrating Master Password.'); // Prevent deleting store (Issue 5.5)
     if (!password) throw new Error('Password cannot be empty');
 
     const salt = crypto.randomBytes(16).toString('hex');
@@ -237,7 +256,21 @@ class ProfileStore {
     }
     const idx = this.profiles.findIndex(p => p.id === profile.id);
     if (idx >= 0) {
-      this.profiles[idx] = { ...this.profiles[idx], ...profile };
+      const existing = this.profiles[idx];
+      const updated = { ...existing, ...profile };
+      
+      // Preserve existing credentials on import if incoming ones are blank/empty (Issue 5.4)
+      if (!profile.password && existing.password) {
+        updated.password = existing.password;
+      }
+      if (!profile.passphrase && existing.passphrase) {
+        updated.passphrase = existing.passphrase;
+      }
+      if (!profile.privateKey && existing.privateKey) {
+        updated.privateKey = existing.privateKey;
+      }
+      
+      this.profiles[idx] = updated;
     } else {
       this.profiles.push(profile);
     }

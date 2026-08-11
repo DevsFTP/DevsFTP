@@ -118,6 +118,7 @@ class CacheWatcherService {
   writeManifest(localPath, meta) {
     try {
       const manifestPath = `${localPath}.meta.json`;
+      const tempPath = `${manifestPath}.tmp`;
       const existing = this.readManifest(localPath);
       const payload = {
         version: '1.0',
@@ -132,8 +133,9 @@ class CacheWatcherService {
         initialSha256: meta.initialSha256 !== undefined ? meta.initialSha256 : ((existing && existing.initialSha256) ? existing.initialSha256 : ''),
         lastSha256: meta.lastSha256 || meta.initialSha256 || (existing ? existing.lastSha256 : '')
       };
-      fs.writeFileSync(manifestPath, JSON.stringify(payload, null, 2), 'utf8');
-      logCacheDiagnostic('manifest written', { manifestPath, remotePath: payload.remotePath });
+      fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
+      fs.renameSync(tempPath, manifestPath);
+      logCacheDiagnostic('manifest written atomically', { manifestPath, remotePath: payload.remotePath });
     } catch (err) {
       console.error('Failed to write cache manifest:', err);
     }
@@ -236,7 +238,7 @@ class CacheWatcherService {
             });
           }
         }
-      }, 200);
+      }, 500); // 500ms debounce supports editor atomic save file replace procedures safely
     });
 
     this.watchers.set(localPath, watcherRecord);
@@ -331,14 +333,29 @@ class CacheWatcherService {
           const itemFolderPath = path.join(profilePath, itemDir.name);
           try {
             const stats = fs.statSync(itemFolderPath);
-            const isStale = (now - stats.mtimeMs) > maxAgeMs;
+            let downloadedAtTime = stats.mtimeMs; // Default fallback to folder mtime
+
+            const filesInFolder = fs.readdirSync(itemFolderPath);
+            const manifestFile = filesInFolder.find(f => f.endsWith('.meta.json'));
+            if (manifestFile) {
+              try {
+                const manifestPath = path.join(itemFolderPath, manifestFile);
+                const rawMeta = fs.readFileSync(manifestPath, 'utf8');
+                const meta = JSON.parse(rawMeta);
+                if (meta && meta.downloadedAt) {
+                  downloadedAtTime = new Date(meta.downloadedAt).getTime();
+                }
+              } catch (metaErr) {}
+            }
+
+            const isStale = (now - downloadedAtTime) > maxAgeMs;
 
             // Check if any file in this folder is currently being watched
             const isWatched = Array.from(this.watchers.keys()).some(p => p.startsWith(itemFolderPath));
 
             if (isStale && !isWatched) {
               fs.rmSync(itemFolderPath, { recursive: true, force: true });
-              logCacheDiagnostic('cleaned stale edit cache folder', { itemFolderPath, ageDays: Math.round((now - stats.mtimeMs) / 86400000) });
+              logCacheDiagnostic('cleaned stale edit cache folder', { itemFolderPath, ageDays: Math.round((now - downloadedAtTime) / 86400000) });
             }
           } catch (e) {}
         }
@@ -346,6 +363,15 @@ class CacheWatcherService {
     } catch (err) {
       logCacheDiagnostic('cleanupStaleCache error', { error: err.message }, 'warn');
     }
+  }
+
+  updateWatcherSessionId(profileId, newSessionId) {
+    this.watchers.forEach(record => {
+      if (record.sessionId === newSessionId) {
+        record.profileId = profileId;
+        logCacheDiagnostic('watcher profile updated for session', { profileId, newSessionId, remotePath: record.remotePath });
+      }
+    });
   }
 
   stopWatching(localPath) {

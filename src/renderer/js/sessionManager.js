@@ -7,6 +7,7 @@
 window.SessionManager = {
   sessions: [],
   activeSessionId: null,
+  hasRestored: false,
 
   init() {
     if (this.isInitialized) return;
@@ -143,6 +144,10 @@ window.SessionManager = {
     // 3. Update Remote Workspace Display & Breadcrumb + Restore Tab Local Directory
     if (window.FileBrowser) {
       window.FileBrowser.setRemoteState(session.remoteFiles, session.remotePath);
+      // If we are connected but don't have remoteFiles loaded yet, trigger a refresh! (Issue 3)
+      if (session.connectionState === 'connected' && (!session.remoteFiles || session.remoteFiles.length === 0)) {
+        window.FileBrowser.refreshRemote(session.remotePath || '/');
+      }
       if (session.localPath && window.FileBrowser.localPath !== session.localPath) {
         window.FileBrowser.refreshLocal(session.localPath);
       }
@@ -194,17 +199,25 @@ window.SessionManager = {
     }
   },
 
-  updateActiveSessionConnectionState(isConnected, profile = null) {
-    const active = this.getActiveSession();
-    if (active) {
-      active.connectionState = isConnected ? 'connected' : 'disconnected';
+  updateSessionConnectionState(sessionId, isConnected, profile = null) {
+    const sess = this.sessions.find(s => s.sessionId === sessionId);
+    if (sess) {
+      sess.connectionState = isConnected ? 'connected' : 'disconnected';
       if (profile) {
-        active.profile = { ...profile };
-        active.profileId = profile.id;
-        active.accentColor = profile.accentColor || '#F59E0B';
+        sess.profile = { ...profile };
+        sess.profileId = profile.id;
+        sess.accentColor = profile.accentColor || '#F59E0B';
       }
-      this.setActiveSession(active.sessionId);
+      if (sessionId === this.activeSessionId) {
+        this.setActiveSession(sessionId);
+      } else {
+        this.renderTabs();
+      }
     }
+  },
+
+  updateActiveSessionConnectionState(isConnected, profile = null) {
+    this.updateSessionConnectionState(this.activeSessionId, isConnected, profile);
   },
 
   disconnectActiveSession() {
@@ -247,8 +260,8 @@ window.SessionManager = {
       this.renderTabs();
     }
 
-    // Immediately update saved workspace session storage
-    this.saveWorkspaceSessionState();
+    // Immediately update saved workspace session storage (using debounced write)
+    this.saveWorkspaceSessionStateDebounced();
   },
 
   renderTabs() {
@@ -282,7 +295,14 @@ window.SessionManager = {
       this.tabContainer.appendChild(tab);
     });
 
-    this.saveWorkspaceSessionState();
+    this.saveWorkspaceSessionStateDebounced();
+  },
+
+  saveWorkspaceSessionStateDebounced() {
+    if (this._saveSessionTimeout) clearTimeout(this._saveSessionTimeout);
+    this._saveSessionTimeout = setTimeout(() => {
+      this.saveWorkspaceSessionState();
+    }, 1000);
   },
 
   saveWorkspaceSessionState() {
@@ -302,13 +322,22 @@ window.SessionManager = {
         return;
       }
 
-      const savedState = validSessions.map(s => ({
-        profileId: s.profileId || (s.profile ? s.profile.id : null),
-        profile: s.profile,
-        remotePath: s.remotePath || (s.profile ? s.profile.remotePath : '/'),
-        localPath: s.localPath || (s.profile ? s.profile.localPath : 'C:\\'),
-        accentColor: s.accentColor
-      }));
+      const savedState = validSessions.map(s => {
+        const sanitizedProfile = s.profile ? { ...s.profile } : null;
+        if (sanitizedProfile) {
+          delete sanitizedProfile.password;
+          delete sanitizedProfile.passphrase;
+          delete sanitizedProfile.privateKey;
+          delete sanitizedProfile.privateKeyPath;
+        }
+        return {
+          profileId: s.profileId || (s.profile ? s.profile.id : null),
+          profile: sanitizedProfile,
+          remotePath: s.remotePath || (s.profile ? s.profile.remotePath : '/'),
+          localPath: s.localPath || (s.profile ? s.profile.localPath : 'C:\\'),
+          accentColor: s.accentColor
+        };
+      });
       const jsonStr = JSON.stringify(savedState);
       localStorage.setItem('devsftp_workspace_saved_tabs', jsonStr);
       if (window.LogViewer) {
@@ -322,6 +351,11 @@ window.SessionManager = {
   },
 
   async restoreWorkspaceSessionState() {
+    if (this.hasRestored) {
+      console.log('[Workspace Restore] Skip duplicate restore call.');
+      return;
+    }
+    this.hasRestored = true;
     this.isRestoring = true;
     const log = (type, msg) => {
       console.log(`[Workspace Restore] ${msg}`);
@@ -411,14 +445,15 @@ window.SessionManager = {
           if (tabData.remotePath) restoredSess.remotePath = tabData.remotePath;
           if (tabData.localPath) restoredSess.localPath = tabData.localPath;
 
-          try {
-            if (window.connectToProfileSession) {
-              await window.connectToProfileSession(prof, restoredSess.sessionId, true, tabData.remotePath, tabData.localPath);
-              log('info', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: ✓ Connection established cleanly for restored tab [${restoredSess.sessionId}].`);
-            }
-          } catch (err) {
-            log('error', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: Connection failed for restored tab [${restoredSess.sessionId}]: ${err.message}`);
-            this.closeSession(restoredSess.sessionId);
+          if (window.connectToProfileSession) {
+            window.connectToProfileSession(prof, restoredSess.sessionId, true, tabData.remotePath, tabData.localPath)
+              .then(() => {
+                log('info', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: ✓ Connection established cleanly for restored tab [${restoredSess.sessionId}].`);
+              })
+              .catch((err) => {
+                log('error', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: Connection failed for restored tab [${restoredSess.sessionId}]: ${err.message}`);
+                this.closeSession(restoredSess.sessionId);
+              });
           }
         } else {
           log('warning', `Phase 6 [Tab ${i + 1}/${validSavedTabs.length}]: Skipping invalid saved tab data (missing host/profile).`);
@@ -435,6 +470,9 @@ window.SessionManager = {
       }
     } catch (e) {
       log('error', `Workspace Session Restore exception: ${e.message}`);
+      if (this.sessions.length === 0) {
+        this.createDefaultSession(); // Prevent leaving workspace completely empty (Issue 7.3)
+      }
       openLauncherIfEmpty();
     } finally {
       this.isRestoring = false;

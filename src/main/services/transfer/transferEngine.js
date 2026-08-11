@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const SFTPAdapter = require('./sftpAdapter');
 const FTPAdapter = require('./ftpAdapter');
+const WebDAVAdapter = require('./webdavAdapter');
 
 let app = null;
 try {
@@ -51,7 +52,7 @@ class TransferEngine {
   }
 
   upsertQueueTask(task) {
-    const idx = this.queue.findIndex(q => q.id === task.id || (q.source === task.source && q.dest === task.dest));
+    const idx = this.queue.findIndex(q => q.id === task.id || (q.source === task.source && q.dest === task.dest && q.profileId === task.profileId));
     if (idx >= 0) {
       this.queue[idx] = { ...this.queue[idx], ...task };
     } else {
@@ -74,7 +75,23 @@ class TransferEngine {
 
   saveQueue(newQueue) {
     if (Array.isArray(newQueue)) {
-      this.queue = newQueue;
+      // Merge queue to prevent out-of-sync overwrites (Issue 12.1)
+      this.queue = newQueue.map(rendererTask => {
+        const mainTask = this.queue.find(q => q.id === rendererTask.id);
+        if (mainTask) {
+          if (mainTask.status === 'Completed' || mainTask.status === 'Failed' || mainTask.status === 'Running' || mainTask.status === 'Verifying') {
+            return {
+              ...rendererTask,
+              status: mainTask.status,
+              percentage: mainTask.percentage,
+              bytesTransferred: mainTask.bytesTransferred,
+              totalBytes: mainTask.totalBytes,
+              verificationState: mainTask.verificationState
+            };
+          }
+        }
+        return rendererTask;
+      });
       this._saveQueue();
     }
     return this.queue;
@@ -92,13 +109,20 @@ class TransferEngine {
   _saveQueue() {
     try {
       fs.writeFileSync(this.queueFilePath, JSON.stringify(this.queue, null, 2), 'utf8');
-    } catch (e) {}
+    } catch (e) {
+      this.logFn('error', `[TransferEngine] Failed to write transfer queue file: ${e.message}`);
+    }
   }
 
   _loadHistory() {
     if (!fs.existsSync(this.historyFilePath)) return [];
     try {
-      return JSON.parse(fs.readFileSync(this.historyFilePath, 'utf8'));
+      const raw = fs.readFileSync(this.historyFilePath, 'utf8');
+      const loaded = JSON.parse(raw);
+      if (Array.isArray(loaded)) {
+        return loaded.slice(-500); // Trim on load to keep memory footprint bounded (Issue 3.8)
+      }
+      return [];
     } catch (e) {
       return [];
     }
@@ -108,7 +132,9 @@ class TransferEngine {
     try {
       const trimmed = this.history.slice(-500);
       fs.writeFileSync(this.historyFilePath, JSON.stringify(trimmed, null, 2), 'utf8');
-    } catch (e) {}
+    } catch (e) {
+      this.logFn('error', `[TransferEngine] Failed to write transfer history file: ${e.message}`);
+    }
   }
 
   logHistory(task, status, errorMsg = null) {
@@ -137,8 +163,16 @@ class TransferEngine {
 
   getAdapter(session) {
     if (!session) return null;
+    const name = session.constructor.name;
+    if (name === 'SFTPService') return new SFTPAdapter(session);
+    if (name === 'FTPService') return new FTPAdapter(session);
+    if (name === 'WebDAVService') return new WebDAVAdapter(session);
+    
+    // Fallback checks
     if (session.sftp) return new SFTPAdapter(session);
+    if (session.client && typeof session.client.getFileContents === 'function') return new WebDAVAdapter(session);
     if (session.client) return new FTPAdapter(session);
+    
     return new SFTPAdapter(session);
   }
 
@@ -170,15 +204,34 @@ class TransferEngine {
     let partialTransfer = false;
     let resumeOffset = 0;
     let conflictType = 'exist';
+    let isLocalNewer = false;
+    let isRemoteNewer = false;
 
     if (conflict && destStat && srcStat) {
       const srcSize = srcStat.size || 0;
       const destSize = destStat.size || 0;
 
+      // Parse mtimes
+      const localTime = localStat && localStat.modifyTime ? new Date(localStat.modifyTime).getTime() : 0;
+      const remoteTime = remoteStat && remoteStat.modifyTime ? new Date(remoteStat.modifyTime).getTime() : 0;
+
+      if (localTime > 0 && remoteTime > 0) {
+        // 2-second tolerance for filesystem timestamp resolution
+        if (localTime - remoteTime > 2000) {
+          isLocalNewer = true;
+        } else if (remoteTime - localTime > 2000) {
+          isRemoteNewer = true;
+        }
+      }
+
       if (destSize > 0 && destSize < srcSize) {
         partialTransfer = true;
         resumeOffset = destSize;
         conflictType = 'partial';
+      } else if (isRemoteNewer) {
+        conflictType = 'remote_newer';
+      } else if (isLocalNewer) {
+        conflictType = 'local_newer';
       } else if (destSize === srcSize) {
         conflictType = 'same_size';
       } else if (destSize > srcSize) {
@@ -191,6 +244,8 @@ class TransferEngine {
       partialTransfer,
       resumeOffset,
       conflictType,
+      isLocalNewer,
+      isRemoteNewer,
       localStat,
       remoteStat
     };
@@ -203,8 +258,8 @@ class TransferEngine {
     const adapter = this.getAdapter(session);
     if (!adapter) throw new Error('No valid protocol adapter available');
 
-    // Reuse existing task object in queue if available
-    const existingIndex = this.queue.findIndex(q => q.source === task.source && q.dest === task.dest && q.status !== 'Completed');
+    // Reuse existing task object in queue if available (Issue 3.3)
+    const existingIndex = this.queue.findIndex(q => q.source === task.source && q.dest === task.dest && q.profileId === task.profileId && q.status !== 'Completed');
     let targetTask = task;
     if (existingIndex >= 0) {
       targetTask = this.queue[existingIndex];
@@ -233,13 +288,68 @@ class TransferEngine {
     this.logFn('info', `[TransferEngine] ${targetTask.type.toUpperCase()} ${targetTask.source} -> ${targetTask.dest} (Resume Offset: ${offset} B, Start %: ${targetTask.percentage || 0}%)`);
 
     try {
+      // Determine if source is directory (Issue 3.1 & 3.2 integration)
+      let isDirectory = false;
+      if (targetTask.type === 'download') {
+        if (session.stat) {
+          try {
+            const stat = await session.stat(targetTask.source);
+            isDirectory = stat ? Boolean(stat.isDir || stat.isDirectory) : false;
+          } catch (e) {}
+        }
+      } else {
+        try {
+          if (fs.existsSync(targetTask.source)) {
+            isDirectory = fs.statSync(targetTask.source).isDirectory();
+          }
+        } catch (e) {}
+      }
+
+      if (isDirectory) {
+        if (targetTask.type === 'download') {
+          if (typeof session.downloadDir === 'function') {
+            await session.downloadDir(targetTask.source, targetTask.dest, (progress) => {
+              targetTask.bytesTransferred = progress.transferred;
+              targetTask.totalBytes = progress.total;
+              targetTask.percentage = progress.percentage;
+              this.upsertQueueTask(targetTask);
+              this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, remotePath: targetTask.source, localPath: targetTask.dest, type: 'download' });
+            });
+          } else {
+            throw new Error('Directory download not supported by this protocol.');
+          }
+        } else {
+          if (typeof session.uploadDir === 'function') {
+            await session.uploadDir(targetTask.source, targetTask.dest, (progress) => {
+              targetTask.bytesTransferred = progress.transferred;
+              targetTask.totalBytes = progress.total;
+              targetTask.percentage = progress.percentage;
+              this.upsertQueueTask(targetTask);
+              this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, localPath: targetTask.source, remotePath: targetTask.dest, type: 'upload' });
+            });
+          } else {
+            throw new Error('Directory upload not supported by this protocol.');
+          }
+        }
+
+        // Directories skip size verification checks
+        targetTask.status = 'Completed';
+        targetTask.verificationState = 'Verified';
+        targetTask.percentage = 100;
+        this.upsertQueueTask(targetTask);
+        this.logHistory(targetTask, 'Success');
+        this.logFn('info', `✅ [TransferEngine] Directory transfer complete: ${targetTask.dest}`);
+        return true;
+      }
+
+      // Single file transfer stream logic
       if (targetTask.type === 'download') {
         await adapter.downloadStream(targetTask.source, targetTask.dest, offset, (progress) => {
           targetTask.bytesTransferred = progress.transferred;
           targetTask.totalBytes = progress.total;
           targetTask.percentage = progress.percentage;
           this.upsertQueueTask(targetTask);
-          this.notifyWindow('transfer:progress', { ...progress, remotePath: targetTask.source, localPath: targetTask.dest, type: 'download' });
+          this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, remotePath: targetTask.source, localPath: targetTask.dest, type: 'download' });
         });
       } else {
         await adapter.uploadStream(targetTask.source, targetTask.dest, offset, (progress) => {
@@ -247,7 +357,7 @@ class TransferEngine {
           targetTask.totalBytes = progress.total;
           targetTask.percentage = progress.percentage;
           this.upsertQueueTask(targetTask);
-          this.notifyWindow('transfer:progress', { ...progress, localPath: targetTask.source, remotePath: targetTask.dest, type: 'upload' });
+          this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, localPath: targetTask.source, remotePath: targetTask.dest, type: 'upload' });
         });
       }
 
@@ -261,7 +371,16 @@ class TransferEngine {
       const destStat = targetTask.type === 'download' ? verifyCheck.localStat : verifyCheck.remoteStat;
       const srcStat = targetTask.type === 'download' ? verifyCheck.remoteStat : verifyCheck.localStat;
 
-      if (srcStat && destStat && srcStat.size > 0 && destStat.size !== srcStat.size) {
+      // Fail verification if we can't obtain stats for both sides due to connection drops (Issue 3.6)
+      if (!srcStat || !destStat) {
+        targetTask.status = 'Failed';
+        targetTask.verificationState = 'VerificationFailed';
+        this.upsertQueueTask(targetTask);
+        this.logHistory(targetTask, 'Failed', `Verification failed: could not stat source or destination files.`);
+        throw new Error(`Verification failed: could not stat source or destination files.`);
+      }
+
+      if (srcStat.size > 0 && destStat.size !== srcStat.size) {
         targetTask.status = 'Failed';
         targetTask.verificationState = 'Mismatch';
         this.upsertQueueTask(targetTask);

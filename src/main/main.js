@@ -86,7 +86,6 @@ let knownHostsStore = null;
 let scheduledJobStore = null;
 let jobRunnerService = null;
 let transferEngine = null;
-let activeSession = null; // sftpService or ftpService
 let activeConfig = null;
 let sshTerminalService = null;
 let cacheWatcherService = null;
@@ -96,6 +95,21 @@ function redactSensitiveText(text) {
   return String(text)
     .replace(/(password|passphrase|secret|token)[:=]\s*\S+/gi, '$1: [REDACTED]')
     .replace(/-----BEGIN[A-Z\s]+PRIVATE KEY-----[\s\S]*?-----END[A-Z\s]+PRIVATE KEY-----/g, '[REDACTED PRIVATE KEY]');
+}
+
+function isSafeLocalPath(targetPath) {
+  if (!targetPath) return false;
+  const resolved = path.resolve(targetPath);
+  const lower = resolved.toLowerCase();
+  
+  // Prevent deleting system or root directories (Issue 13.1)
+  if (lower === 'c:\\' || lower === 'c:' || lower === 'd:\\' || lower === 'd:' || resolved === '/') return false;
+  if (lower.startsWith('c:\\windows') || lower.startsWith('c:\\program files')) return false;
+  
+  const userHome = process.env.USERPROFILE || process.env.HOME || '';
+  if (userHome && lower === path.resolve(userHome).toLowerCase()) return false;
+  
+  return true;
 }
 
 function stringifyDiagnosticValue(value, seen = new WeakSet()) {
@@ -160,11 +174,23 @@ function appendDiagnosticLine(line) {
     const time = new Date().toLocaleTimeString();
     const normalized = String(line).endsWith('\n') ? String(line) : `${line}\n`;
     const formatted = `[${time}] ${normalized}`;
-    const logPath1 = path.join(process.cwd(), 'devsftp-debug.log');
-    fs.appendFileSync(logPath1, formatted);
+    
+    // Attempt writing to working directory (may restrict this - Issue 13.4)
+    try {
+      const logPath1 = path.join(process.cwd(), 'devsftp-debug.log');
+      fs.appendFileSync(logPath1, formatted);
+    } catch (e1) {
+      console.warn('Failed to write diagnostics to working directory:', e1.message);
+    }
+
     if (app) {
-      const logPath2 = path.join(app.getPath('userData'), 'devsftp-debug.log');
-      fs.appendFileSync(logPath2, formatted);
+      try {
+        const logPath2 = path.join(app.getPath('userData'), 'devsftp-debug.log');
+        fs.appendFileSync(logPath2, formatted);
+      } catch (e2) {
+        // Fallback for crash handler write failures (Issue 14.4)
+        console.error('Failed to write diagnostics to AppData directory:', e2.message);
+      }
     }
   } catch (e) {}
 }
@@ -303,7 +329,10 @@ function createSystemTray() {
       {
         label: '❌ Exit DevsFTP',
         click: () => {
-          if (activeSession) activeSession.disconnect();
+          for (const item of activeSessions.values()) {
+            if (item && item.session) item.session.disconnect();
+          }
+          activeSessions.clear();
           app.quit();
         }
       }
@@ -509,7 +538,11 @@ async function handleHostKeyVerification({ host, port, fingerprint }) {
       
       const onResponse = (_event, response) => {
         if (response && response.requestId === requestId) {
+          clearTimeout(timeout);
           ipcMain.removeListener('ssh:host-key-verify-response', onResponse);
+          mainWindow.off('closed', cleanupOnWindowReloadOrClose);
+          mainWindow.webContents.off('did-start-navigation', cleanupOnWindowReloadOrClose);
+
           if (response.action === 'trust_always') {
             knownHostsStore.saveHostKey(host, port, fingerprint);
             sendLog('info', `Trusted & encrypted new SSH host key for ${host}:${port}`);
@@ -523,6 +556,23 @@ async function handleHostKeyVerification({ host, port, fingerprint }) {
           }
         }
       };
+
+      const timeout = setTimeout(() => {
+        ipcMain.removeListener('ssh:host-key-verify-response', onResponse);
+        mainWindow.off('closed', cleanupOnWindowReloadOrClose);
+        mainWindow.webContents.off('did-start-navigation', cleanupOnWindowReloadOrClose);
+        sendLog('warning', `Host key verification request timed out for ${host}:${port}`);
+        resolve(false);
+      }, 60000);
+
+      const cleanupOnWindowReloadOrClose = () => {
+        clearTimeout(timeout);
+        ipcMain.removeListener('ssh:host-key-verify-response', onResponse);
+        resolve(false);
+      };
+
+      mainWindow.once('closed', cleanupOnWindowReloadOrClose);
+      mainWindow.webContents.once('did-start-navigation', cleanupOnWindowReloadOrClose);
 
       ipcMain.on('ssh:host-key-verify-response', onResponse);
 
@@ -571,9 +621,60 @@ if (!gotTheLock) {
   });
 }
 
+app.on('before-quit', () => {
+  writeDebugLog({
+    scope: 'main',
+    event: 'before-quit',
+    level: 'info',
+    message: 'Teardown services and timers'
+  });
+
+  // 14.1 Graceful Transfer Shutdown
+  if (transferEngine && transferEngine.queue) {
+    const active = transferEngine.queue.filter(q => q.status === 'Running' || q.status === 'In Progress' || q.status === 'Verifying');
+    active.forEach(task => {
+      task.status = 'Waiting to Resume';
+      task.speed = '0 KB/s';
+      if (!task.resumeOffset && task.bytesTransferred) {
+        task.resumeOffset = task.bytesTransferred;
+      }
+    });
+    transferEngine._saveQueue();
+  }
+
+  // 14.2 Timer Teardowns
+  if (jobRunnerService && typeof jobRunnerService.stop === 'function') {
+    try {
+      jobRunnerService.stop();
+    } catch (err) {}
+  }
+
+  // 14.3 Tunnel Teardowns
+  if (tunnelService && typeof tunnelService.stopAll === 'function') {
+    try {
+      tunnelService.tunnels.forEach((t, id) => {
+        if (t.localServer) {
+          try { t.localServer.close(); } catch (err) {}
+        }
+        if (t.activeSockets) {
+          for (const s of t.activeSockets) {
+            try { s.destroy(); } catch (err) {}
+          }
+        }
+        if (t.sshClient) {
+          try { t.sshClient.end(); } catch (err) {}
+        }
+      });
+    } catch (err) {}
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (activeSession) activeSession.disconnect();
+    for (const item of activeSessions.values()) {
+      if (item && item.session) item.session.disconnect();
+    }
+    activeSessions.clear();
     if (sshTerminalService) sshTerminalService.disconnect();
     app.quit();
   }
@@ -639,7 +740,7 @@ registerLoggedHandle('profiles:import-ssh-config', async (_event, customFilePath
     }
     const saved = [];
     for (const p of importedProfiles) {
-      const result = await profileStore.upsertProfile(p);
+      const result = await profileStore.upsert(p);
       saved.push(result);
     }
     sendLog('info', `Successfully imported ${saved.length} profile(s) from SSH config.`);
@@ -787,7 +888,6 @@ function triggerAutoReconnect(sessionId, config, protocol) {
 
       newSession.onUnexpectedClose = () => triggerAutoReconnect(sessionId, config, protocol);
 
-      activeSession = newSession;
       activeSessions.set(sessionId, { session: newSession, config, protocol });
       autoReconnectState.delete(sessionId);
 
@@ -809,15 +909,28 @@ registerLoggedOn('notification:send', (_event, { title, body }) => {
 });
 
 function getActiveSessionInstance(sessionId) {
-  if (sessionId && activeSessions.has(sessionId)) {
+  if (sessionId) {
     const item = activeSessions.get(sessionId);
-    if (item && item.session && item.session.connected) return item.session;
+    if (item && item.session && item.session.connected) {
+      return item.session;
+    }
+    return null; // Do NOT fall back to other sessions if a specific sessionId was requested but is not connected
   }
-  if (activeSession && activeSession.connected) {
-    return activeSession;
+  // If no sessionId was provided (fallback to last active session or single connection)
+  if (activeSessions.size === 1) {
+    const item = activeSessions.values().next().value;
+    if (item && item.session && item.session.connected) {
+      return item.session;
+    }
   }
-  for (const item of activeSessions.values()) {
-    if (item && item.session && item.session.connected) return item.session;
+  return null;
+}
+
+function getSessionByProfileId(profileId) {
+  for (const [sessId, item] of activeSessions.entries()) {
+    if (item && item.config && item.config.id === profileId && item.session && item.session.connected) {
+      return { session: item.session, sessionId: sessId };
+    }
   }
   return null;
 }
@@ -846,12 +959,13 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
     try {
       await session.connect(config, (type, msg) => sendLog(type, msg), handleHostKeyVerification);
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
-      activeSession = session;
       activeSessions.set(sessId, { session, config, protocol });
+      if (cacheWatcherService) {
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+      }
       sendLog('info', `SFTP Session established cleanly for tab [${sessId}] to ${config.host}:${config.port || 22}`);
       return { success: true, protocol: 'sftp', sessionId: sessId };
     } catch (err) {
-      activeSession = null; // Prevent stale session fallback
       sendLog('error', `SFTP Connection failed for tab [${sessId}]: ${err.message}`);
       throw err;
     }
@@ -860,12 +974,13 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
     try {
       await session.connect(config, (type, msg) => sendLog(type, msg));
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
-      activeSession = session;
       activeSessions.set(sessId, { session, config, protocol });
+      if (cacheWatcherService) {
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+      }
       sendLog('info', `WebDAV Session established cleanly for tab [${sessId}] to ${config.webdavUrl || config.host}`);
       return { success: true, protocol: 'webdav', sessionId: sessId };
     } catch (err) {
-      activeSession = null; // Prevent stale session fallback
       sendLog('error', `WebDAV Connection failed for tab [${sessId}]: ${err.message}`);
       throw err;
     }
@@ -874,12 +989,13 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
     try {
       await session.connect(config, (type, msg) => sendLog(type, msg));
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
-      activeSession = session;
       activeSessions.set(sessId, { session, config, protocol });
+      if (cacheWatcherService) {
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+      }
       sendLog('info', `FTP/FTPS Session established cleanly for tab [${sessId}] to ${config.host}:${config.port || 21}`);
       return { success: true, protocol: 'ftp', sessionId: sessId };
     } catch (err) {
-      activeSession = null; // Prevent stale session fallback
       sendLog('error', `FTP Connection failed for tab [${sessId}]: ${err.message}`);
       throw err;
     }
@@ -994,6 +1110,9 @@ registerLoggedHandle('local:rename', async (_event, oldPath, newPath) => {
 });
 
 registerLoggedHandle('local:delete', async (_event, localPath) => {
+  if (!isSafeLocalPath(localPath)) {
+    throw new Error(`Permission denied: Deletion path '${localPath}' is outside safe boundaries.`);
+  }
   if (fs.existsSync(localPath)) {
     fs.rmSync(localPath, { recursive: true, force: true });
   }
@@ -1056,9 +1175,9 @@ registerLoggedHandle('local:open', async (_event, localPath) => {
     if (webExts.includes(ext) && process.platform === 'win32') {
       const codeEditorPath = cacheWatcherService ? cacheWatcherService.getSystemCodeEditorPath() : null;
       if (codeEditorPath && fs.existsSync(codeEditorPath)) {
-        const { exec } = require('child_process');
+        const { execFile } = require('child_process'); // Avoid shell injection (Issue 13.2)
         sendLog('info', `Opening local code file in system code editor (${path.basename(codeEditorPath)}): ${normalized}`);
-        exec(`"${codeEditorPath}" "${normalized}"`);
+        execFile(codeEditorPath, [normalized]);
         return true;
       }
     }
@@ -1074,75 +1193,63 @@ registerLoggedHandle('local:open', async (_event, localPath) => {
 // Transfer Operations & Unified Transfer Engine IPC
 
 registerLoggedHandle('transfer:download', async (_event, remotePath, localPath, sessionId, options = {}) => {
-  const session = getActiveSessionInstance(sessionId);
+  let session = getActiveSessionInstance(sessionId);
+  if (!session || !session.connected) {
+    if (options && options.profileId) {
+      const match = getSessionByProfileId(options.profileId);
+      if (match) {
+        session = match.session;
+        sessionId = match.sessionId;
+      }
+    }
+  }
   if (!session || !session.connected) throw new Error('Not connected');
+
+  const sessionItem = sessionId ? activeSessions.get(sessionId) : null;
+  const profile = sessionItem ? sessionItem.config : activeConfig;
+  const profileId = profile ? profile.id : 'temp';
   
   sendLog('info', `Starting download via Transfer Engine: ${remotePath} -> ${localPath}`);
 
-  let isDirectory = false;
-  if (session.stat) {
-    try {
-      const stat = await session.stat(remotePath);
-      isDirectory = stat ? Boolean(stat.isDir || stat.isDirectory) : false;
-    } catch (e) {}
-  }
-
-  if (isDirectory && session.downloadDir) {
-    return await session.downloadDir(remotePath, localPath, (progress) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('transfer:progress', {
-          type: 'download',
-          remotePath,
-          localPath,
-          ...progress
-        });
-      }
-    });
-  } else {
-    const task = {
-      id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      type: 'download',
-      source: remotePath,
-      dest: localPath
-    };
-    return await transferEngine.executeTransfer(task, session, options);
-  }
+  const task = {
+    id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    type: 'download',
+    source: remotePath,
+    dest: localPath,
+    profileId: profileId,
+    sessionId: sessionId
+  };
+  return await transferEngine.executeTransfer(task, session, options);
 });
 
 registerLoggedHandle('transfer:upload', async (_event, localPath, remotePath, sessionId, options = {}) => {
-  const session = getActiveSessionInstance(sessionId);
+  let session = getActiveSessionInstance(sessionId);
+  if (!session || !session.connected) {
+    if (options && options.profileId) {
+      const match = getSessionByProfileId(options.profileId);
+      if (match) {
+        session = match.session;
+        sessionId = match.sessionId;
+      }
+    }
+  }
   if (!session || !session.connected) throw new Error('Not connected');
+
+  const sessionItem = sessionId ? activeSessions.get(sessionId) : null;
+  const profile = sessionItem ? sessionItem.config : activeConfig;
+  const profileId = profile ? profile.id : 'temp';
 
   sendLog('info', `Starting upload via Transfer Engine: ${localPath} -> ${remotePath}`);
 
-  let isDirectory = false;
-  try {
-    if (fs.existsSync(localPath)) {
-      const stat = fs.statSync(localPath);
-      isDirectory = stat.isDirectory();
-    }
-  } catch (e) {}
-
-  if (isDirectory && session.uploadDir) {
-    return await session.uploadDir(localPath, remotePath, (progress) => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('transfer:progress', {
-          type: 'upload',
-          localPath,
-          remotePath,
-          ...progress
-        });
-      }
-    });
-  } else {
-    const task = {
-      id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      type: 'upload',
-      source: localPath,
-      dest: remotePath
-    };
-    return await transferEngine.executeTransfer(task, session, options);
-  }
+  const task = {
+    id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    type: 'upload',
+    source: localPath,
+    dest: remotePath,
+    profileId: profileId,
+    sessionId: sessionId
+  };
+  return await transferEngine.executeTransfer(task, session, options);
 });
 
 registerLoggedHandle('history:get-all', async () => {
@@ -1189,9 +1296,19 @@ registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
 
   if (!session || !session.connected) throw new Error('Not connected');
 
-  const profileId = activeConfig ? activeConfig.id : 'temp';
+  const sessionItem = sessionId ? activeSessions.get(sessionId) : null;
+  const profile = sessionItem ? sessionItem.config : activeConfig;
+  const profileId = profile ? profile.id : 'temp';
+
   const localCachePath = cacheWatcherService.getCachePath(profileId, remotePath);
   console.log('[CHECKPOINT 12] Temporary cache file path:', localCachePath);
+
+  // If the file is already being watched/edited, do not download it again! (Issue 2.6)
+  if (cacheWatcherService && cacheWatcherService.watchers.has(localCachePath)) {
+    sendLog('info', `File ${path.basename(remotePath)} is already open for editing. Re-focusing.`);
+    cacheWatcherService.launchEditor(localCachePath);
+    return { localPath: localCachePath };
+  }
 
   console.log('[CHECKPOINT 10] Download started for editing:', { remotePath, localCachePath });
   writeDebugLog({
@@ -1219,7 +1336,7 @@ registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
     } catch (e) {}
   }
   
-  cacheWatcherService.openAndWatch(localCachePath, remotePath, activeConfig || profileId, sessionId, remoteStats);
+  cacheWatcherService.openAndWatch(localCachePath, remotePath, profile || profileId, sessionId, remoteStats);
   sendLog('info', `Opened ${path.basename(remotePath)} in default editor with live sync.`);
   return { localPath: localCachePath };
 });
@@ -1256,7 +1373,7 @@ registerLoggedHandle('transfer:background-upload-batch', async (_event, payload)
     groups[pId].push(item);
   });
 
-  const profiles = await profileStore.getAllProfiles();
+  const profiles = await profileStore.getAll();
   const conflicts = [];
   let uploadedCount = 0;
 
@@ -1403,10 +1520,14 @@ registerLoggedHandle('dialog:save-file', async (_event, options) => {
 // =========================================================================
 
 registerLoggedHandle('system:open-external', async (_event, url) => {
-  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:'))) {
-    await shell.openExternal(url);
-    return true;
-  }
+  if (!url) return false;
+  try {
+    const parsed = new URL(url); // Robust protocol parsing (Issue 13.3)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+      await shell.openExternal(url);
+      return true;
+    }
+  } catch (e) {}
   return false;
 });
 

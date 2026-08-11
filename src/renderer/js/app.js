@@ -1107,14 +1107,22 @@ document.addEventListener('DOMContentLoaded', () => {
       await api.connect(profile, sessId);
 
       if (window.SessionManager) {
-        window.SessionManager.updateActiveSessionConnectionState(true, profile);
+        window.SessionManager.updateSessionConnectionState(sessId, true, profile);
       }
 
       const initialRemotePath = targetRemotePath || profile.remotePath || '/';
-      await window.FileBrowser.refreshRemote(initialRemotePath);
-
       const initialLocalPath = targetLocalPath || profile.localPath || 'C:\\';
-      await window.FileBrowser.refreshLocal(initialLocalPath);
+
+      const targetSess = window.SessionManager ? window.SessionManager.sessions.find(s => s.sessionId === sessId) : null;
+      if (targetSess) {
+        targetSess.remotePath = initialRemotePath;
+        targetSess.localPath = initialLocalPath;
+      }
+
+      if (!window.SessionManager || sessId === window.SessionManager.activeSessionId) {
+        await window.FileBrowser.refreshRemote(initialRemotePath);
+        await window.FileBrowser.refreshLocal(initialLocalPath);
+      }
 
       if (profile.protocol === 'sftp') {
         try {
@@ -1260,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.TransferQueue.addTransfer('upload', data.localPath, data.remotePath);
         }
         try {
-          await api.uploadFile(data.localPath, data.remotePath, data.sessionId);
+          await api.uploadFile(data.localPath, data.remotePath, data.sessionId, { profileId: data.profileId });
           if (window.EditorDebug) window.EditorDebug.addEntry('STAGE 6', `UPLOAD COMPLETE = YES (${data.fileName} updated on remote server)`);
           logDiagnostic('upload completed', {
             fileName: data.fileName,
@@ -1464,7 +1472,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (policy === 'newer') {
         const srcTime = data.localStat ? new Date(data.localStat.modifyTime).getTime() : 0;
         const dstTime = data.remoteStat ? new Date(data.remoteStat.modifyTime).getTime() : 0;
-        return srcTime > dstTime ? 'overwrite' : 'skip';
+        const localIsNewer = data.isLocalNewer !== undefined ? data.isLocalNewer : (srcTime - dstTime > 2000);
+        const remoteIsNewer = data.isRemoteNewer !== undefined ? data.isRemoteNewer : (dstTime - srcTime > 2000);
+
+        if (localIsNewer) {
+          return 'overwrite';
+        } else if (remoteIsNewer) {
+          if (window.LogViewer) {
+            window.LogViewer.addEntry('warning', `⚠️ Remote server file is newer (${new Date(dstTime).toLocaleString()}) than local file (${new Date(srcTime).toLocaleString()}). Prompting for conflict decision.`);
+          }
+          // Fall through to show Conflict Modal prompt below
+        } else {
+          // Same timestamp / within 2s tolerance
+          return 'overwrite';
+        }
       }
 
       if (batchConflictAction) {

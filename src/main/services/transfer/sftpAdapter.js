@@ -45,6 +45,22 @@ class SFTPAdapter {
         let validOffset = Math.min(offset, totalBytes);
         if (validOffset < 0) validOffset = 0;
 
+        // Verify local file size matches the offset to prevent corrupt appends (Issue 3.4)
+        if (validOffset > 0) {
+          try {
+            if (fs.existsSync(localPath)) {
+              const localSize = fs.statSync(localPath).size;
+              if (validOffset > localSize) {
+                validOffset = localSize;
+              }
+            } else {
+              validOffset = 0;
+            }
+          } catch (e) {
+            validOffset = 0;
+          }
+        }
+
         let bytesRead = validOffset;
 
         const writeFlags = validOffset > 0 ? 'a' : 'w';
@@ -105,45 +121,63 @@ class SFTPAdapter {
         let validOffset = Math.min(offset, totalBytes);
         if (validOffset < 0) validOffset = 0;
 
-        let bytesSent = validOffset;
+        const startUpload = () => {
+          let bytesSent = validOffset;
 
-        const readStreamOptions = validOffset > 0 ? { start: validOffset } : {};
-        const readStream = fs.createReadStream(localPath, readStreamOptions);
+          const readStreamOptions = validOffset > 0 ? { start: validOffset } : {};
+          const readStream = fs.createReadStream(localPath, readStreamOptions);
 
-        const writeStreamOptions = validOffset > 0 ? { flags: 'a' } : { flags: 'w' };
-        const writeStream = this.sftp.createWriteStream(normRemote, writeStreamOptions);
+          const writeStreamOptions = validOffset > 0 ? { flags: 'a' } : { flags: 'w' };
+          const writeStream = this.sftp.createWriteStream(normRemote, writeStreamOptions);
 
-        let isDone = false;
-        const cleanup = (err) => {
-          if (isDone) return;
-          isDone = true;
-          if (err) {
-            try { writeStream.destroy(); } catch (e) {}
-            try { readStream.destroy(); } catch (e) {}
-            reject(err);
-          } else {
-            resolve({ transferred: bytesSent, total: totalBytes });
-          }
+          let isDone = false;
+          const cleanup = (err) => {
+            if (isDone) return;
+            isDone = true;
+            if (err) {
+              try { writeStream.destroy(); } catch (e) {}
+              try { readStream.destroy(); } catch (e) {}
+              reject(err);
+            } else {
+              resolve({ transferred: bytesSent, total: totalBytes });
+            }
+          };
+
+          readStream.on('data', (chunk) => {
+            bytesSent += chunk.length;
+            if (onProgress) {
+              onProgress({
+                transferred: bytesSent,
+                total: totalBytes,
+                percentage: Math.min(100, parseFloat(((bytesSent / totalBytes) * 100).toFixed(1)))
+              });
+            }
+          });
+
+          readStream.on('error', (err) => cleanup(err));
+          writeStream.on('error', (err) => cleanup(err));
+
+          writeStream.on('finish', () => cleanup(null));
+          writeStream.on('close', () => cleanup(null));
+
+          readStream.pipe(writeStream);
         };
 
-        readStream.on('data', (chunk) => {
-          bytesSent += chunk.length;
-          if (onProgress) {
-            onProgress({
-              transferred: bytesSent,
-              total: totalBytes,
-              percentage: Math.min(100, parseFloat(((bytesSent / totalBytes) * 100).toFixed(1)))
-            });
-          }
-        });
-
-        readStream.on('error', (err) => cleanup(err));
-        writeStream.on('error', (err) => cleanup(err));
-
-        writeStream.on('finish', () => cleanup(null));
-        writeStream.on('close', () => cleanup(null));
-
-        readStream.pipe(writeStream);
+        if (validOffset > 0) {
+          this.sftp.stat(normRemote, (remoteStatErr, remoteStats) => {
+            if (!remoteStatErr && remoteStats) {
+              const remoteSize = remoteStats.size || 0;
+              if (validOffset > remoteSize) {
+                validOffset = remoteSize;
+              }
+            } else {
+              validOffset = 0;
+            }
+            startUpload();
+          });
+        } else {
+          startUpload();
+        }
       });
     });
   }

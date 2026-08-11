@@ -8,6 +8,7 @@ const path = require('path');
 const { Notification } = require('electron');
 const SFTPService = require('./sftpService');
 const FTPService = require('./ftpService');
+const WebDAVService = require('./webdavService');
 
 class JobRunnerService {
   constructor(ipcWindow, jobStore, profileStore, logFn) {
@@ -84,6 +85,7 @@ class JobRunnerService {
     }
 
     if (job.frequency === 'once') {
+      if (job.lastRun) return null;
       return job.targetTimestamp ? new Date(job.targetTimestamp).toISOString() : null;
     }
 
@@ -98,7 +100,14 @@ class JobRunnerService {
       if (!job.enabled || this.runningJobs.has(job.id)) continue;
       if (job.frequency === 'startup') continue;
 
-      const nextRunStr = this.calculateNextRun(job);
+      let nextRunStr = job.nextRun;
+      if (!nextRunStr) {
+        nextRunStr = this.calculateNextRun(job);
+        if (nextRunStr) {
+          job.nextRun = nextRunStr;
+          this.jobStore.upsert(job);
+        }
+      }
       if (!nextRunStr || nextRunStr === 'On App Startup') continue;
 
       const nextRunDate = new Date(nextRunStr);
@@ -145,7 +154,14 @@ class JobRunnerService {
       return;
     }
 
-    const Driver = (profile.protocol === 'ftp' || profile.protocol === 'ftps') ? FTPService : SFTPService;
+    let Driver;
+    if (profile.protocol === 'webdav') {
+      Driver = WebDAVService;
+    } else if (profile.protocol === 'ftp' || profile.protocol === 'ftps') {
+      Driver = FTPService;
+    } else {
+      Driver = SFTPService;
+    }
     const driver = new Driver();
 
     try {
@@ -184,7 +200,12 @@ class JobRunnerService {
       job.lastStatus = 'Success';
       job.lastError = null;
       job.lastRun = new Date().toISOString();
-      job.nextRun = this.calculateNextRun(job);
+      if (job.frequency === 'once') {
+        job.enabled = false;
+        job.nextRun = null;
+      } else {
+        job.nextRun = this.calculateNextRun(job);
+      }
       this.jobStore.upsert(job);
       this.log('info', `✅ Scheduled Job [${job.name}] completed successfully.`);
 
@@ -203,6 +224,12 @@ class JobRunnerService {
       job.lastStatus = 'Failed';
       job.lastError = errMsg;
       job.lastRun = new Date().toISOString();
+      if (job.frequency === 'once') {
+        job.enabled = false;
+        job.nextRun = null;
+      } else {
+        job.nextRun = this.calculateNextRun(job); // Calculate next interval run even on failure (Issue 4.3)
+      }
       this.jobStore.upsert(job);
       this.log('error', `❌ Scheduled Job [${job.name}] failed: ${errMsg}`);
 

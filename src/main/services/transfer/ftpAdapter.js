@@ -31,10 +31,18 @@ class FTPAdapter {
     if (!this.session || !this.session.connected) throw new Error('FTP client disconnected');
     const normRemote = normalizePOSIXPath(remotePath);
 
+    let actualOffset = offset;
     this.client.trackProgress(info => {
       if (onProgress) {
-        const transferred = offset + info.bytes;
-        const total = offset + (info.bytesOverall || info.bytes);
+        // If the bytes transferred in this call exceeds the expected remaining bytes,
+        // it means the server did not resume and is sending the file from the beginning.
+        const expectedRemaining = info.bytesOverall - actualOffset;
+        if (info.bytes > expectedRemaining) {
+          actualOffset = 0; // Reset offset to 0 because we are transferring from the start
+        }
+
+        const transferred = actualOffset + info.bytes;
+        const total = info.bytesOverall || transferred;
         onProgress({
           transferred,
           total,
@@ -55,10 +63,18 @@ class FTPAdapter {
     if (!this.session || !this.session.connected) throw new Error('FTP client disconnected');
     const normRemote = normalizePOSIXPath(remotePath);
 
+    let actualOffset = offset;
     this.client.trackProgress(info => {
       if (onProgress) {
-        const transferred = offset + info.bytes;
-        const total = offset + (info.bytesOverall || info.bytes);
+        // If the bytes transferred in this call exceeds the expected remaining bytes,
+        // it means the server did not resume and is sending the file from the beginning.
+        const expectedRemaining = info.bytesOverall - actualOffset;
+        if (info.bytes > expectedRemaining) {
+          actualOffset = 0;
+        }
+
+        const transferred = actualOffset + info.bytes;
+        const total = info.bytesOverall || transferred;
         onProgress({
           transferred,
           total,
