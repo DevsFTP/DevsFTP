@@ -119,6 +119,8 @@ window.ConnectionDialog = {
         if (portGroup) portGroup.style.display = proto === 's3' ? 'none' : '';
         if (s3Group) s3Group.style.display = proto === 's3' ? 'flex' : 'none';
 
+        this.updateFormLabels(proto);
+
         if (proto === 'sftp') {
           portField.value = '22';
           if (webdavPathGroup) webdavPathGroup.style.display = 'none';
@@ -326,6 +328,8 @@ window.ConnectionDialog = {
 
     this.setIdentityColor(profile.accentColor || '#68a063');
 
+    this.updateFormLabels(profile.protocol || 'sftp');
+
     const btnConnect = document.getElementById('btn-conn-connect');
     if (btnConnect) btnConnect.disabled = false;
   },
@@ -385,8 +389,35 @@ window.ConnectionDialog = {
 
     this.setIdentityColor('#68a063');
 
+    this.updateFormLabels('sftp');
+
     const btnConnect = document.getElementById('btn-conn-connect');
     if (btnConnect) btnConnect.disabled = false;
+  },
+
+  updateFormLabels(proto) {
+    const lblUser = document.getElementById('lbl-prof-username');
+    const lblPass = document.getElementById('lbl-prof-password');
+    const txtUser = document.getElementById('prof-username');
+    const txtPass = document.getElementById('prof-password');
+    const groupAuth = document.getElementById('group-authtype');
+    const groupUser = document.getElementById('group-username');
+
+    if (proto === 's3') {
+      if (lblUser) lblUser.textContent = 'Access Key ID';
+      if (txtUser) txtUser.placeholder = 'AKIAIOSFODNN7EXAMPLE';
+      if (lblPass) lblPass.textContent = 'Secret Access Key';
+      if (txtPass) txtPass.placeholder = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+      if (groupAuth) groupAuth.style.display = 'none';
+      if (groupUser) groupUser.style.gridColumn = 'span 2';
+    } else {
+      if (lblUser) lblUser.textContent = 'Username';
+      if (txtUser) txtUser.placeholder = 'root or ubuntu';
+      if (lblPass) lblPass.textContent = 'Password';
+      if (txtPass) txtPass.placeholder = '••••••••';
+      if (groupAuth) groupAuth.style.display = '';
+      if (groupUser) groupUser.style.gridColumn = '';
+    }
   },
 
   async saveCurrentProfile() {
