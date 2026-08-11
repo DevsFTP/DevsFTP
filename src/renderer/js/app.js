@@ -1133,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Show/hide SSH Terminal drawer tab based on protocol
-      // WebDAV and FTP do not support PTY terminal shells
+      // WebDAV and FTP do not support PTY terminal shells or tunneling
       const termTab = document.querySelector('.drawer-tab[data-tab="tab-terminal"]');
       if (termTab) {
         const hasTerminal = profile.protocol === 'sftp';
@@ -1142,6 +1142,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!hasTerminal) {
           const activeTab = document.querySelector('.drawer-tab.active');
           if (!activeTab || activeTab.getAttribute('data-tab') === 'tab-terminal') {
+            const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
+            if (queueTab) queueTab.click();
+          }
+        }
+      }
+
+      // Show/hide SSH Tunnels drawer tab based on protocol
+      const tunnelsTab = document.querySelector('.drawer-tab[data-tab="tab-tunnels"]');
+      if (tunnelsTab) {
+        const hasTunnels = profile.protocol === 'sftp';
+        tunnelsTab.style.display = hasTunnels ? '' : 'none';
+        if (!hasTunnels) {
+          const activeTab = document.querySelector('.drawer-tab.active');
+          if (activeTab && activeTab.getAttribute('data-tab') === 'tab-tunnels') {
             const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
             if (queueTab) queueTab.click();
           }

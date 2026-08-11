@@ -153,10 +153,36 @@ window.SessionManager = {
       }
     }
 
-    // 4. Update status indicator text
+    // 4. Update status indicator text and drawer tab visibility based on active session protocol
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
     const remoteTag = document.getElementById('remote-tag');
+
+    const hasSsh = session.connectionState === 'connected' && session.profile && session.profile.protocol === 'sftp';
+
+    const termTab = document.querySelector('.drawer-tab[data-tab="tab-terminal"]');
+    if (termTab) {
+      termTab.style.display = hasSsh ? '' : 'none';
+      if (!hasSsh) {
+        const activeTab = document.querySelector('.drawer-tab.active');
+        if (activeTab && activeTab.getAttribute('data-tab') === 'tab-terminal') {
+          const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
+          if (queueTab) queueTab.click();
+        }
+      }
+    }
+
+    const tunnelsTab = document.querySelector('.drawer-tab[data-tab="tab-tunnels"]');
+    if (tunnelsTab) {
+      tunnelsTab.style.display = hasSsh ? '' : 'none';
+      if (!hasSsh) {
+        const activeTab = document.querySelector('.drawer-tab.active');
+        if (activeTab && activeTab.getAttribute('data-tab') === 'tab-tunnels') {
+          const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
+          if (queueTab) queueTab.click();
+        }
+      }
+    }
 
     if (session.connectionState === 'connected') {
       if (statusDot) {
