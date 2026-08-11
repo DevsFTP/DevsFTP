@@ -1249,7 +1249,11 @@ registerLoggedHandle('transfer:upload', async (_event, localPath, remotePath, se
     profileId: profileId,
     sessionId: sessionId
   };
-  return await transferEngine.executeTransfer(task, session, options);
+  const result = await transferEngine.executeTransfer(task, session, options);
+  if (cacheWatcherService) {
+    cacheWatcherService.markUploaded(localPath);
+  }
+  return result;
 });
 
 registerLoggedHandle('history:get-all', async () => {
