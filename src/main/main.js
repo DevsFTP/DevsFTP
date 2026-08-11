@@ -271,6 +271,7 @@ function createSystemTray() {
 
   try {
     const trayImg = nativeImage.createFromPath(trayPath);
+    if (trayImg.isEmpty()) return;
     appTray = new Tray(trayImg);
     appTray.setToolTip('DevsFTP — The SFTP & FTP Client for Windows');
 
@@ -367,18 +368,16 @@ function sendOSNotification(title, body) {
 function getAppIconPath() {
   try {
     const isDark = nativeTheme ? nativeTheme.shouldUseDarkColors : true;
-    // Dark OS Theme -> use icon_light.png (Bright mark)
-    // Light OS Theme -> use icon_dark.png (Dark mark)
     const iconName = isDark ? 'icon_light.png' : 'icon_dark.png';
 
     const resPng = path.join(process.resourcesPath, 'assets/branding', iconName);
-    if (fs.existsSync(resPng)) return resPng;
+    if (fs.existsSync(resPng)) return nativeImage.createFromPath(resPng);
 
     const devPng = path.join(__dirname, '../../assets/branding', iconName);
-    if (fs.existsSync(devPng)) return devPng;
+    if (fs.existsSync(devPng)) return nativeImage.createFromPath(devPng);
 
     const devIco = path.join(__dirname, '../../assets/icon.ico');
-    if (fs.existsSync(devIco)) return devIco;
+    if (fs.existsSync(devIco)) return nativeImage.createFromPath(devIco);
   } catch (e) {}
   return undefined;
 }
@@ -541,8 +540,9 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
       mainWindow.focus();
     }
   });
