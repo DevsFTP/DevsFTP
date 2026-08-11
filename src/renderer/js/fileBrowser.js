@@ -73,6 +73,14 @@ window.FileBrowser = {
 
     // Remote Controls
     document.getElementById('btn-remote-refresh').addEventListener('click', () => this.refreshRemote(this.remotePath));
+    const btnRemoteDisconnect = document.getElementById('btn-remote-disconnect');
+    if (btnRemoteDisconnect) {
+      btnRemoteDisconnect.addEventListener('click', () => {
+        if (window.SessionManager) {
+          window.SessionManager.disconnectActiveSession();
+        }
+      });
+    }
     document.getElementById('btn-remote-up').addEventListener('click', () => this.remoteUp());
     document.getElementById('remote-path-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.refreshRemote(e.target.value);
@@ -947,6 +955,23 @@ window.FileBrowser = {
     const idx = this.remotePath.lastIndexOf('/');
     const parent = idx <= 0 ? '/' : this.remotePath.substring(0, idx);
     this.refreshRemote(parent);
+  },
+
+  setRemoteState(files, path) {
+    this.remoteFiles = files || [];
+    this.remotePath = path || '/';
+    const input = document.getElementById('remote-path-input');
+    if (input) input.value = this.remotePath;
+
+    const btnRemoteDisconnect = document.getElementById('btn-remote-disconnect');
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const isConnected = activeSess && activeSess.connectionState === 'connected';
+
+    if (btnRemoteDisconnect) {
+      btnRemoteDisconnect.style.display = isConnected ? 'inline-block' : 'none';
+    }
+
+    this.renderRemoteTable(this.remoteFiles);
   },
 
   updateLocalRowHighlights() {

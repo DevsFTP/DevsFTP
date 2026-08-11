@@ -9,6 +9,9 @@ window.SessionManager = {
   activeSessionId: null,
 
   init() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
+
     this.tabContainer = document.getElementById('session-tabs-container');
     this.btnNewTab = document.getElementById('btn-new-session-tab');
 
@@ -204,6 +207,24 @@ window.SessionManager = {
     }
   },
 
+  disconnectActiveSession() {
+    const active = this.getActiveSession();
+    if (!active) return;
+
+    const getApi = () => window.devsFTP || window.pulseFTP;
+    const api = getApi();
+    if (api && api.disconnect) {
+      api.disconnect(active.sessionId);
+    }
+
+    active.connectionState = 'disconnected';
+    active.remoteFiles = [];
+    this.setActiveSession(active.sessionId);
+    if (window.LogViewer) {
+      window.LogViewer.addEntry('info', `🔌 Disconnected active session tab [${active.sessionId}] (${active.profile.name || active.profile.host}).`);
+    }
+  },
+
   closeSession(sessionId) {
     const index = this.sessions.findIndex(s => s.sessionId === sessionId);
     if (index === -1) return;
@@ -246,7 +267,7 @@ window.SessionManager = {
         <span class="session-tab-dot" style="background-color: ${session.accentColor};"></span>
         <span class="session-tab-proto">${proto}</span>
         <span class="session-tab-title" title="${name} (${host})">${name}</span>
-        <button class="session-tab-close" title="Close Session">✕</button>
+        <button class="session-tab-close" title="Disconnect & Remove Tab">✕</button>
       `;
 
       tab.addEventListener('click', (e) => {
@@ -273,7 +294,13 @@ window.SessionManager = {
         s.profileId !== 'default' && 
         s.profile.name !== 'Local Workspace'
       );
-      if (validSessions.length === 0) return;
+      if (validSessions.length === 0) {
+        localStorage.removeItem('devsftp_workspace_saved_tabs');
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('info', '[Workspace Save] Cleared persistent saved tabs storage (no active remote tabs).');
+        }
+        return;
+      }
 
       const savedState = validSessions.map(s => ({
         profileId: s.profileId || (s.profile ? s.profile.id : null),
@@ -301,6 +328,14 @@ window.SessionManager = {
       if (window.LogViewer) window.LogViewer.addEntry(type, `[Workspace Restore] ${msg}`);
     };
 
+    const openLauncherIfEmpty = () => {
+      setTimeout(() => {
+        if (window.ConnectionDialog && window.ConnectionDialog.openConnectionDialog) {
+          window.ConnectionDialog.openConnectionDialog();
+        }
+      }, 350);
+    };
+
     try {
       log('info', 'Phase 1: Initializing Workspace Session Restore engine on startup...');
 
@@ -310,6 +345,7 @@ window.SessionManager = {
       
       if (!shouldRestore) {
         log('warning', 'Phase 2: Restore is DISABLED in Preferences (devsftp_pref_restore_tabs is "false"). Session restore skipped.');
+        openLauncherIfEmpty();
         return;
       }
 
@@ -317,7 +353,8 @@ window.SessionManager = {
       log('info', `Phase 3: Reading 'devsftp_workspace_saved_tabs' raw storage data = ${raw ? `${raw.length} bytes` : 'NULL/EMPTY'}`);
 
       if (!raw) {
-        log('warning', 'Phase 3: No saved workspace session tabs found in storage. Restore skipped.');
+        log('warning', 'Phase 3: No saved workspace session tabs found in storage. Opening Session Launcher...');
+        openLauncherIfEmpty();
         return;
       }
 
@@ -325,7 +362,8 @@ window.SessionManager = {
       log('info', `Phase 4: Parsed saved tabs array containing ${Array.isArray(savedTabs) ? savedTabs.length : 0} tab(s).`);
 
       if (!Array.isArray(savedTabs) || savedTabs.length === 0) {
-        log('warning', 'Phase 4: Saved tabs array is empty. Restore skipped.');
+        log('warning', 'Phase 4: Saved tabs array is empty. Opening Session Launcher...');
+        openLauncherIfEmpty();
         return;
       }
 
@@ -333,6 +371,7 @@ window.SessionManager = {
       const api = getApi();
       if (!api || !api.profiles || !api.profiles.getAll) {
         log('error', 'Phase 5: IPC API (devsFTP/pulseFTP) not ready. Restore skipped.');
+        openLauncherIfEmpty();
         return;
       }
 
@@ -347,7 +386,8 @@ window.SessionManager = {
       );
 
       if (validSavedTabs.length === 0) {
-        log('warning', 'Phase 5: No remote server tabs to restore. Keeping default local workspace.');
+        log('warning', 'Phase 5: No remote server tabs to restore. Opening Session Launcher...');
+        openLauncherIfEmpty();
         return;
       }
 
@@ -389,11 +429,13 @@ window.SessionManager = {
         log('info', `Phase 9: Switching active view to restored session tab [${this.sessions[0].sessionId}].`);
         this.setActiveSession(this.sessions[0].sessionId);
       } else {
-        log('warning', 'Phase 9: Creating default empty workspace session.');
+        log('warning', 'Phase 9: Creating default empty workspace session & opening Session Launcher...');
         this.createDefaultSession();
+        openLauncherIfEmpty();
       }
     } catch (e) {
       log('error', `Workspace Session Restore exception: ${e.message}`);
+      openLauncherIfEmpty();
     } finally {
       this.isRestoring = false;
     }
