@@ -22,7 +22,7 @@ Website: [DevsFTP.com](https://devsftp.com)
 Most FTP clients force you to adapt your workflow around the tool. DevsFTP takes the opposite approach: **We don't change your workflow. We help you move faster.**
 
 ### 📍 Pick up right where you left off
-You don't need to configure a local workspace directory for every single profile. Start at `C:\`, navigate to wherever you actually work, and DevsFTP remembers where you left off. When you return to a session, DevsFTP puts you right back there.
+You don't need to configure a local workspace directory for every single profile. Start at `C:\`, navigate to wherever you actually work, and DevsFTP remembers where you left off. When you return to a session tab, DevsFTP puts you right back there.
 
 ### 🛠️ Work with the applications you already use
 Whether you are opening a remote script in VS Code, Notepad++, or Sublime Text, or opening a remote asset in your operating system's default viewer, DevsFTP respects the application associations registered on your machine. You already have the tools—DevsFTP simply works with them.
@@ -53,38 +53,52 @@ Automate background server syncs or backup tasks on your schedule. They are ther
 
 ---
 
-## ✨ Key Features & Capabilities
+## ✨ Exhaustive Technical Feature Inventory
 
 DevsFTP combines essential file management with smart capabilities designed for developer productivity:
 
-### ⚡ Multi-Protocol & Tabbed Sessions
-- **SFTP, FTP, FTPS & WebDAV Support**: Connect securely via SSH File Transfer Protocol (SFTP), FTP/FTPS (Explicit & Implicit TLS/SSL), or WebDAV.
-- **Concurrent Multi-Session Tabs**: Manage multiple server connections simultaneously across independent tabs with custom identity accent colors.
-- **Session Tab Restoration Engine**: Automatically saves active tabs, working remote subfolders, and local paths, restoring your exact workspace upon relaunch.
-- **Keepalive & Auto-Reconnect**: Proactive keepalives prevent session drops during long idle periods, backed by automatic background reconnect.
+### 🌐 Protocols & Connection Drivers
+- **SFTP (SSH File Transfer Protocol)**: Full SFTP driver supporting password and RSA/ED25519 private key authentication.
+- **FTP & FTPS**: Explicit and Implicit TLS/SSL encrypted FTP connection support.
+- **WebDAV**: RFC 4918-compliant WebDAV driver for Nextcloud, ownCloud, Apache WebDAV, Synology NAS, and custom WebDAV endpoints.
+- **Anti-Disconnect Keepalives**: Proactive keepalives prevent idle session disconnects, backed by automatic background reconnect.
 
-### 📝 Live Remote File Editing & Auto-Sync
-- **Local Editor Integration**: Edit remote files directly in your preferred system editor (VS Code, Notepad++, Sublime Text, PhpStorm).
-- **Automated Cache Watcher Service**: Downloads files to an isolated edit cache, watches for local saves, and automatically re-uploads modified files to the remote server.
-- **Orphan Watcher Recovery**: Re-attaches watchers on app startup after unexpected shutdowns, with automatic 7-day cache cleanup.
+### 🎨 Session Tabs & Profile Branding
+- **Profile Accent Colors**: Assign custom identity accent colors to server profiles for instant visual identification across session tabs.
+- **Per-Tab Automatic Local Directory Path Memory**: Remembers local directory navigation per tab (`session.localPath`) and restores your exact local folder location when switching tabs or restarting.
+- **Multi-Session Tabbed Client**: Open multiple server connections simultaneously in tabbed views.
+- **Session Tab Restoration Engine**: Automatically restores active tabs, working remote subfolders, and local paths upon app launch.
+- **OpenSSH Config Auto-Import**: Auto-discovers and imports server profiles directly from system `~/.ssh/config`.
+- **Profile Import & Export**: 1-click JSON backup and restoration for connection profiles.
 
-### ⏰ Automated Scheduled Tasks
-- **Background Job Runner Daemon**: Schedule recurring background syncs, backups, and file transfers (on startup, recurring intervals, or daily).
-- **Direction-Aware Path Pickers**: Native Windows File Explorer folder selector (`📂 Browse OS...`) and 1-click active tab auto-fill (`📍 Active Local`, `📍 Active Remote`).
-- **Native OS Toast Notifications**: Native Windows notifications on task completion or failure.
+### 🌓 Dynamic Theme-Respecting Assets & Windows 11 UI
+- **Dynamic OS Theme-Respecting Icons**: Automatically switches between `icon_light.png` (bright mark for Dark OS themes) and `icon_dark.png` (dark mark for Light OS themes) via Electron `nativeTheme` listener.
+- **Modern Windows 11 Interface**: Smooth CSS HSL color tokens, dark mode layout, glassmorphism design, and responsive panels.
 
-### 🖥️ SSH Terminal & Port Forwarding
-- **xterm.js Terminal**: Interactive SSH terminal embedded directly inside DevsFTP, pre-authenticated with your active session.
-- **SSH Tunnels Manager**: Configure local (L2R) and remote (R2L) port forwarding rules directly inside the panel drawer.
+### 📝 Live Remote File Editing & Synchronization
+- **System Default Editor Integration**: Edit remote files in your preferred system editor (VS Code, Notepad++, Sublime Text, PhpStorm).
+- **Automated Cache Watcher Service**: Downloads files to an isolated edit cache (`%AppData%\DevsFTP\devsftp_edit_cache`), watches for local saves via SHA-256 hash comparison, and automatically re-uploads modified files.
+- **Auto-Upload Save Detection**: Notifies you when a local edit has changes, presenting clear choices (Skip, Rename, Overwrite if newer, Overwrite).
+- **Orphan Watcher Recovery & 7-Day TTL Garbage Collection**: Re-attaches edit watchers on app startup after crashes and automatically purges un-watched cache files older than 7 days.
 
-### 🔍 Visual Directory Comparison & Permissions
-- **Side-by-Side Diff Grid**: Color-coded comparison showing New Local (Green), New Remote (Blue), and Modified files (Yellow) with 1-click sync.
+### 🖥️ SSH Terminal & Network Tunnels
+- **Embedded Interactive SSH Terminal**: Powered by `xterm.js` with full terminal colors, PTY resize handling, and 1-click launch pre-authenticated with your active SSH profile.
+- **SSH Port Forwarding Tunnels**: Configure local (L2R) and remote (R2L) port forwarding rules directly inside the panel drawer.
+
+### ⏰ Background Scheduled Tasks Engine
+- **Background Job Runner Daemon**: Schedule recurring background syncs, backups, and file transfers (on startup, recurring intervals 1m to 24h, or daily target time).
+- **Direction-Aware Path Pickers**: Native Windows File Explorer folder/file selector (`📂 Browse OS...`) and 1-click active tab auto-fill (`📍 Active Local`, `📍 Active Remote`).
+- **Orientation Validation & Toast Notifications**: Prevents path orientation mistakes (e.g. Windows paths in remote Linux fields) and sends native Windows OS Toast Notifications on job completion or failure.
+
+### 🔍 Directory Inspection & Transfer Engine
+- **Visual Directory Comparison**: Side-by-side local vs remote diff tool (`directoryCompare.js`) with color-coded status badges (New Local, New Remote, Modified) and 1-click sync actions.
 - **Unix CHMOD Permission Matrix**: Interactive numeric and checkbox matrix for Owner, Group, and Others permission bits.
+- **Multi-Threaded Transfer Queue**: Queued file transfer engine with 1.2-second debounced notification aggregator for multi-file transfers.
+- **Instant Stream Cancellation**: Stream abort cancellation engine for instant `Cancel All` response.
 
-### 🔒 Master Password Vault & Security Architecture
-- **AES-256-GCM Vault**: Encrypts stored connection passwords, passphrases, and SSH keys at rest using AES-256-GCM with PBKDF2 (100,000 iterations) key derivation.
-- **Host Key Verification**: Strict SSH fingerprint checking against persistent `known_hosts` to prevent Man-in-the-Middle (MitM) attacks.
-- **OpenSSH Config Auto-Import**: 1-click auto-discovery and profile import from system `~/.ssh/config`.
+### 🔒 Master Password Vault & Security
+- **AES-256-GCM Vault**: Encrypts stored connection passwords, passphrases, and SSH keys at rest using AES-256-GCM with PBKDF2 (100,000 iterations) key derivation and startup unlock screen.
+- **Strict SSH Host Key Fingerprint Verification**: Checks SSH public key fingerprints (SHA256 & MD5) against persistent `known_hosts` to prevent Man-in-the-Middle (MitM) attacks.
 - **Zero Telemetry**: No user tracking, zero analytics, total privacy.
 
 ---
@@ -125,15 +139,16 @@ The output executables will be generated under `dist/win-unpacked/DevsFTP.exe` a
 
 ```
 DevsFTP/
-├── assets/                  # Icons and branding assets
+├── assets/                  # Icons and branding assets (icon_light.png, icon_dark.png, icon.ico)
+├── scripts/                 # Clean build & Win32 PE metadata injection script (build_clean_exe.js)
 ├── src/
-│   ├── main/                # Main Process (IPC handlers, SFTP/FTP services, Job Runner, Cache Watcher)
+│   ├── main/                # Main Process (IPC handlers, SFTP/FTP/WebDAV services, Job Runner, Cache Watcher)
 │   │   ├── main.js
 │   │   ├── preload.js
 │   │   └── services/
 │   └── renderer/            # Renderer Process (UI Layout, Theme Engine, Tab Manager, Modals)
 │       ├── index.html
-│       ├── styles/
+│       ├── css/
 │       └── js/
 ├── LICENSE                  # GNU General Public License v3.0 (GPL-3.0)
 ├── package.json
