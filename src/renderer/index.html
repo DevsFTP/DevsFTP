@@ -1177,7 +1177,7 @@
     <div class="modal-card pref-modal-card">
       <div class="pref-modal-header">
         <span class="modal-title">DevsFTP Preferences</span>
-        <button id="btn-pref-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-pref-close" class="modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="pref-layout">
@@ -1690,10 +1690,10 @@
   <!-- Bug Reporting & Feedback Modal (devsftp.com/bugs.php)                     -->
   <!-- ========================================================================= -->
   <div id="bug-report-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card" style="max-width: 520px; width: 92%;" role="dialog" aria-modal="true">
-      <div class="modal-header">
+    <div class="modal-card" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog" aria-modal="true">
+      <div class="pref-modal-header">
         <span class="modal-title">🐛 Submit Bug Report / Feedback</span>
-        <button id="btn-bug-report-close" class="modal-close-btn" title="Close">✕</button>
+        <button id="btn-bug-report-close" class="modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <!-- Form View -->
@@ -1744,9 +1744,9 @@
   <!-- Update Available Modal -->
   <div id="update-modal" class="modal-overlay" aria-hidden="true">
     <div class="modal-card" style="max-width: 480px; width: 92%; padding: 0; overflow: hidden; border: 1px solid hsl(var(--border-color)); border-radius: 12px; background: hsl(var(--bg-secondary));" role="dialog" aria-modal="true">
-      <div class="modal-header" style="padding: 14px 20px; border-bottom: 1px solid hsl(var(--border-subtle)); background: hsl(var(--bg-primary)); display: flex; justify-content: space-between; align-items: center;">
+      <div class="pref-modal-header">
         <span class="modal-title" style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">🚀 DevsFTP Update Available</span>
-        <button id="btn-update-modal-close" class="modal-close-btn" style="background: none; border: none; font-size: 14px; cursor: pointer; color: hsl(var(--text-muted));" title="Close">✕</button>
+        <button id="btn-update-modal-close" class="modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body" style="padding: 24px 20px; text-align: center;">

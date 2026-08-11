@@ -1519,7 +1519,10 @@ registerLoggedHandle('system:submit-bug-report', async (_event, payload) => {
     timestamp: new Date().toISOString(),
     userEmail: payload ? (payload.email || 'Anonymous') : 'Anonymous',
     description: payload ? (payload.description || 'No description provided') : 'No description provided',
-    logs: payload && payload.includeLogs ? sanitizeText(rawLogs) : 'Logs excluded by user'
+    logs: payload && payload.includeLogs ? sanitizeText(rawLogs) : 'Logs excluded by user',
+    status: 'incomplete',
+    completed: false,
+    complete: false
   };
 
   const postJson = (url, bodyObj) => new Promise((resolve) => {

@@ -961,6 +961,52 @@ input[type="number"] {
   box-sizing: border-box;
 }
 
+/* Standardized Modal Headers & Close Buttons */
+.modal-header,
+.pref-modal-header {
+  height: 42px;
+  background-color: hsl(var(--bg-secondary));
+  border-bottom: 1px solid hsl(var(--border-color));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.modal-header .modal-title,
+.pref-modal-header .modal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--text-primary));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-close-btn {
+  padding: 3px 10px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  background-color: hsl(var(--bg-surface)) !important;
+  border: 1px solid hsl(var(--border-subtle)) !important;
+  border-radius: var(--radius-sm) !important;
+  color: hsl(var(--text-secondary)) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  line-height: 1.2 !important;
+}
+
+.modal-close-btn:hover {
+  background-color: hsl(var(--bg-hover)) !important;
+  border-color: hsl(var(--border-color)) !important;
+  color: hsl(var(--text-primary)) !important;
+}
+
 .pref-modal-card {
   width: 840px !important;
   max-width: 95vw !important;
