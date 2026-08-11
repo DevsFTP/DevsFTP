@@ -453,6 +453,30 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
 
+  // Initialize all services BEFORE loading the renderer page.
+  // This ensures IPC handlers have valid service references when the renderer
+  // fires its first queries (e.g. profiles:master-status on startup).
+  // Previously these were instantiated AFTER loadFile(), creating a race
+  // condition that caused the master password unlock flow to fail and
+  // workspace session restore to wipe the saved tab list.
+  exclusionService = new ExclusionService();
+  profileStore = new ProfileStore();
+  knownHostsStore = new KnownHostsStore();
+  transferEngine = new TransferEngine(mainWindow, sendLog);
+  scheduledJobStore = new ScheduledJobStore();
+  jobRunnerService = new JobRunnerService(mainWindow, scheduledJobStore, profileStore, sendLog);
+  cacheWatcherService = new CacheWatcherService(mainWindow);
+  if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
+  sshTerminalService = new SSHTerminalService(mainWindow);
+  dirSizeService = new DirSizeService(mainWindow);
+
+  // If Master Password is NOT enabled, start background daemons immediately.
+  // If Master Password IS enabled, daemons will start only after master password is confirmed unlocked.
+  if (!profileStore.masterConfig || !profileStore.masterConfig.enabled) {
+    if (jobRunnerService) jobRunnerService.start();
+  }
+
+  // Load the renderer only after all services are ready.
   const rendererPath = path.join(__dirname, '../renderer/index.html');
   writeDebugLog({
     scope: 'main',
@@ -508,11 +532,14 @@ function createWindow() {
       msg: '[DEBUG SYSTEM ONLINE]',
       details: { timestamp: new Date().toISOString() }
     });
-    setTimeout(() => {
-      if (cacheWatcherService && mainWindow && !mainWindow.isDestroyed()) {
-        cacheWatcherService.recoverWatchersOnStartup(mainWindow);
-      }
-    }, 1200);
+    // Startup cache recovery is deferred until Master Password unlock (or app start if no master pass)
+    if (!profileStore.masterConfig || !profileStore.masterConfig.enabled) {
+      setTimeout(() => {
+        if (cacheWatcherService && mainWindow && !mainWindow.isDestroyed()) {
+          cacheWatcherService.recoverWatchersOnStartup(mainWindow);
+        }
+      }, 1200);
+    }
   });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
@@ -524,18 +551,6 @@ function createWindow() {
       details: { errorCode, validatedURL, isMainFrame }
     });
   });
-
-  exclusionService = new ExclusionService();
-  profileStore = new ProfileStore();
-  knownHostsStore = new KnownHostsStore();
-  transferEngine = new TransferEngine(mainWindow, sendLog);
-  scheduledJobStore = new ScheduledJobStore();
-  jobRunnerService = new JobRunnerService(mainWindow, scheduledJobStore, profileStore, sendLog);
-  jobRunnerService.start();
-  cacheWatcherService = new CacheWatcherService(mainWindow);
-  if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
-  sshTerminalService = new SSHTerminalService(mainWindow);
-  dirSizeService = new DirSizeService(mainWindow);
 }
 
 async function handleHostKeyVerification({ host, port, fingerprint }) {
@@ -730,7 +745,15 @@ registerLoggedHandle('profiles:master-status', async () => {
 });
 
 registerLoggedHandle('profiles:master-unlock', async (_event, password) => {
-  return profileStore.unlock(password);
+  const ok = profileStore.unlock(password);
+  if (ok) {
+    // Master password confirmed unlocked: NOW start background daemons
+    if (jobRunnerService) jobRunnerService.start();
+    if (cacheWatcherService && mainWindow && !mainWindow.isDestroyed()) {
+      cacheWatcherService.recoverWatchersOnStartup(mainWindow);
+    }
+  }
+  return ok;
 });
 
 registerLoggedHandle('profiles:master-enable', async (_event, password) => {
@@ -1549,13 +1572,18 @@ registerLoggedHandle('dialog:save-file', async (_event, options) => {
 registerLoggedHandle('system:open-external', async (_event, url) => {
   if (!url) return false;
   try {
-    const parsed = new URL(url); // Robust protocol parsing (Issue 13.3)
+    const parsed = new URL(url);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
       await shell.openExternal(url);
       return true;
     }
   } catch (e) {}
   return false;
+});
+
+ipcMain.on('system:quit', () => {
+  const { app } = require('electron');
+  app.quit();
 });
 
 registerLoggedHandle('system:check-updates', async () => {

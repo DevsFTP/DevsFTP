@@ -131,7 +131,10 @@ const devsFTPApi = {
   calculateDirSize: (targetPath, isRemote, sessionId) => ipcRenderer.invoke('system:calculate-dir-size', targetPath, isRemote, sessionId),
   getDirSizePrefs: () => ipcRenderer.invoke('system:get-dir-size-prefs'),
   saveDirSizePrefs: (prefs) => ipcRenderer.invoke('system:save-dir-size-prefs', prefs),
-  onDirSizeUpdated: (callback) => ipcRenderer.on('dir-size:updated', (_event, data) => callback(data))
+  onDirSizeUpdated: (callback) => ipcRenderer.on('dir-size:updated', (_event, data) => callback(data)),
+
+  // App Control
+  quit: () => ipcRenderer.send('system:quit')
 };
 
 contextBridge.exposeInMainWorld('devsFTP', devsFTPApi);

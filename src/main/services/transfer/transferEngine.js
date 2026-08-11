@@ -108,7 +108,9 @@ class TransferEngine {
 
   _saveQueue() {
     try {
-      fs.writeFileSync(this.queueFilePath, JSON.stringify(this.queue, null, 2), 'utf8');
+      const tempPath = this.queueFilePath + '.tmp';
+      fs.writeFileSync(tempPath, JSON.stringify(this.queue, null, 2), 'utf8');
+      fs.renameSync(tempPath, this.queueFilePath);
     } catch (e) {
       this.logFn('error', `[TransferEngine] Failed to write transfer queue file: ${e.message}`);
     }

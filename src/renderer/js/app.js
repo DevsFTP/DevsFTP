@@ -298,110 +298,67 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     logDiagnostic('startup', { phase: 'DOMContentLoaded' });
 
-    // Initialize Subcomponents
-    window.LogViewer.init();
-    window.TransferQueue.init();
-    window.SSHTerminal.init();
-    window.FileBrowser.init();
-    window.ConnectionDialog.init();
-    if (window.ScheduledJobs) window.ScheduledJobs.init();
-    if (window.TunnelManager) window.TunnelManager.init();
+    // Master Password Top-Layer Gate.
+    // startNormalApp() is the ONLY entry point for all app logic.
+    // It runs only after master password is confirmed, or immediately if disabled.
+    let isAppStarted = false;
+    const startNormalApp = () => {
+      if (isAppStarted) return;
+      isAppStarted = true;
 
-    // Check for update availability on startup
-    try {
-      const autoCheckPref = localStorage.getItem('devsftp_pref_auto_check_updates') !== 'false';
-      if (autoCheckPref) {
-        setTimeout(() => {
-          doCheckForUpdates(null, false);
-        }, 1500);
-      }
-    } catch (e) {}
+      // Initialize Subcomponents
+      window.LogViewer.init();
+      window.TransferQueue.init();
+      window.SSHTerminal.init();
+      window.FileBrowser.init();
+      window.ConnectionDialog.init();
+      if (window.ScheduledJobs) window.ScheduledJobs.init();
+      if (window.TunnelManager) window.TunnelManager.init();
 
-    // Master Password Startup Check
-    const checkMasterUnlock = async () => {
-      const api = getApi();
-      if (api && api.profiles && api.profiles.master) {
-        try {
-          const status = await api.profiles.master.getStatus();
-          if (status && status.enabled && !status.unlocked) {
-            const unlockModal = document.getElementById('master-unlock-modal');
-            const pwdInput = document.getElementById('master-unlock-password');
-            const submitBtn = document.getElementById('btn-master-unlock-submit');
-            const errDiv = document.getElementById('master-unlock-error');
+      // Check for update availability on startup
+      try {
+        const autoCheckPref = localStorage.getItem('devsftp_pref_auto_check_updates') !== 'false';
+        if (autoCheckPref) {
+          setTimeout(() => {
+            doCheckForUpdates(null, false);
+          }, 1500);
+        }
+      } catch (e) {}
 
-            if (unlockModal) unlockModal.classList.add('active');
-            if (pwdInput) {
-              pwdInput.value = '';
-              pwdInput.style.borderColor = '';
-              setTimeout(() => pwdInput.focus(), 100);
-            }
-
-            const attemptUnlock = async () => {
-              const pwd = pwdInput ? pwdInput.value : '';
-              if (!pwd) return;
-              const ok = await api.profiles.master.unlock(pwd);
-              if (ok) {
-                if (unlockModal) unlockModal.classList.remove('active');
-                if (errDiv) errDiv.style.display = 'none';
-                if (window.ConnectionDialog) window.ConnectionDialog.loadProfiles();
-                if (window.SessionManager) window.SessionManager.init();
-                if (window.LogViewer) window.LogViewer.addEntry('info', '🔓 Master Password vault unlocked cleanly.');
-              } else {
-                if (errDiv) errDiv.style.display = 'block';
-                if (pwdInput) {
-                  pwdInput.style.borderColor = 'hsl(var(--status-danger))';
-                  pwdInput.select();
-                }
-              }
-            };
-
-            if (submitBtn) submitBtn.onclick = attemptUnlock;
-            if (pwdInput) {
-              pwdInput.onkeydown = (e) => {
-                if (e.key === 'Enter') attemptUnlock();
-              };
-            }
-            return;
-          }
-        } catch (e) {}
-      }
+      // Start session manager and workspace restore
       window.SessionManager.init();
-    };
 
-    checkMasterUnlock();
-
-    // Checkbox preference persistence & dynamic badges
-    window.updateWorkspaceBadges = () => {
-      const tabsCb = document.getElementById('pref-restore-tabs');
-      const tabsBadge = document.getElementById('restore-tabs-badge');
-      if (tabsCb && tabsBadge) {
-        if (tabsCb.checked) {
-          tabsBadge.textContent = 'Active';
-          tabsBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-          tabsBadge.style.color = '#34D399';
-        } else {
-          tabsBadge.textContent = 'Disabled';
-          tabsBadge.style.background = 'rgba(100, 116, 139, 0.2)';
-          tabsBadge.style.color = '#94A3B8';
+      window.updateWorkspaceBadges = () => {
+        const tabsCb = document.getElementById('pref-restore-tabs');
+        const tabsBadge = document.getElementById('restore-tabs-badge');
+        if (tabsCb && tabsBadge) {
+          if (tabsCb.checked) {
+            tabsBadge.textContent = 'Active';
+            tabsBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            tabsBadge.style.color = '#34D399';
+          } else {
+            tabsBadge.textContent = 'Disabled';
+            tabsBadge.style.background = 'rgba(100, 116, 139, 0.2)';
+            tabsBadge.style.color = '#94A3B8';
+          }
         }
-      }
 
-      const drawerCb = document.getElementById('pref-restore-bottom-drawer');
-      const drawerBadge = document.getElementById('restore-drawer-badge');
-      if (drawerCb && drawerBadge) {
-        if (drawerCb.checked) {
-          drawerBadge.textContent = 'Active';
-          drawerBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-          drawerBadge.style.color = '#34D399';
-        } else {
-          drawerBadge.textContent = 'Disabled';
-          drawerBadge.style.background = 'rgba(100, 116, 139, 0.2)';
-          drawerBadge.style.color = '#94A3B8';
+        const drawerCb = document.getElementById('pref-restore-bottom-drawer');
+        const drawerBadge = document.getElementById('restore-drawer-badge');
+        if (drawerCb && drawerBadge) {
+          if (drawerCb.checked) {
+            drawerBadge.textContent = 'Active';
+            drawerBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            drawerBadge.style.color = '#34D399';
+          } else {
+            drawerBadge.textContent = 'Disabled';
+            drawerBadge.style.background = 'rgba(100, 116, 139, 0.2)';
+            drawerBadge.style.color = '#94A3B8';
+          }
         }
-      }
-    };
+      }; // end updateWorkspaceBadges
 
-    const prefRestoreTabs = document.getElementById('pref-restore-tabs');
+      const prefRestoreTabs = document.getElementById('pref-restore-tabs');
     if (prefRestoreTabs) {
       const stored = localStorage.getItem('devsftp_pref_restore_tabs');
       prefRestoreTabs.checked = (stored === 'true');
@@ -1091,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ok = await api.profiles.import(fileContent);
             if (ok) {
               alert('Profiles imported successfully!');
-              window.ConnectionDialog.loadProfiles();
+              window.ConnectionDialog.renderConnectionProfileList();
             } else {
               alert('Failed to parse profile JSON.');
             }
@@ -1187,10 +1144,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Now that connectToProfileSession is defined, restore saved workspace session tabs if enabled
-  if (window.SessionManager && window.SessionManager.restoreWorkspaceSessionState) {
-    window.SessionManager.restoreWorkspaceSessionState();
-  }
 
   const disconnectSession = async () => {
     const api = window.devsFTP || window.pulseFTP;
@@ -1568,6 +1521,88 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnConflictRename) btnConflictRename.addEventListener('click', () => closeConflictModal('rename'));
   const btnConflictClose = document.getElementById('btn-conflict-close');
   if (btnConflictClose) btnConflictClose.addEventListener('click', () => closeConflictModal('skip'));
+
+    }; // END startNormalApp()
+
+    // Master Password Startup Gate
+    // ONLY this runs on startup when master password is enabled.
+    // startNormalApp() fires ONLY after password is confirmed, or immediately if disabled.
+    const checkMasterUnlock = async () => {
+      const api = getApi();
+      if (api && api.profiles && api.profiles.master) {
+        try {
+          const status = await api.profiles.master.getStatus();
+          if (status && status.enabled && !status.unlocked) {
+            const unlockModal = document.getElementById('master-unlock-modal');
+            const pwdInput = document.getElementById('master-unlock-password');
+            const submitBtn = document.getElementById('btn-master-unlock-submit');
+            const errDiv = document.getElementById('master-unlock-error');
+
+            if (unlockModal) unlockModal.classList.add('active');
+            if (pwdInput) {
+              pwdInput.value = '';
+              pwdInput.style.borderColor = '';
+              setTimeout(() => pwdInput.focus(), 100);
+            }
+
+            const lockoutDiv = document.getElementById('master-unlock-lockout');
+            const MAX_ATTEMPTS = 3;
+            let failedAttempts = 0;
+
+            const attemptUnlock = async () => {
+              const pwd = pwdInput ? pwdInput.value : '';
+              if (!pwd) return;
+              const ok = await api.profiles.master.unlock(pwd);
+              if (ok) {
+                if (unlockModal) unlockModal.classList.remove('active');
+                if (errDiv) errDiv.style.display = 'none';
+                if (lockoutDiv) lockoutDiv.style.display = 'none';
+                startNormalApp();
+                if (window.ConnectionDialog) window.ConnectionDialog.renderConnectionProfileList();
+                if (window.LogViewer) window.LogViewer.addEntry('info', '🔓 Master Password vault unlocked.');
+              } else {
+                failedAttempts++;
+                const remaining = MAX_ATTEMPTS - failedAttempts;
+
+                if (failedAttempts >= MAX_ATTEMPTS) {
+                  // Lockout: disable input, show message, quit after 3s
+                  if (pwdInput) { pwdInput.disabled = true; pwdInput.style.borderColor = 'hsl(var(--status-danger))'; }
+                  if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
+                  if (errDiv) errDiv.style.display = 'none';
+                  if (lockoutDiv) lockoutDiv.style.display = 'block';
+                  setTimeout(() => {
+                    const api2 = getApi();
+                    if (api2 && api2.quit) { api2.quit(); } else { window.close(); }
+                  }, 3000);
+                } else {
+                  // Show remaining attempts
+                  if (errDiv) {
+                    errDiv.style.display = 'block';
+                    errDiv.textContent = `⚠️ Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`;
+                  }
+                  if (pwdInput) {
+                    pwdInput.style.borderColor = 'hsl(var(--status-danger))';
+                    pwdInput.select();
+                  }
+                }
+              }
+            };
+
+            if (submitBtn) submitBtn.onclick = attemptUnlock;
+            if (pwdInput) {
+              pwdInput.onkeydown = (e) => {
+                if (e.key === 'Enter') attemptUnlock();
+              };
+            }
+            return; // HALT: nothing starts until password confirmed
+          }
+        } catch (e) {}
+      }
+      startNormalApp(); // no master password — start immediately
+    };
+
+    checkMasterUnlock();
+
     logDiagnostic('startup', { phase: 'init-complete' });
   } catch (err) {
     logDiagnostic('renderer initialization failures', {
@@ -1577,3 +1612,4 @@ document.addEventListener('DOMContentLoaded', () => {
     throw err;
   }
 });
+

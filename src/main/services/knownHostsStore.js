@@ -82,7 +82,9 @@ class KnownHostsStore {
     try {
       const json = JSON.stringify(this.hosts, null, 2);
       const encrypted = this._encrypt(json);
-      fs.writeFileSync(this.filePath, encrypted, 'utf8');
+      const tempPath = this.filePath + '.tmp';
+      fs.writeFileSync(tempPath, encrypted, 'utf8');
+      fs.renameSync(tempPath, this.filePath);
     } catch (e) {
       console.error('Failed to save known host keys:', e);
     }

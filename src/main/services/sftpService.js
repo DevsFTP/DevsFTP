@@ -115,6 +115,10 @@ class SFTPService {
         }
       } else {
         connectOpts.password = config.password || '';
+        connectOpts.tryKeyboard = true;
+        this.sshClient.on('keyboard-interactive', (_name, _instructions, _instructionsLang, _prompts, finish) => {
+          finish([config.password || '']);
+        });
       }
 
       const proxyType = config.proxyType ? String(config.proxyType).toLowerCase() : 'none';

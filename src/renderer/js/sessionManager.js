@@ -482,7 +482,7 @@ window.SessionManager = {
               })
               .catch((err) => {
                 log('error', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: Connection failed for restored tab [${restoredSess.sessionId}]: ${err.message}`);
-                this.closeSession(restoredSess.sessionId);
+                this.updateSessionConnectionState(restoredSess.sessionId, false, prof);
               });
           }
         } else {
