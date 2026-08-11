@@ -593,6 +593,18 @@ window.ConnectionDialog = {
     this.closeConnectionDialog();
 
     if (window.SessionManager) {
+      // Guard: if this profile already has a live connected session, switch to it instead of opening a duplicate
+      const existingSession = window.SessionManager.sessions.find(
+        s => s.profileId === profile.id && s.connectionState === 'connected'
+      );
+      if (existingSession) {
+        window.SessionManager.setActiveSession(existingSession.sessionId);
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('info', `Already connected to "${profile.name || profile.host}" — switched to existing session tab.`);
+        }
+        return;
+      }
+
       let activeSession = window.SessionManager.getActiveSession();
       if (!activeSession || activeSession.connectionState === 'connected') {
         activeSession = window.SessionManager.createSession(profile, false);
