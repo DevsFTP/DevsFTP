@@ -1148,21 +1148,20 @@ window.FileBrowser = {
 
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 80px 24px; color: hsl(var(--text-secondary));">
-            <div style="margin-bottom: 20px;">
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ${accentColor}; filter: drop-shadow(0 4px 12px ${accentColor}40); display: inline-block;">
+          <td colspan="4" style="text-align: center; padding: 96px 24px; color: hsl(var(--text-secondary));">
+            <div style="margin-bottom: 16px;">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 12px ${accentColor}40); display: inline-block;">
                 <line x1="2" y1="2" x2="22" y2="22" stroke="hsl(var(--destructive))" stroke-width="2.5"></line>
                 <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
                 <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
-                <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" fill="currentColor"></path>
+                <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"></path>
                 <path d="M8.58 13.72a5 5 0 0 1 2.24-1.22"></path>
                 <path d="M13.18 12.5a5 5 0 0 1 2.24 1.22"></path>
                 <path d="M16.28 5.69A18.89 18.89 0 0 1 22 8"></path>
                 <path d="M2 8a18.89 18.89 0 0 1 7.72-2.31"></path>
               </svg>
             </div>
-            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 6px;">Session Disconnected</div>
-            <div style="font-size: 12px; color: hsl(var(--text-muted));">You are currently disconnected from ${profileName}.</div>
+            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary));">${profileName} Disconnected</div>
           </td>
         </tr>
       `;
