@@ -1585,6 +1585,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const lockoutDiv = document.getElementById('master-unlock-lockout');
+            const exitBtn = document.getElementById('btn-master-lockout-exit');
             const MAX_ATTEMPTS = 3;
             let failedAttempts = 0;
 
@@ -1605,15 +1606,18 @@ document.addEventListener('DOMContentLoaded', () => {
                   const remaining = MAX_ATTEMPTS - failedAttempts;
 
                   if (failedAttempts >= MAX_ATTEMPTS) {
-                    // Lockout: disable input, show message, quit after 3s
+                    // Lockout: disable input, show message, swap buttons
                     if (pwdInput) { pwdInput.disabled = true; pwdInput.style.borderColor = 'hsl(var(--status-danger))'; }
-                    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
+                    if (submitBtn) { submitBtn.style.display = 'none'; }
                     if (errDiv) errDiv.style.display = 'none';
                     if (lockoutDiv) lockoutDiv.style.display = 'block';
-                    setTimeout(() => {
-                      const api2 = getApi();
-                      if (api2 && api2.quit) { api2.quit(); } else { window.close(); }
-                    }, 3000);
+                    if (exitBtn) {
+                      exitBtn.style.display = 'block';
+                      exitBtn.onclick = () => {
+                        const api2 = getApi();
+                        if (api2 && api2.quit) { api2.quit(); } else { window.close(); }
+                      };
+                    }
                   } else {
                     // Show remaining attempts
                     if (errDiv) {
