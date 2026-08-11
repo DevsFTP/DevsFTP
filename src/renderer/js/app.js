@@ -105,6 +105,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // About DevsFTP Website & Updates Controller
+  const openWebsite = (url = 'https://devsftp.com') => {
+    const api = window.devsFTP || window.pulseFTP;
+    if (api && api.openExternal) {
+      api.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  const updateModal = document.getElementById('update-modal');
+  const updateModalCloseBtn = document.getElementById('btn-update-modal-close');
+  const updateModalDismissBtn = document.getElementById('btn-update-modal-dismiss');
+  const updateModalDownloadBtn = document.getElementById('btn-update-modal-download');
+  const updateModalTitle = document.getElementById('update-modal-version-title');
+  const updateModalCurrentVer = document.getElementById('update-modal-current-ver');
+  const updateModalLatestVer = document.getElementById('update-modal-latest-ver');
+  const updateModalNotes = document.getElementById('update-modal-release-notes');
+  const topUpdateBtn = document.getElementById('btn-top-update-available');
+  let cachedUpdateData = null;
+
+  window.UpdateModal = {
+    open(data) {
+      if (!updateModal || !data) return;
+      cachedUpdateData = data;
+      if (updateModalTitle) updateModalTitle.textContent = `DevsFTP v${data.latestVersion} Available!`;
+      if (updateModalCurrentVer) updateModalCurrentVer.textContent = `v${data.currentVersion || '1.0.0'}`;
+      if (updateModalLatestVer) updateModalLatestVer.textContent = `v${data.latestVersion}`;
+      if (updateModalNotes) updateModalNotes.textContent = data.releaseNotes || 'New release available on devsftp.com.';
+      updateModal.setAttribute('aria-hidden', 'false');
+      updateModal.classList.add('active');
+    },
+    close() {
+      if (!updateModal) return;
+      updateModal.classList.remove('active');
+      updateModal.setAttribute('aria-hidden', 'true');
+    }
+  };
+
+  if (updateModalCloseBtn) updateModalCloseBtn.addEventListener('click', () => window.UpdateModal.close());
+  if (updateModalDismissBtn) updateModalDismissBtn.addEventListener('click', () => window.UpdateModal.close());
+  if (updateModalDownloadBtn) {
+    updateModalDownloadBtn.addEventListener('click', () => {
+      window.UpdateModal.close();
+      openWebsite(cachedUpdateData ? (cachedUpdateData.downloadUrl || 'https://devsftp.com/download/') : 'https://devsftp.com/download/');
+    });
+  }
+
+  if (topUpdateBtn) {
+    topUpdateBtn.addEventListener('click', () => {
+      if (cachedUpdateData) window.UpdateModal.open(cachedUpdateData);
+    });
+  }
+
+  const doCheckForUpdates = async (statusEl, isUserInitiated = true) => {
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#F59E0B';
+      statusEl.textContent = '⏳ Checking server for updates (devsftp.com/version.json)...';
+    }
+    try {
+      const api = window.devsFTP || window.pulseFTP;
+      const res = api && api.checkForUpdates ? await api.checkForUpdates() : null;
+      if (res && res.updateAvailable) {
+        cachedUpdateData = res;
+        if (topUpdateBtn) topUpdateBtn.style.display = 'inline-block';
+        if (statusEl) {
+          statusEl.style.color = '#10B981';
+          statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">View Update Details</a>`;
+          const link = statusEl.querySelector('.link-download-update-action');
+          if (link) link.onclick = (e) => { e.preventDefault(); window.UpdateModal.open(res); };
+        }
+        if (isUserInitiated) {
+          window.UpdateModal.open(res);
+        }
+      } else {
+        if (topUpdateBtn) topUpdateBtn.style.display = 'none';
+        if (statusEl) {
+          statusEl.style.color = '#34D399';
+          statusEl.textContent = `✓ You are running the latest version of DevsFTP (${res ? 'v' + res.currentVersion : 'v1.0.0'}).`;
+        }
+      }
+    } catch (err) {
+      if (statusEl) {
+        statusEl.style.color = '#FCA5A5';
+        statusEl.textContent = '⚠️ Unable to connect to update server (devsftp.com).';
+      }
+    }
+  };
+
   const uploadPromptStorageKey = 'devsftp_live_edit_upload_prompt_disabled';
   const uploadPromptModal = document.getElementById('upload-save-modal');
   const uploadPromptFile = document.getElementById('upload-save-modal-file');
@@ -341,99 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // About DevsFTP Website & Updates Wire
-    const openWebsite = (url = 'https://devsftp.com') => {
-      const api = window.devsFTP || window.pulseFTP;
-      if (api && api.openExternal) {
-        api.openExternal(url);
-      } else {
-        window.open(url, '_blank');
-      }
-    };
 
-        window.open(url, '_blank');
-      }
-    };
-
-    const updateModal = document.getElementById('update-modal');
-    const updateModalCloseBtn = document.getElementById('btn-update-modal-close');
-    const updateModalDismissBtn = document.getElementById('btn-update-modal-dismiss');
-    const updateModalDownloadBtn = document.getElementById('btn-update-modal-download');
-    const updateModalTitle = document.getElementById('update-modal-version-title');
-    const updateModalCurrentVer = document.getElementById('update-modal-current-ver');
-    const updateModalLatestVer = document.getElementById('update-modal-latest-ver');
-    const updateModalNotes = document.getElementById('update-modal-release-notes');
-    const topUpdateBtn = document.getElementById('btn-top-update-available');
-    let cachedUpdateData = null;
-
-    window.UpdateModal = {
-      open(data) {
-        if (!updateModal || !data) return;
-        cachedUpdateData = data;
-        if (updateModalTitle) updateModalTitle.textContent = `DevsFTP v${data.latestVersion} Available!`;
-        if (updateModalCurrentVer) updateModalCurrentVer.textContent = `v${data.currentVersion || '1.0.0'}`;
-        if (updateModalLatestVer) updateModalLatestVer.textContent = `v${data.latestVersion}`;
-        if (updateModalNotes) updateModalNotes.textContent = data.releaseNotes || 'New release available on devsftp.com.';
-        updateModal.setAttribute('aria-hidden', 'false');
-        updateModal.classList.add('active');
-      },
-      close() {
-        if (!updateModal) return;
-        updateModal.classList.remove('active');
-        updateModal.setAttribute('aria-hidden', 'true');
-      }
-    };
-
-    if (updateModalCloseBtn) updateModalCloseBtn.addEventListener('click', () => window.UpdateModal.close());
-    if (updateModalDismissBtn) updateModalDismissBtn.addEventListener('click', () => window.UpdateModal.close());
-    if (updateModalDownloadBtn) {
-      updateModalDownloadBtn.addEventListener('click', () => {
-        window.UpdateModal.close();
-        openWebsite(cachedUpdateData ? (cachedUpdateData.downloadUrl || 'https://devsftp.com/download/') : 'https://devsftp.com/download/');
-      });
-    }
-
-    if (topUpdateBtn) {
-      topUpdateBtn.addEventListener('click', () => {
-        if (cachedUpdateData) window.UpdateModal.open(cachedUpdateData);
-      });
-    }
-
-    const doCheckForUpdates = async (statusEl, isUserInitiated = true) => {
-      if (statusEl) {
-        statusEl.style.display = 'block';
-        statusEl.style.color = '#F59E0B';
-        statusEl.textContent = '⏳ Checking server for updates (devsftp.com/version.json)...';
-      }
-      try {
-        const api = window.devsFTP || window.pulseFTP;
-        const res = api && api.checkForUpdates ? await api.checkForUpdates() : null;
-        if (res && res.updateAvailable) {
-          cachedUpdateData = res;
-          if (topUpdateBtn) topUpdateBtn.style.display = 'inline-block';
-          if (statusEl) {
-            statusEl.style.color = '#10B981';
-            statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">View Update Details</a>`;
-            const link = statusEl.querySelector('.link-download-update-action');
-            if (link) link.onclick = (e) => { e.preventDefault(); window.UpdateModal.open(res); };
-          }
-          if (isUserInitiated) {
-            window.UpdateModal.open(res);
-          }
-        } else {
-          if (topUpdateBtn) topUpdateBtn.style.display = 'none';
-          if (statusEl) {
-            statusEl.style.color = '#34D399';
-            statusEl.textContent = `✓ You are running the latest version of DevsFTP (${res ? 'v' + res.currentVersion : 'v1.0.0'}).`;
-          }
-        }
-      } catch (err) {
-        if (statusEl) {
-          statusEl.style.color = '#FCA5A5';
-          statusEl.textContent = '⚠️ Unable to connect to update server (devsftp.com).';
-        }
-      }
-    };
 
     // =========================================================================
     // Bug Reporting & Feedback Dialog Controller (devsftp.com/bugs.php)
