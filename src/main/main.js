@@ -201,7 +201,16 @@ function writeDebugLog(entry) {
   appendDiagnosticLine(formatDiagnosticEntry(entry));
 }
 
+// Channels whose positional IPC arguments must never be logged (e.g. plaintext passwords)
+const SENSITIVE_IPC_CHANNELS = new Set([
+  'profiles:master-unlock',
+  'profiles:master-enable',
+  'profiles:master-disable',
+  'profiles:master-change'
+]);
+
 function registerLoggedHandle(channel, handler) {
+  const isSensitive = SENSITIVE_IPC_CHANNELS.has(channel);
   ipcMain.handle(channel, async (...args) => {
     const ipcArgs = args.slice(1);
     const start = Date.now();
@@ -210,7 +219,8 @@ function registerLoggedHandle(channel, handler) {
       event: channel,
       level: 'info',
       message: 'request',
-      details: ipcArgs
+      // Never log argument contents for sensitive channels (HIGH-01: master password leak prevention)
+      details: isSensitive ? '[REDACTED — sensitive channel]' : ipcArgs
     });
     try {
       const result = await handler(...args);
@@ -219,7 +229,7 @@ function registerLoggedHandle(channel, handler) {
         event: channel,
         level: 'info',
         message: `success (${Date.now() - start}ms)`,
-        details: result
+        details: isSensitive ? '[REDACTED — sensitive channel]' : result
       });
       return result;
     } catch (error) {
@@ -1391,7 +1401,17 @@ registerLoggedHandle('transfer:background-upload-batch', async (_event, payload)
       continue;
     }
 
-    const Driver = (profile.protocol === 'ftp' || profile.protocol === 'ftps') ? FTPService : SFTPService;
+    // HIGH-02 fix: route each protocol to its correct service class.
+    // Before this fix, WebDAV profiles silently fell through to SFTPService,
+    // causing all background uploads for WebDAV connections to fail.
+    let Driver;
+    if (profile.protocol === 'ftp' || profile.protocol === 'ftps' || profile.protocol === 'ftps-implicit') {
+      Driver = FTPService;
+    } else if (profile.protocol === 'webdav') {
+      Driver = WebDAVService;
+    } else {
+      Driver = SFTPService; // sftp (default)
+    }
     const bgDriver = new Driver();
 
     try {
