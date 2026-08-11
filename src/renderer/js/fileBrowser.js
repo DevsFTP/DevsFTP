@@ -935,8 +935,16 @@ window.FileBrowser = {
   },
 
   async refreshLocal(targetPath) {
+    if (this._refreshingLocal) {
+      console.log('[FileBrowser] refreshLocal already in progress, skipping duplicate call.');
+      return;
+    }
+    this._refreshingLocal = true;
     const api = this.getApi();
-    if (!api) return;
+    if (!api) {
+      this._refreshingLocal = false;
+      return;
+    }
     try {
       const res = await api.localList(targetPath);
       this.localPath = res.currentPath;
@@ -950,12 +958,22 @@ window.FileBrowser = {
       this.triggerAutoCalcLocal();
     } catch (err) {
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read local directory: ${err.message}`);
+    } finally {
+      this._refreshingLocal = false;
     }
   },
 
   async refreshRemote(targetPath) {
+    if (this._refreshingRemote) {
+      console.log('[FileBrowser] refreshRemote already in progress, skipping duplicate call.');
+      return;
+    }
+    this._refreshingRemote = true;
     const api = this.getApi();
-    if (!api) return;
+    if (!api) {
+      this._refreshingRemote = false;
+      return;
+    }
     try {
       const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
       const res = await api.remoteList(targetPath, sessId);
@@ -970,6 +988,8 @@ window.FileBrowser = {
       this.triggerAutoCalcRemote();
     } catch (err) {
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read remote directory: ${err.message}`);
+    } finally {
+      this._refreshingRemote = false;
     }
   },
 
