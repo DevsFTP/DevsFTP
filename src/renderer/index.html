@@ -45,6 +45,7 @@
           <div class="dropdown-action" id="menu-help-about">ℹ️ About DevsFTP</div>
         </div>
       </div>
+      <button id="btn-top-update-available" class="btn" style="display: none; padding: 3px 10px; font-size: 11px; font-weight: 700; background: var(--accent-primary-hex, #10B981); color: #052E16; border-radius: 4px; margin-left: 10px; border: none; cursor: pointer; transition: transform 0.15s ease;" title="New DevsFTP release available! Click to view update details.">🚀 Update Available</button>
     </nav>
 
     <!-- Top Header Navigation & Quick Connection Toolbar -->
@@ -1353,6 +1354,29 @@
               </div>
             </div>
 
+            <!-- Card 4: Automatic Update Availability Check -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🔄</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Automatic Update Availability Check</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically checks https://devsftp.com/version.json on launch to notify you when a new version is available. DevsFTP never downloads or installs software in the background without your explicit consent.</div>
+                  </div>
+                </div>
+                <span id="update-check-pref-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div class="form-group" style="margin: 0;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-auto-check-updates" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Check for new version availability on launch</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
           </div>
 
           <!-- SECTION 3: SSH Terminal -->
@@ -1677,6 +1701,34 @@
         <div style="display: flex; gap: 10px; justify-content: center;">
           <button id="btn-bug-report-done" class="btn btn-primary" style="padding: 6px 20px; font-size: 12px; font-weight: 600;">Done</button>
           <button id="btn-bug-report-visit" class="btn" style="padding: 6px 16px; font-size: 12px;">🌐 Visit DevsFTP.com</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Update Available Modal -->
+  <div id="update-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="max-width: 480px; width: 92%; padding: 0; overflow: hidden; border: 1px solid hsl(var(--border-color)); border-radius: 12px; background: hsl(var(--bg-secondary));" role="dialog" aria-modal="true">
+      <div class="modal-header" style="padding: 14px 20px; border-bottom: 1px solid hsl(var(--border-subtle)); background: hsl(var(--bg-primary)); display: flex; justify-content: space-between; align-items: center;">
+        <span class="modal-title" style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">🚀 DevsFTP Update Available</span>
+        <button id="btn-update-modal-close" class="modal-close-btn" style="background: none; border: none; font-size: 14px; cursor: pointer; color: hsl(var(--text-muted));" title="Close">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 24px 20px; text-align: center;">
+        <div style="font-size: 38px; margin-bottom: 8px;">🎉</div>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 4px;" id="update-modal-version-title">DevsFTP v1.0.2 Available!</h3>
+        <p style="font-size: 12px; color: hsl(var(--text-muted)); margin-bottom: 16px;">
+          Installed Version: <strong id="update-modal-current-ver">v1.0.0</strong> &nbsp;•&nbsp; Latest Version: <strong id="update-modal-latest-ver" style="color: #34D399;">v1.0.2</strong>
+        </p>
+
+        <div style="background: hsl(var(--bg-primary)); border: 1px solid hsl(var(--border-subtle)); border-radius: 8px; padding: 12px; text-align: left; margin-bottom: 20px; max-height: 120px; overflow-y: auto;">
+          <div style="font-size: 11px; font-weight: 700; color: hsl(var(--text-muted)); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Release Notes</div>
+          <div id="update-modal-release-notes" style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.5;">New release available on devsftp.com.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-update-modal-download" class="btn btn-primary" style="padding: 8px 20px; font-size: 12px; font-weight: 700; background: #10B981; color: #052E16; border: none;">🌐 Download Update from DevsFTP.com</button>
+          <button id="btn-update-modal-dismiss" class="btn" style="padding: 8px 16px; font-size: 12px;">Dismiss</button>
         </div>
       </div>
     </div>

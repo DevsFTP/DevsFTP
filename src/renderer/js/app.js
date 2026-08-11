@@ -217,6 +217,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.ScheduledJobs) window.ScheduledJobs.init();
     if (window.TunnelManager) window.TunnelManager.init();
 
+    // Check for update availability on startup
+    try {
+      const autoCheckPref = localStorage.getItem('devsftp_pref_auto_check_updates') !== 'false';
+      if (autoCheckPref) {
+        setTimeout(() => {
+          doCheckForUpdates(null, false);
+        }, 1500);
+      }
+    } catch (e) {}
+
     // Master Password Startup Check
     const checkMasterUnlock = async () => {
       const api = getApi();
@@ -341,7 +351,55 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const doCheckForUpdates = async (statusEl) => {
+        window.open(url, '_blank');
+      }
+    };
+
+    const updateModal = document.getElementById('update-modal');
+    const updateModalCloseBtn = document.getElementById('btn-update-modal-close');
+    const updateModalDismissBtn = document.getElementById('btn-update-modal-dismiss');
+    const updateModalDownloadBtn = document.getElementById('btn-update-modal-download');
+    const updateModalTitle = document.getElementById('update-modal-version-title');
+    const updateModalCurrentVer = document.getElementById('update-modal-current-ver');
+    const updateModalLatestVer = document.getElementById('update-modal-latest-ver');
+    const updateModalNotes = document.getElementById('update-modal-release-notes');
+    const topUpdateBtn = document.getElementById('btn-top-update-available');
+    let cachedUpdateData = null;
+
+    window.UpdateModal = {
+      open(data) {
+        if (!updateModal || !data) return;
+        cachedUpdateData = data;
+        if (updateModalTitle) updateModalTitle.textContent = `DevsFTP v${data.latestVersion} Available!`;
+        if (updateModalCurrentVer) updateModalCurrentVer.textContent = `v${data.currentVersion || '1.0.0'}`;
+        if (updateModalLatestVer) updateModalLatestVer.textContent = `v${data.latestVersion}`;
+        if (updateModalNotes) updateModalNotes.textContent = data.releaseNotes || 'New release available on devsftp.com.';
+        updateModal.setAttribute('aria-hidden', 'false');
+        updateModal.classList.add('active');
+      },
+      close() {
+        if (!updateModal) return;
+        updateModal.classList.remove('active');
+        updateModal.setAttribute('aria-hidden', 'true');
+      }
+    };
+
+    if (updateModalCloseBtn) updateModalCloseBtn.addEventListener('click', () => window.UpdateModal.close());
+    if (updateModalDismissBtn) updateModalDismissBtn.addEventListener('click', () => window.UpdateModal.close());
+    if (updateModalDownloadBtn) {
+      updateModalDownloadBtn.addEventListener('click', () => {
+        window.UpdateModal.close();
+        openWebsite(cachedUpdateData ? (cachedUpdateData.downloadUrl || 'https://devsftp.com/download/') : 'https://devsftp.com/download/');
+      });
+    }
+
+    if (topUpdateBtn) {
+      topUpdateBtn.addEventListener('click', () => {
+        if (cachedUpdateData) window.UpdateModal.open(cachedUpdateData);
+      });
+    }
+
+    const doCheckForUpdates = async (statusEl, isUserInitiated = true) => {
       if (statusEl) {
         statusEl.style.display = 'block';
         statusEl.style.color = '#F59E0B';
@@ -351,13 +409,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const api = window.devsFTP || window.pulseFTP;
         const res = api && api.checkForUpdates ? await api.checkForUpdates() : null;
         if (res && res.updateAvailable) {
+          cachedUpdateData = res;
+          if (topUpdateBtn) topUpdateBtn.style.display = 'inline-block';
           if (statusEl) {
             statusEl.style.color = '#10B981';
-            statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">Download Now from DevsFTP.com</a>`;
+            statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">View Update Details</a>`;
             const link = statusEl.querySelector('.link-download-update-action');
-            if (link) link.onclick = (e) => { e.preventDefault(); api.openExternal(res.downloadUrl || 'https://devsftp.com/download/'); };
+            if (link) link.onclick = (e) => { e.preventDefault(); window.UpdateModal.open(res); };
+          }
+          if (isUserInitiated) {
+            window.UpdateModal.open(res);
           }
         } else {
+          if (topUpdateBtn) topUpdateBtn.style.display = 'none';
           if (statusEl) {
             statusEl.style.color = '#34D399';
             statusEl.textContent = `✓ You are running the latest version of DevsFTP (${res ? 'v' + res.currentVersion : 'v1.0.0'}).`;
@@ -497,8 +561,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCheckUpdatesTab = document.getElementById('btn-about-tab-check-updates');
     const updateMsgTab = document.getElementById('about-tab-update-status');
 
-    if (btnCheckUpdates) btnCheckUpdates.addEventListener('click', () => doCheckForUpdates(updateMsg));
-    if (btnCheckUpdatesTab) btnCheckUpdatesTab.addEventListener('click', () => doCheckForUpdates(updateMsgTab));
+    if (btnCheckUpdates) btnCheckUpdates.addEventListener('click', () => doCheckForUpdates(updateMsg, true));
+    if (btnCheckUpdatesTab) btnCheckUpdatesTab.addEventListener('click', () => doCheckForUpdates(updateMsgTab, true));
+
+    const prefAutoCheck = document.getElementById('pref-auto-check-updates');
+    if (prefAutoCheck) {
+      prefAutoCheck.checked = localStorage.getItem('devsftp_pref_auto_check_updates') !== 'false';
+      prefAutoCheck.addEventListener('change', (e) => {
+        localStorage.setItem('devsftp_pref_auto_check_updates', e.target.checked ? 'true' : 'false');
+      });
+    }
 
     const btnDirCompare = document.getElementById('btn-dir-compare');
     if (btnDirCompare) {

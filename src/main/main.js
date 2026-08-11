@@ -1438,6 +1438,17 @@ registerLoggedHandle('system:check-updates', async () => {
       }
     }
 
+    if (!data) {
+      const localDevsWWWVer = path.join(app.getAppPath(), 'DevsWWW', 'version.json');
+      const localRootVer = path.join(process.cwd(), 'DevsWWW', 'version.json');
+      const targetLocalFile = fs.existsSync(localDevsWWWVer) ? localDevsWWWVer : (fs.existsSync(localRootVer) ? localRootVer : null);
+      if (targetLocalFile) {
+        try {
+          data = JSON.parse(fs.readFileSync(targetLocalFile, 'utf8'));
+        } catch (e) {}
+      }
+    }
+
     if (data && data.version) {
       const latestVersion = data.version.replace(/^v/, '');
       const semverCompare = (v1, v2) => {
