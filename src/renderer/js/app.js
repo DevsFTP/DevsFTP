@@ -578,9 +578,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     }
-  } catch (err) {
-    console.error('DOMContentLoaded initialization error:', err);
-  }
 
   // =========================================================================
   // 1. Workspace Panel Independent Sizing & Layout Persistence Store
