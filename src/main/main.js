@@ -1752,11 +1752,44 @@ registerLoggedHandle('system:save-exclusion-prefs', async (_event, prefs) => {
 
 registerLoggedHandle('system:calculate-dir-size', async (_event, targetPath, isRemote, sessionId) => {
   if (!dirSizeService) return false;
+  
   let session = null;
+  let tempSession = null;
+
   if (isRemote) {
-    session = getActiveSessionInstance(sessionId);
+    const sessionItem = activeSessions.get(sessionId);
+    if (sessionItem) {
+      const { config, protocol } = sessionItem;
+      if (protocol === 'sftp') {
+        tempSession = new SFTPService();
+      } else if (protocol === 'webdav') {
+        tempSession = new WebDAVService();
+      } else {
+        tempSession = new FTPService();
+      }
+
+      try {
+        await tempSession.connect(config, () => {});
+        session = tempSession;
+      } catch (err) {
+        console.error('[DirSizeService] Failed to establish temporary session:', err);
+        return false;
+      }
+    }
   }
-  dirSizeService.calculateSize(targetPath, isRemote, session);
+
+  dirSizeService.calculateSize(targetPath, isRemote, session)
+    .catch((err) => {
+      console.error('[DirSizeService] Calculation failed:', err);
+    })
+    .finally(() => {
+      if (tempSession) {
+        try {
+          tempSession.disconnect();
+        } catch (e) {}
+      }
+    });
+
   return true;
 });
 
