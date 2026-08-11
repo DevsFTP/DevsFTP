@@ -125,7 +125,13 @@ const devsFTPApi = {
 
   // Exclusion Rules & Ignore Filters IPC
   getExclusionPrefs: () => ipcRenderer.invoke('system:get-exclusion-prefs'),
-  saveExclusionPrefs: (prefs) => ipcRenderer.invoke('system:save-exclusion-prefs', prefs)
+  saveExclusionPrefs: (prefs) => ipcRenderer.invoke('system:save-exclusion-prefs', prefs),
+
+  // Directory Size Calculator IPC
+  calculateDirSize: (targetPath, isRemote, sessionId) => ipcRenderer.invoke('system:calculate-dir-size', targetPath, isRemote, sessionId),
+  getDirSizePrefs: () => ipcRenderer.invoke('system:get-dir-size-prefs'),
+  saveDirSizePrefs: (prefs) => ipcRenderer.invoke('system:save-dir-size-prefs', prefs),
+  onDirSizeUpdated: (callback) => ipcRenderer.on('dir-size:updated', (_event, data) => callback(data))
 };
 
 contextBridge.exposeInMainWorld('devsFTP', devsFTPApi);

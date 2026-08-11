@@ -613,6 +613,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Directory Size Calculator Preference Wiring
+    const prefAutoCalcDir = document.getElementById('pref-auto-calculate-dir-size');
+    if (prefAutoCalcDir && exApi && exApi.getDirSizePrefs) {
+      exApi.getDirSizePrefs().then(prefs => {
+        if (prefs) {
+          prefAutoCalcDir.checked = Boolean(prefs.autoCalculate);
+        }
+      }).catch(() => {});
+
+      prefAutoCalcDir.addEventListener('change', async (e) => {
+        if (exApi.saveDirSizePrefs) {
+          await exApi.saveDirSizePrefs({ autoCalculate: e.target.checked });
+        }
+      });
+    }
+
     const btnDirCompare = document.getElementById('btn-dir-compare');
     if (btnDirCompare) {
       btnDirCompare.addEventListener('click', () => {

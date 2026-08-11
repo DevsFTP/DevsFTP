@@ -43,6 +43,7 @@ window.FileBrowser = {
   },
 
   async init() {
+    this.calculatedDirSizes = new Map();
     this.setupListeners();
     this.loadDrives();
     const api = this.getApi();
@@ -53,6 +54,19 @@ window.FileBrowser = {
       } catch (e) {}
     }
     this.refreshLocal(initialPath);
+
+    if (api && api.onDirSizeUpdated) {
+      api.onDirSizeUpdated((data) => {
+        if (data && data.targetPath) {
+          this.calculatedDirSizes.set(data.targetPath, data.formattedSize);
+          if (data.isRemote) {
+            this.renderRemoteTable(this.remoteFiles);
+          } else {
+            this.renderLocalTable(this.localFiles);
+          }
+        }
+      });
+    }
   },
 
   setRemoteState(files, targetPath) {
@@ -124,6 +138,10 @@ window.FileBrowser = {
     document.getElementById('ctx-copy-path').addEventListener('click', (e) => {
       console.log('[DEBUG MENU] #ctx-copy-path click fired');
       this.handleContextAction('copy-path');
+    });
+    document.getElementById('ctx-calculate-size').addEventListener('click', (e) => {
+      console.log('[DEBUG MENU] #ctx-calculate-size click fired');
+      this.handleContextAction('calculate-size');
     });
     document.getElementById('ctx-chmod').addEventListener('click', (e) => {
       console.log('[DEBUG MENU] #ctx-chmod click fired');
@@ -929,6 +947,7 @@ window.FileBrowser = {
       if (window.SessionManager) {
         window.SessionManager.updateActiveSessionLocalPath(this.localPath);
       }
+      this.triggerAutoCalcLocal();
     } catch (err) {
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read local directory: ${err.message}`);
     }
@@ -948,9 +967,41 @@ window.FileBrowser = {
         window.SessionManager.updateActiveSessionRemoteState(this.remoteFiles, this.remotePath);
         window.SessionManager.saveWorkspaceSessionState();
       }
+      this.triggerAutoCalcRemote();
     } catch (err) {
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read remote directory: ${err.message}`);
     }
+  },
+
+  async triggerAutoCalcLocal() {
+    const api = this.getApi();
+    if (!api || !api.getDirSizePrefs) return;
+    try {
+      const prefs = await api.getDirSizePrefs();
+      if (prefs && prefs.autoCalculate) {
+        this.localFiles.forEach(f => {
+          if (f.isDir) {
+            api.calculateDirSize(f.path, false);
+          }
+        });
+      }
+    } catch (e) {}
+  },
+
+  async triggerAutoCalcRemote() {
+    const api = this.getApi();
+    if (!api || !api.getDirSizePrefs) return;
+    try {
+      const prefs = await api.getDirSizePrefs();
+      if (prefs && prefs.autoCalculate) {
+        const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
+        this.remoteFiles.forEach(f => {
+          if (f.isDir) {
+            api.calculateDirSize(f.path, true, sessId);
+          }
+        });
+      }
+    } catch (e) {}
   },
 
   localUp() {
@@ -1048,7 +1099,7 @@ window.FileBrowser = {
           <span>${f.name}</span>
           ${badgeHtml}
         </td>
-        <td>${f.isDir ? '--' : this.formatSize(f.size)}</td>
+        <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td>${new Date(f.modifyTime).toLocaleDateString()}</td>
       `;
 
@@ -1205,7 +1256,7 @@ window.FileBrowser = {
           <span>${f.name}</span>
           ${badgeHtml}
         </td>
-        <td>${f.isDir ? '--' : this.formatSize(f.size)}</td>
+        <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td class="permissions-cell">${f.permissions || 'rwxr-xr-x'}</td>
         <td>${new Date(f.modifyTime).toLocaleDateString()}</td>
       `;
@@ -1323,6 +1374,7 @@ window.FileBrowser = {
     const ctxRename = document.getElementById('ctx-rename');
     const ctxDelete = document.getElementById('ctx-delete');
     const ctxCopyPath = document.getElementById('ctx-copy-path');
+    const ctxCalculateSize = document.getElementById('ctx-calculate-size');
     const ctxNewFile = document.getElementById('ctx-new-file');
     const ctxMkdir = document.getElementById('ctx-mkdir');
 
@@ -1335,6 +1387,7 @@ window.FileBrowser = {
       if (ctxRename) ctxRename.style.display = 'none';
       if (ctxDelete) ctxDelete.style.display = 'none';
       if (ctxCopyPath) ctxCopyPath.style.display = 'none';
+      if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else if (selectedList.length === 1) {
@@ -1364,6 +1417,9 @@ window.FileBrowser = {
         const label = ctxCopyPath.querySelector('span:last-child');
         if (label) label.textContent = 'Copy Path';
       }
+      if (ctxCalculateSize) {
+        ctxCalculateSize.style.display = isDir ? 'flex' : 'none';
+      }
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else {
@@ -1392,6 +1448,7 @@ window.FileBrowser = {
         const label = ctxCopyPath.querySelector('span:last-child');
         if (label) label.textContent = `Copy Paths (${count} items)`;
       }
+      if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     }
@@ -1467,6 +1524,22 @@ window.FileBrowser = {
       this.openDeleteConfirmModal(items, pane);
     } else if (action === 'rename' && items.length === 1) {
       this.openRenameModal(items[0], pane);
+    } else if (action === 'calculate-size' && items.length === 1) {
+      const item = items[0];
+      if (item.isDir) {
+        const api = this.getApi();
+        if (api && api.calculateDirSize) {
+          const isRemote = pane === 'remote';
+          const sessId = isRemote && window.SessionManager ? window.SessionManager.activeSessionId : null;
+          this.calculatedDirSizes.set(item.path, 'Calculating...');
+          if (isRemote) {
+            this.renderRemoteTable(this.remoteFiles);
+          } else {
+            this.renderLocalTable(this.localFiles);
+          }
+          api.calculateDirSize(item.path, isRemote, sessId);
+        }
+      }
     }
   },
 

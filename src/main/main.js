@@ -79,6 +79,7 @@ const { parseSSHConfigFile } = require('./services/sshConfigParser');
 const { normalizePOSIXPath } = require('./services/pathUtils');
 
 const ExclusionService = require('./services/exclusionService');
+const DirSizeService = require('./services/dirSizeService');
 
 let mainWindow = null;
 let profileStore = null;
@@ -90,6 +91,7 @@ let activeConfig = null;
 let sshTerminalService = null;
 let cacheWatcherService = null;
 let exclusionService = null;
+let dirSizeService = null;
 
 function redactSensitiveText(text) {
   return String(text)
@@ -523,6 +525,7 @@ function createWindow() {
   cacheWatcherService = new CacheWatcherService(mainWindow);
   if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
   sshTerminalService = new SSHTerminalService(mainWindow);
+  dirSizeService = new DirSizeService(mainWindow);
 }
 
 async function handleHostKeyVerification({ host, port, fingerprint }) {
@@ -1745,4 +1748,37 @@ registerLoggedHandle('system:save-exclusion-prefs', async (_event, prefs) => {
     return { success: true };
   }
   return { success: false };
+});
+
+registerLoggedHandle('system:calculate-dir-size', async (_event, targetPath, isRemote, sessionId) => {
+  if (!dirSizeService) return false;
+  let session = null;
+  if (isRemote) {
+    session = getActiveSessionInstance(sessionId);
+  }
+  dirSizeService.calculateSize(targetPath, isRemote, session);
+  return true;
+});
+
+registerLoggedHandle('system:get-dir-size-prefs', async () => {
+  const userDataPath = app ? app.getPath('userData') : path.join(process.cwd(), '.devs_userData');
+  const prefsFile = path.join(userDataPath, 'devsftp_dir_size_prefs.json');
+  try {
+    if (fs.existsSync(prefsFile)) {
+      return JSON.parse(fs.readFileSync(prefsFile, 'utf8'));
+    }
+  } catch (e) {}
+  return { autoCalculate: false };
+});
+
+registerLoggedHandle('system:save-dir-size-prefs', async (_event, prefs) => {
+  const userDataPath = app ? app.getPath('userData') : path.join(process.cwd(), '.devs_userData');
+  const prefsFile = path.join(userDataPath, 'devsftp_dir_size_prefs.json');
+  try {
+    fs.writeFileSync(prefsFile, JSON.stringify(prefs, null, 2), 'utf8');
+    sendLog('info', 'Directory size calculation preferences saved.');
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
 });
