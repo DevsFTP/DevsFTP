@@ -1144,26 +1144,21 @@ window.FileBrowser = {
 
     if (isDisconnected) {
       const profileName = activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server';
-      const accentHue = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '24'; // default accent color hue
+      const accentColor = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '#F59E0B';
 
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 72px 24px; color: hsl(var(--text-secondary));">
-            <div style="margin-bottom: 18px;">
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: hsl(${accentHue}, 90%, 55%); filter: drop-shadow(0 4px 12px hsl(${accentHue}, 90%, 55%, 0.25)); display: inline-block;">
-                <!-- Bottom-left socket -->
-                <path d="M4 20l4-4" stroke-width="2"></path>
-                <rect x="7" y="11" width="4" height="6" rx="1" transform="rotate(-45 9 14)" fill="currentColor" opacity="0.9"></rect>
-                
-                <!-- Top-right plug -->
-                <path d="M20 4l-4 4" stroke-width="2"></path>
-                <rect x="13" y="7" width="4" height="6" rx="1" transform="rotate(-45 15 10)" fill="currentColor" opacity="0.9"></rect>
-                <!-- Prongs pointing down-left -->
-                <line x1="12.5" y1="11.5" x2="10.5" y2="13.5" stroke-width="2"></line>
-                <line x1="14" y1="13" x2="12" y2="15" stroke-width="2"></line>
-                
-                <!-- Lightning warning bolt in the gap -->
-                <path d="M12.5 10.5l-2 1.5h2.5l-2 1.5" stroke="hsl(var(--destructive))" stroke-width="2" fill="none"></path>
+          <td colspan="4" style="text-align: center; padding: 80px 24px; color: hsl(var(--text-secondary));">
+            <div style="margin-bottom: 20px;">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ${accentColor}; filter: drop-shadow(0 4px 12px ${accentColor}40); display: inline-block;">
+                <line x1="2" y1="2" x2="22" y2="22" stroke="hsl(var(--destructive))" stroke-width="2.5"></line>
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
+                <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
+                <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" fill="currentColor"></path>
+                <path d="M8.58 13.72a5 5 0 0 1 2.24-1.22"></path>
+                <path d="M13.18 12.5a5 5 0 0 1 2.24 1.22"></path>
+                <path d="M16.28 5.69A18.89 18.89 0 0 1 22 8"></path>
+                <path d="M2 8a18.89 18.89 0 0 1 7.72-2.31"></path>
               </svg>
             </div>
             <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 6px;">Session Disconnected</div>
