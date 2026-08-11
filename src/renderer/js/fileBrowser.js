@@ -1148,22 +1148,26 @@ window.FileBrowser = {
 
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 64px 24px; color: hsl(var(--text-secondary));">
-            <div style="margin-bottom: 16px;">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: hsl(${accentHue}, 90%, 55%); filter: drop-shadow(0 2px 8px hsl(${accentHue}, 90%, 55%, 0.3)); display: inline-block;">
-                <path d="M18.66 10.5H21a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2.34"></path>
-                <path d="M5.34 10.5H3a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2.34"></path>
-                <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <path d="M12 4v4"></path>
-                <path d="M16 10.5v5.5a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-5.5"></path>
-                <line x1="1" y1="1" x2="23" y2="23" style="stroke: hsl(var(--destructive)); stroke-width: 2.5;"></line>
+          <td colspan="4" style="text-align: center; padding: 72px 24px; color: hsl(var(--text-secondary));">
+            <div style="margin-bottom: 18px;">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: hsl(${accentHue}, 90%, 55%); filter: drop-shadow(0 4px 12px hsl(${accentHue}, 90%, 55%, 0.25)); display: inline-block;">
+                <!-- Bottom-left socket -->
+                <path d="M4 20l4-4" stroke-width="2"></path>
+                <rect x="7" y="11" width="4" height="6" rx="1" transform="rotate(-45 9 14)" fill="currentColor" opacity="0.9"></rect>
+                
+                <!-- Top-right plug -->
+                <path d="M20 4l-4 4" stroke-width="2"></path>
+                <rect x="13" y="7" width="4" height="6" rx="1" transform="rotate(-45 15 10)" fill="currentColor" opacity="0.9"></rect>
+                <!-- Prongs pointing down-left -->
+                <line x1="12.5" y1="11.5" x2="10.5" y2="13.5" stroke-width="2"></line>
+                <line x1="14" y1="13" x2="12" y2="15" stroke-width="2"></line>
+                
+                <!-- Lightning warning bolt in the gap -->
+                <path d="M12.5 10.5l-2 1.5h2.5l-2 1.5" stroke="hsl(var(--destructive))" stroke-width="2" fill="none"></path>
               </svg>
             </div>
-            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 4px;">Session Disconnected</div>
-            <div style="font-size: 12px; color: hsl(var(--text-muted)); margin-bottom: 20px;">You are currently disconnected from ${profileName}.</div>
-            <button class="btn btn-primary" onclick="const active = window.SessionManager.getActiveSession(); if (active && window.connectToProfileSession) window.connectToProfileSession(active.profile, active.sessionId);" style="background-color: hsl(${accentHue}, 90%, 45%); color: #fff; font-weight: 600; padding: 6px 16px; border-radius: 4px; border: none; cursor: pointer; transition: background-color 0.2s;">
-              Reconnect
-            </button>
+            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 6px;">Session Disconnected</div>
+            <div style="font-size: 12px; color: hsl(var(--text-muted));">You are currently disconnected from ${profileName}.</div>
           </td>
         </tr>
       `;
