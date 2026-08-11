@@ -339,10 +339,9 @@ window.SessionManager = {
   saveWorkspaceSessionState() {
     if (this.isRestoring) return; // DO NOT OVERWRITE STORAGE DURING STARTUP RESTORE INITIALIZATION
     try {
-      const validSessions = this.sessions.filter(s => 
-        s && s.profile && s.profile.host && 
-        s.profile.host !== 'localhost' && 
-        s.profileId !== 'default' && 
+      const validSessions = this.sessions.filter(s =>
+        s && s.profile && s.profile.host &&
+        s.profileId !== 'default' &&
         s.profile.name !== 'Local Workspace'
       );
       if (validSessions.length === 0) {

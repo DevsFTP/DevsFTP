@@ -14,6 +14,18 @@ class FTPService {
     this.connected = false;
     this.currentConfig = null;
     this.onUnexpectedClose = null;
+    this._queue = Promise.resolve(); // Rolling promise chain – serializes all socket commands
+  }
+
+  /**
+   * Serializes all FTP operations through a rolling promise chain to prevent
+   * basic-ftp "client is closed" errors caused by concurrent command execution.
+   */
+  executeSequentially(fn) {
+    const next = this._queue.then(() => fn()).catch(err => { throw err; });
+    // Swallow errors on the shared chain so one failure doesn't block future ops
+    this._queue = next.catch(() => {});
+    return next;
   }
 
   async connect(config, onLog) {
@@ -68,121 +80,143 @@ class FTPService {
 
   async list(remoteDir = '/') {
     if (!this.connected) throw new Error('FTP client is not connected.');
-    const normalizedPath = normalizePOSIXPath(remoteDir);
-    const list = await this.client.list(normalizedPath); // Avoid cd() side effects (Issues 9.1 & 9.3)
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP client is not connected.');
+      const normalizedPath = normalizePOSIXPath(remoteDir);
 
-    const items = list.map(item => {
-      const isDir = item.isDirectory;
-      const isLink = item.isSymbolicLink;
-      const type = isDir ? 'd' : (isLink ? 'l' : '-');
+      // Use CWD + parameterless LIST for maximum compatibility with chrooted
+      // and virtual-directory FTP servers (RFC 959). Passing a path argument
+      // to LIST/MLSD fails with 550 Access Denied on many servers.
+      await this.client.cd(normalizedPath);
+      const list = await this.client.list();
 
-      // Robust modification time parsing with year fallback (Issue 9.4)
-      let modifyTimeDate = new Date();
-      if (item.modifiedAt instanceof Date && !isNaN(item.modifiedAt)) {
-        modifyTimeDate = item.modifiedAt;
-      } else if (item.rawModifiedAt) {
-        modifyTimeDate = new Date(item.rawModifiedAt);
-        if (!isNaN(modifyTimeDate)) {
-          const now = new Date();
-          if (modifyTimeDate.getTime() - now.getTime() > 86400000) {
-            modifyTimeDate.setFullYear(now.getFullYear() - 1);
+      const items = list.map(item => {
+        const isDir = item.isDirectory;
+        const isLink = item.isSymbolicLink;
+        const type = isDir ? 'd' : (isLink ? 'l' : '-');
+
+        // Robust modification time parsing with year fallback (Issue 9.4)
+        let modifyTimeDate = new Date();
+        if (item.modifiedAt instanceof Date && !isNaN(item.modifiedAt)) {
+          modifyTimeDate = item.modifiedAt;
+        } else if (item.rawModifiedAt) {
+          modifyTimeDate = new Date(item.rawModifiedAt);
+          if (!isNaN(modifyTimeDate)) {
+            const now = new Date();
+            if (modifyTimeDate.getTime() - now.getTime() > 86400000) {
+              modifyTimeDate.setFullYear(now.getFullYear() - 1);
+            }
+          } else {
+            modifyTimeDate = new Date();
           }
-        } else {
-          modifyTimeDate = new Date();
         }
-      }
 
-      return {
-        name: item.name,
-        path: normalizePOSIXPath(`${normalizedPath}/${item.name}`),
-        type: type,
-        isDir: isDir,
-        size: item.size || 0,
-        modifyTime: modifyTimeDate.toISOString(),
-        permissions: formatPermissions(item.rights ? item.rights.user : null),
-        mode: item.rights
-      };
+        return {
+          name: item.name,
+          path: normalizePOSIXPath(`${normalizedPath}/${item.name}`),
+          type: type,
+          isDir: isDir,
+          size: item.size || 0,
+          modifyTime: modifyTimeDate.toISOString(),
+          permissions: formatPermissions(item.rights ? item.rights.user : null),
+          mode: item.rights
+        };
+      });
+
+      items.sort((a, b) => {
+        if (a.isDir && !b.isDir) return -1;
+        if (!a.isDir && b.isDir) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return { currentPath: normalizedPath, files: items };
     });
-
-    items.sort((a, b) => {
-      if (a.isDir && !b.isDir) return -1;
-      if (!a.isDir && b.isDir) return 1;
-      return a.name.localeCompare(b.name);
-    });
-
-    return { currentPath: normalizedPath, files: items };
   }
 
   async downloadFile(remotePath, localPath, onProgress) {
     if (!this.connected) throw new Error('FTP client is not connected.');
-    
-    this.client.trackProgress(info => {
-      if (onProgress) {
-        onProgress({
-          transferred: info.bytes,
-          total: info.bytesOverall || info.bytes,
-          percentage: info.bytesOverall ? Math.min(100, Math.round((info.bytes / info.bytesOverall) * 100)) : 50
-        });
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP client is not connected.');
+      this.client.trackProgress(info => {
+        if (onProgress) {
+          onProgress({
+            transferred: info.bytes,
+            total: info.bytesOverall || info.bytes,
+            percentage: info.bytesOverall ? Math.min(100, Math.round((info.bytes / info.bytesOverall) * 100)) : 50
+          });
+        }
+      });
+      try {
+        await this.client.downloadTo(localPath, remotePath);
+      } finally {
+        this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
       }
+      return true;
     });
-
-    try {
-      await this.client.downloadTo(localPath, remotePath);
-    } finally {
-      this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
-    }
-    return true;
   }
 
   async uploadFile(localPath, remotePath, onProgress) {
     if (!this.connected) throw new Error('FTP client is not connected.');
-
-    this.client.trackProgress(info => {
-      if (onProgress) {
-        onProgress({
-          transferred: info.bytes,
-          total: info.bytesOverall || info.bytes,
-          percentage: info.bytesOverall ? Math.min(100, Math.round((info.bytes / info.bytesOverall) * 100)) : 50
-        });
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP client is not connected.');
+      this.client.trackProgress(info => {
+        if (onProgress) {
+          onProgress({
+            transferred: info.bytes,
+            total: info.bytesOverall || info.bytes,
+            percentage: info.bytesOverall ? Math.min(100, Math.round((info.bytes / info.bytesOverall) * 100)) : 50
+          });
+        }
+      });
+      try {
+        await this.client.uploadFrom(localPath, remotePath);
+      } finally {
+        this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
       }
+      return true;
     });
-
-    try {
-      await this.client.uploadFrom(localPath, remotePath);
-    } finally {
-      this.client.trackProgress(); // clear tracker in finally block (Issue 9.2)
-    }
-    return true;
   }
 
   async uploadDir(localDirPath, remoteDestDirPath, onProgress) {
     if (!this.connected) throw new Error('FTP client is not connected.');
-    const normRemote = normalizePOSIXPath(remoteDestDirPath);
-    await this.client.uploadFromDir(localDirPath, normRemote);
-    return true;
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP client is not connected.');
+      const normRemote = normalizePOSIXPath(remoteDestDirPath);
+      await this.client.uploadFromDir(localDirPath, normRemote);
+      return true;
+    });
   }
 
   async mkdir(remotePath) {
     if (!this.connected) throw new Error('FTP not connected');
-    await this.client.ensureDir(normalizePOSIXPath(remotePath));
-    return true;
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP not connected');
+      await this.client.ensureDir(normalizePOSIXPath(remotePath));
+      return true;
+    });
   }
 
   async delete(remotePath, isDirectory = false) {
     if (!this.connected) throw new Error('FTP not connected');
-    const normPath = normalizePOSIXPath(remotePath);
-    if (isDirectory) {
-      await this.client.removeDir(normPath);
-    } else {
-      await this.client.remove(normPath);
-    }
-    return true;
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP not connected');
+      const normPath = normalizePOSIXPath(remotePath);
+      if (isDirectory) {
+        await this.client.removeDir(normPath);
+      } else {
+        await this.client.remove(normPath);
+      }
+      return true;
+    });
   }
 
   async rename(oldPath, newPath) {
     if (!this.connected) throw new Error('FTP not connected');
-    await this.client.rename(normalizePOSIXPath(oldPath), normalizePOSIXPath(newPath));
-    return true;
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP not connected');
+      await this.client.rename(normalizePOSIXPath(oldPath), normalizePOSIXPath(newPath));
+      return true;
+    });
   }
 
   async stat(remotePath) {
@@ -203,12 +237,15 @@ class FTPService {
 
   async downloadDir(remoteDirPath, localDestPath, onProgress) {
     if (!this.connected) throw new Error('FTP client is not connected.');
-    const normRemote = normalizePOSIXPath(remoteDirPath);
-    if (!fs.existsSync(localDestPath)) {
-      fs.mkdirSync(localDestPath, { recursive: true });
-    }
-    await this.client.downloadToDir(localDestPath, normRemote);
-    return true;
+    return this.executeSequentially(async () => {
+      if (!this.connected) throw new Error('FTP client is not connected.');
+      const normRemote = normalizePOSIXPath(remoteDirPath);
+      if (!fs.existsSync(localDestPath)) {
+        fs.mkdirSync(localDestPath, { recursive: true });
+      }
+      await this.client.downloadToDir(localDestPath, normRemote);
+      return true;
+    });
   }
 
   disconnect() {
