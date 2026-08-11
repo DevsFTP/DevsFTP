@@ -19,7 +19,6 @@
     "@xterm/xterm": "^5.5.0",
     "basic-ftp": "^5.0.5",
     "chokidar": "^3.6.0",
-    "node-webdav": "^0.1.7",
     "socks": "^2.8.9",
     "ssh2": "^1.16.0",
     "webdav": "^5.7.0"
