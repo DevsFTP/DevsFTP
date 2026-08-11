@@ -680,52 +680,7 @@ registerLoggedHandle('dialog:select-local-path', async () => {
   return result.canceled ? null : result.filePaths[0];
 });
 
-registerLoggedHandle('system:open-external', async (_event, url) => {
-  const { shell } = require('electron');
-  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
-    await shell.openExternal(url);
-    return true;
-  }
-  return false;
-});
 
-registerLoggedHandle('system:check-updates', async () => {
-  const { net } = require('electron');
-  const currentVersion = '1.0.0';
-  const updateUrl = 'https://devsftp.com/api/version.json';
-
-  try {
-    const response = await new Promise((resolve, reject) => {
-      const req = net.request(updateUrl);
-      req.on('response', (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => resolve({ statusCode: res.statusCode, body }));
-      });
-      req.on('error', reject);
-      req.end();
-    });
-
-    if (response.statusCode === 200) {
-      const data = JSON.parse(response.body);
-      return {
-        currentVersion,
-        latestVersion: data.version || currentVersion,
-        hasUpdate: data.version ? (data.version !== currentVersion) : false,
-        downloadUrl: data.downloadUrl || 'https://devsftp.com',
-        releaseNotes: data.releaseNotes || ''
-      };
-    }
-  } catch (e) {}
-
-  return {
-    currentVersion,
-    latestVersion: currentVersion,
-    hasUpdate: false,
-    downloadUrl: 'https://devsftp.com',
-    releaseNotes: 'You are running the latest version of DevsFTP.'
-  };
-});
 
 registerLoggedHandle('jobs:toggle', async (_event, id, enabled) => {
   if (!scheduledJobStore) return false;

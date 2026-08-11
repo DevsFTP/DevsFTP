@@ -972,27 +972,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const menuHelpDocs = document.getElementById('menu-help-docs');
-  if (menuHelpDocs) {
-    menuHelpDocs.addEventListener('click', () => {
-      alert('DevsFTP Documentation:\nRefer to README.md and docs/adr/ in the project root folder.');
-    });
-  }
-
-  const menuHelpIssue = document.getElementById('menu-help-issue');
-  if (menuHelpIssue) {
-    menuHelpIssue.addEventListener('click', () => {
-      alert('Report Issues:\nPlease submit issue logs in KNOWN_ISSUES.md or to the engineering lead.');
-    });
-  }
-
-  const menuHelpUpdate = document.getElementById('menu-help-update');
-  if (menuHelpUpdate) {
-    menuHelpUpdate.addEventListener('click', () => {
-      alert('Check for Updates:\nYou are running DevsFTP v1.0.0 (Production Release). Application is up to date.');
-    });
-  }
-
   const menuHelpAbout = document.getElementById('menu-help-about');
   if (menuHelpAbout) {
     menuHelpAbout.addEventListener('click', () => {
