@@ -57,11 +57,11 @@ class S3Service {
       region,
     };
 
-    if (config.s3Endpoint) {
-      clientConfig.endpoint = config.s3Endpoint;
+    if (config.host) {
+      clientConfig.endpoint = config.host;
       // Force path style access for custom/compatible endpoints (MinIO, Ceph, DO Spaces)
       clientConfig.forcePathStyle = true;
-      if (onLog) onLog('info', `Using custom S3 Endpoint: ${config.s3Endpoint}`);
+      if (onLog) onLog('info', `Using S3 Endpoint: ${config.host}`);
     }
 
     try {

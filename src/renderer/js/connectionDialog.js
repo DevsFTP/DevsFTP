@@ -291,10 +291,8 @@ window.ConnectionDialog = {
     // S3 Fields
     const s3BucketEl = document.getElementById('prof-s3-bucket');
     const s3RegionEl = document.getElementById('prof-s3-region');
-    const s3EndpointEl = document.getElementById('prof-s3-endpoint');
     if (s3BucketEl) s3BucketEl.value = profile.s3Bucket || '';
     if (s3RegionEl) s3RegionEl.value = profile.s3Region || 'us-east-1';
-    if (s3EndpointEl) s3EndpointEl.value = profile.s3Endpoint || '';
 
     // Keep Host & Port visible for all protocols except S3
     const isWebDAV = profile.protocol === 'webdav';
@@ -302,12 +300,10 @@ window.ConnectionDialog = {
     const hostGroup = document.getElementById('group-host');
     const portGroup = document.getElementById('group-port');
     const webdavPathGroup = document.getElementById('group-webdav-path');
-    const s3Group = document.getElementById('group-s3-settings');
 
     if (hostGroup) hostGroup.style.display = isS3 ? 'none' : '';
     if (portGroup) portGroup.style.display = isS3 ? 'none' : '';
     if (webdavPathGroup) webdavPathGroup.style.display = isWebDAV ? '' : 'none';
-    if (s3Group) s3Group.style.display = isS3 ? 'flex' : 'none';
 
     const pTypeEl = document.getElementById('prof-proxy-type');
     const pHostEl = document.getElementById('prof-proxy-host');
@@ -358,18 +354,14 @@ window.ConnectionDialog = {
     const hostGroupNew = document.getElementById('group-host');
     const portGroupNew = document.getElementById('group-port');
     const webdavPathGroupNew = document.getElementById('group-webdav-path');
-    const s3GroupNew = document.getElementById('group-s3-settings');
     if (hostGroupNew) hostGroupNew.style.display = '';
     if (portGroupNew) portGroupNew.style.display = '';
     if (webdavPathGroupNew) webdavPathGroupNew.style.display = 'none';
-    if (s3GroupNew) s3GroupNew.style.display = 'none';
 
     const s3BucketEl = document.getElementById('prof-s3-bucket');
     const s3RegionEl = document.getElementById('prof-s3-region');
-    const s3EndpointEl = document.getElementById('prof-s3-endpoint');
     if (s3BucketEl) s3BucketEl.value = '';
     if (s3RegionEl) s3RegionEl.value = 'us-east-1';
-    if (s3EndpointEl) s3EndpointEl.value = '';
 
     const pTypeEl = document.getElementById('prof-proxy-type');
     const pHostEl = document.getElementById('prof-proxy-host');
@@ -396,27 +388,48 @@ window.ConnectionDialog = {
   },
 
   updateFormLabels(proto) {
+    const lblHost = document.getElementById('lbl-prof-host');
+    const txtHost = document.getElementById('prof-host');
+    const groupPort = document.getElementById('group-port');
+
     const lblUser = document.getElementById('lbl-prof-username');
-    const lblPass = document.getElementById('lbl-prof-password');
     const txtUser = document.getElementById('prof-username');
-    const txtPass = document.getElementById('prof-password');
     const groupAuth = document.getElementById('group-authtype');
-    const groupUser = document.getElementById('group-username');
+    const groupBucket = document.getElementById('group-s3-bucket');
+
+    const lblPass = document.getElementById('lbl-prof-password');
+    const txtPass = document.getElementById('prof-password');
+    const groupPass = document.getElementById('group-password');
+    const groupRegion = document.getElementById('group-s3-region');
 
     if (proto === 's3') {
+      if (lblHost) lblHost.textContent = 'S3 Endpoint URL (Optional)';
+      if (txtHost) txtHost.placeholder = 'https://nyc3.digitaloceanspaces.com (Default: AWS)';
+      if (groupPort) groupPort.style.display = 'none';
+
       if (lblUser) lblUser.textContent = 'Access Key ID';
       if (txtUser) txtUser.placeholder = 'AKIAIOSFODNN7EXAMPLE';
+      if (groupAuth) groupAuth.style.display = 'none';
+      if (groupBucket) groupBucket.style.display = '';
+
       if (lblPass) lblPass.textContent = 'Secret Access Key';
       if (txtPass) txtPass.placeholder = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
-      if (groupAuth) groupAuth.style.display = 'none';
-      if (groupUser) groupUser.style.gridColumn = 'span 2';
+      if (groupPass) groupPass.style.gridColumn = '';
+      if (groupRegion) groupRegion.style.display = '';
     } else {
+      if (lblHost) lblHost.textContent = 'Host / IP Address';
+      if (txtHost) txtHost.placeholder = 'appvark.com or 192.168.1.100';
+      if (groupPort) groupPort.style.display = '';
+
       if (lblUser) lblUser.textContent = 'Username';
       if (txtUser) txtUser.placeholder = 'root or ubuntu';
+      if (groupAuth) groupAuth.style.display = '';
+      if (groupBucket) groupBucket.style.display = 'none';
+
       if (lblPass) lblPass.textContent = 'Password';
       if (txtPass) txtPass.placeholder = '••••••••';
-      if (groupAuth) groupAuth.style.display = '';
-      if (groupUser) groupUser.style.gridColumn = '';
+      if (groupPass) groupPass.style.gridColumn = 'span 2';
+      if (groupRegion) groupRegion.style.display = 'none';
     }
   },
 
@@ -444,7 +457,6 @@ window.ConnectionDialog = {
     const webdavPathVal = document.getElementById('prof-webdav-path') ? document.getElementById('prof-webdav-path').value.trim() : '';
     const s3BucketVal = document.getElementById('prof-s3-bucket') ? document.getElementById('prof-s3-bucket').value.trim() : '';
     const s3RegionVal = document.getElementById('prof-s3-region') ? document.getElementById('prof-s3-region').value.trim() : 'us-east-1';
-    const s3EndpointVal = document.getElementById('prof-s3-endpoint') ? document.getElementById('prof-s3-endpoint').value.trim() : '';
 
     const profile = {
       id: this.activeProfileId,
@@ -459,7 +471,6 @@ window.ConnectionDialog = {
       webdavPath: webdavPathVal,
       s3Bucket: s3BucketVal,
       s3Region: s3RegionVal,
-      s3Endpoint: s3EndpointVal,
       accentColor: this.activeAccentColor || '#F59E0B',
       remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
       localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
