@@ -961,7 +961,7 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
       activeSessions.set(sessId, { session, config, protocol });
       if (cacheWatcherService) {
-        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId, Array.from(activeSessions.keys()));
       }
       sendLog('info', `SFTP Session established cleanly for tab [${sessId}] to ${config.host}:${config.port || 22}`);
       return { success: true, protocol: 'sftp', sessionId: sessId };
@@ -976,7 +976,7 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
       activeSessions.set(sessId, { session, config, protocol });
       if (cacheWatcherService) {
-        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId, Array.from(activeSessions.keys()));
       }
       sendLog('info', `WebDAV Session established cleanly for tab [${sessId}] to ${config.webdavUrl || config.host}`);
       return { success: true, protocol: 'webdav', sessionId: sessId };
@@ -991,7 +991,7 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
       session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
       activeSessions.set(sessId, { session, config, protocol });
       if (cacheWatcherService) {
-        cacheWatcherService.updateWatcherSessionId(config.id, sessId);
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId, Array.from(activeSessions.keys()));
       }
       sendLog('info', `FTP/FTPS Session established cleanly for tab [${sessId}] to ${config.host}:${config.port || 21}`);
       return { success: true, protocol: 'ftp', sessionId: sessId };

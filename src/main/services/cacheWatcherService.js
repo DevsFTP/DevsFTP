@@ -365,11 +365,16 @@ class CacheWatcherService {
     }
   }
 
-  updateWatcherSessionId(profileId, newSessionId) {
+  updateWatcherSessionId(profileId, newSessionId, activeSessionIds = []) {
     this.watchers.forEach(record => {
-      if (record.sessionId === newSessionId) {
-        record.profileId = profileId;
-        logCacheDiagnostic('watcher profile updated for session', { profileId, newSessionId, remotePath: record.remotePath });
+      if (record.profileId === profileId) {
+        if (record.sessionId === newSessionId) return;
+        const isStale = !activeSessionIds.includes(record.sessionId);
+        if (isStale) {
+          const oldSess = record.sessionId;
+          record.sessionId = newSessionId;
+          logCacheDiagnostic('watcher session updated (recovered stale session)', { profileId, oldSessionId: oldSess, newSessionId, remotePath: record.remotePath });
+        }
       }
     });
   }
