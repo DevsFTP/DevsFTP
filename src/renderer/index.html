@@ -1628,6 +1628,61 @@
   </div>
 
   <!-- ========================================================================= -->
+  <!-- Bug Reporting & Feedback Modal (devsftp.com/bugs.php)                     -->
+  <!-- ========================================================================= -->
+  <div id="bug-report-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="max-width: 520px; width: 92%;" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <span class="modal-title">🐛 Submit Bug Report / Feedback</span>
+        <button id="btn-bug-report-close" class="modal-close-btn" title="Close">✕</button>
+      </div>
+
+      <!-- Form View -->
+      <div id="bug-report-form-view" class="modal-body" style="padding: 16px;">
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 14px; line-height: 1.5;">
+          Describe what went wrong or send feedback. Your diagnostic trace logs will be sent directly to <strong>devsftp.com/bugs.php</strong> to help fix issues.
+        </p>
+
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 11px; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 4px;">Short Description of Issue *</label>
+          <textarea id="bug-report-description" class="search-input" style="width: 100%; height: 90px; resize: vertical; font-family: inherit; font-size: 12px; padding: 8px;" placeholder="Describe what you were doing when the issue occurred..."></textarea>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 11px; font-weight: 600; color: hsl(var(--text-muted)); display: block; margin-bottom: 4px;">Contact Email (Optional for updates)</label>
+          <input type="email" id="bug-report-email" class="search-input" style="width: 100%; font-size: 12px; padding: 6px 10px;" placeholder="your.email@domain.com">
+        </div>
+
+        <label style="display: flex; gap: 8px; align-items: center; font-size: 11px; color: hsl(var(--text-secondary)); margin-bottom: 16px; cursor: pointer;">
+          <input type="checkbox" id="bug-report-include-logs" checked>
+          <span>Include sanitized system specs & diagnostic logs (devsftp-debug.log)</span>
+        </label>
+
+        <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid hsl(var(--border-subtle)); padding-top: 12px;">
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-bug-report-export-log" class="btn" style="padding: 6px 12px; font-size: 11px;" title="Export diagnostic log package to file">📄 Export Log</button>
+            <button id="btn-bug-report-web-link" class="btn" style="padding: 6px 12px; font-size: 11px;" title="Open devsftp.com/bugs/ in browser">🌐 Open Web</button>
+          </div>
+          <button id="btn-bug-report-submit" class="btn btn-primary" style="padding: 6px 16px; font-size: 12px; font-weight: 600;">🚀 Submit Report</button>
+        </div>
+      </div>
+
+      <!-- Thank You View -->
+      <div id="bug-report-thankyou-view" class="modal-body" style="padding: 24px; text-align: center; display: none;">
+        <div style="font-size: 48px; margin-bottom: 12px;">✅</div>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">Thank You for Helping Improve DevsFTP!</h3>
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.6; max-width: 400px; margin: 0 auto 20px auto;">
+          Your bug report and diagnostic package have been transmitted cleanly to <strong>devsftp.com/bugs.php</strong>. We review reports daily to fix issues and release updates.
+        </p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button id="btn-bug-report-done" class="btn btn-primary" style="padding: 6px 20px; font-size: 12px; font-weight: 600;">Done</button>
+          <button id="btn-bug-report-visit" class="btn" style="padding: 6px 16px; font-size: 12px;">🌐 Visit DevsFTP.com</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
   <!-- Upload Confirmation Dialog (Theme-Aware Live Edit Prompt)                 -->
   <!-- ========================================================================= -->
   <div id="upload-save-modal" class="modal-overlay upload-save-modal" aria-hidden="true">

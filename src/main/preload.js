@@ -62,6 +62,8 @@ const devsFTPApi = {
   selectLocalPath: () => ipcRenderer.invoke('dialog:select-local-path'),
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   checkForUpdates: () => ipcRenderer.invoke('system:check-updates'),
+  submitBugReport: (payload) => ipcRenderer.invoke('system:submit-bug-report', payload),
+  exportDiagnostics: () => ipcRenderer.invoke('system:export-diagnostics'),
 
   // Transfer Queue & Live Edit
   downloadFile: (remotePath, localPath, sessionId, options = {}) => ipcRenderer.invoke('transfer:download', remotePath, localPath, sessionId, options),

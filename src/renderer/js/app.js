@@ -332,12 +332,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // About DevsFTP Website & Updates Wire
-    const openWebsite = () => {
+    const openWebsite = (url = 'https://devsftp.com') => {
       const api = window.devsFTP || window.pulseFTP;
       if (api && api.openExternal) {
-        api.openExternal('https://DevsFTP.com');
+        api.openExternal(url);
       } else {
-        window.open('https://DevsFTP.com', '_blank');
+        window.open(url, '_blank');
       }
     };
 
@@ -345,39 +345,151 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusEl) {
         statusEl.style.display = 'block';
         statusEl.style.color = '#F59E0B';
-        statusEl.textContent = '⏳ Checking server for updates...';
+        statusEl.textContent = '⏳ Checking server for updates (devsftp.com/version.json)...';
       }
       try {
-        const api = window.devsFTPApi || window.api;
+        const api = window.devsFTP || window.pulseFTP;
         const res = api && api.checkForUpdates ? await api.checkForUpdates() : null;
-        if (res && res.hasUpdate) {
+        if (res && res.updateAvailable) {
           if (statusEl) {
             statusEl.style.color = '#10B981';
-            statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">Download Now</a>`;
+            statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">Download Now from DevsFTP.com</a>`;
             const link = statusEl.querySelector('.link-download-update-action');
-            if (link) link.onclick = (e) => { e.preventDefault(); api.openExternal(res.downloadUrl); };
+            if (link) link.onclick = (e) => { e.preventDefault(); api.openExternal(res.downloadUrl || 'https://devsftp.com/download/'); };
           }
         } else {
           if (statusEl) {
             statusEl.style.color = '#34D399';
-            statusEl.textContent = `✓ You are running the latest version of DevsFTP (v1.0.0).`;
+            statusEl.textContent = `✓ You are running the latest version of DevsFTP (${res ? 'v' + res.currentVersion : 'v1.0.0'}).`;
           }
         }
       } catch (err) {
         if (statusEl) {
           statusEl.style.color = '#FCA5A5';
-          statusEl.textContent = '⚠️ Unable to connect to update server.';
+          statusEl.textContent = '⚠️ Unable to connect to update server (devsftp.com).';
         }
       }
     };
+
+    // =========================================================================
+    // Bug Reporting & Feedback Dialog Controller (devsftp.com/bugs.php)
+    // =========================================================================
+    const bugReportModal = document.getElementById('bug-report-modal');
+    const bugFormView = document.getElementById('bug-report-form-view');
+    const bugThankyouView = document.getElementById('bug-report-thankyou-view');
+    const bugDescInput = document.getElementById('bug-report-description');
+    const bugEmailInput = document.getElementById('bug-report-email');
+    const bugIncludeLogsCb = document.getElementById('bug-report-include-logs');
+    const btnBugSubmit = document.getElementById('btn-bug-report-submit');
+
+    window.BugReportModal = {
+      open() {
+        if (!bugReportModal) return;
+        if (bugDescInput) {
+          bugDescInput.value = '';
+          bugDescInput.style.borderColor = '';
+        }
+        if (bugEmailInput) bugEmailInput.value = '';
+        if (bugIncludeLogsCb) bugIncludeLogsCb.checked = true;
+        if (bugFormView) bugFormView.style.display = 'block';
+        if (bugThankyouView) bugThankyouView.style.display = 'none';
+        if (btnBugSubmit) {
+          btnBugSubmit.disabled = false;
+          btnBugSubmit.textContent = '🚀 Submit Report';
+        }
+        bugReportModal.setAttribute('aria-hidden', 'false');
+        bugReportModal.classList.add('active');
+      },
+      close() {
+        if (!bugReportModal) return;
+        bugReportModal.classList.remove('active');
+        bugReportModal.setAttribute('aria-hidden', 'true');
+      }
+    };
+
+    const btnBugClose = document.getElementById('btn-bug-report-close');
+    if (btnBugClose) btnBugClose.addEventListener('click', () => window.BugReportModal.close());
+
+    const btnBugDone = document.getElementById('btn-bug-report-done');
+    if (btnBugDone) btnBugDone.addEventListener('click', () => window.BugReportModal.close());
+
+    const btnBugVisit = document.getElementById('btn-bug-report-visit');
+    if (btnBugVisit) btnBugVisit.addEventListener('click', () => openWebsite('https://devsftp.com'));
+
+    const btnBugWebLink = document.getElementById('btn-bug-report-web-link');
+    if (btnBugWebLink) btnBugWebLink.addEventListener('click', () => openWebsite('https://devsftp.com/bugs/'));
+
+    const btnBugExportLog = document.getElementById('btn-bug-report-export-log');
+    if (btnBugExportLog) {
+      btnBugExportLog.addEventListener('click', async () => {
+        const api = window.devsFTP || window.pulseFTP;
+        if (api && api.exportDiagnostics) {
+          const res = await api.exportDiagnostics();
+          if (res && res.filePath) {
+            if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Diagnostic log package saved to Downloads: ${res.filePath}`);
+            alert(`Diagnostic package saved to your Downloads folder:\n${res.filePath}`);
+          }
+        }
+      });
+    }
+
+    if (btnBugSubmit) {
+      btnBugSubmit.addEventListener('click', async () => {
+        const desc = bugDescInput ? bugDescInput.value.trim() : '';
+        if (!desc) {
+          if (bugDescInput) {
+            bugDescInput.style.borderColor = 'hsl(var(--status-danger))';
+            bugDescInput.focus();
+          }
+          return;
+        }
+
+        btnBugSubmit.disabled = true;
+        btnBugSubmit.textContent = '⏳ Transmitting to devsftp.com/bugs.php...';
+
+        const email = bugEmailInput ? bugEmailInput.value.trim() : '';
+        const includeLogs = bugIncludeLogsCb ? bugIncludeLogsCb.checked : true;
+
+        const api = window.devsFTP || window.pulseFTP;
+        if (api && api.submitBugReport) {
+          await api.submitBugReport({ description: desc, email, includeLogs });
+        }
+
+        if (bugFormView) bugFormView.style.display = 'none';
+        if (bugThankyouView) bugThankyouView.style.display = 'block';
+      });
+    }
+
+    // Top Navigation Menu Items Wiring
+    const menuHelpIssue = document.getElementById('menu-help-issue');
+    if (menuHelpIssue) {
+      menuHelpIssue.addEventListener('click', () => window.BugReportModal.open());
+    }
+
+    const menuHelpUpdate = document.getElementById('menu-help-update');
+    if (menuHelpUpdate) {
+      menuHelpUpdate.addEventListener('click', () => {
+        const aboutModal = document.getElementById('about-modal');
+        if (aboutModal) {
+          aboutModal.setAttribute('aria-hidden', 'false');
+          aboutModal.classList.add('active');
+        }
+        doCheckForUpdates(updateMsgTab);
+      });
+    }
+
+    const menuHelpDocs = document.getElementById('menu-help-docs');
+    if (menuHelpDocs) {
+      menuHelpDocs.addEventListener('click', () => openWebsite('https://devsftp.com'));
+    }
 
     const btnVisitWebsite = document.getElementById('btn-about-visit-website');
     const btnVisitWebsiteTab = document.getElementById('btn-about-tab-visit-website');
     const linkAboutTabWebsite = document.getElementById('about-tab-website-link');
 
-    if (btnVisitWebsite) btnVisitWebsite.addEventListener('click', openWebsite);
-    if (btnVisitWebsiteTab) btnVisitWebsiteTab.addEventListener('click', openWebsite);
-    if (linkAboutTabWebsite) linkAboutTabWebsite.addEventListener('click', (e) => { e.preventDefault(); openWebsite(); });
+    if (btnVisitWebsite) btnVisitWebsite.addEventListener('click', () => openWebsite('https://devsftp.com'));
+    if (btnVisitWebsiteTab) btnVisitWebsiteTab.addEventListener('click', () => openWebsite('https://devsftp.com'));
+    if (linkAboutTabWebsite) linkAboutTabWebsite.addEventListener('click', (e) => { e.preventDefault(); openWebsite('https://devsftp.com'); });
 
     const btnCheckUpdates = document.getElementById('btn-about-check-updates');
     const updateMsg = document.getElementById('update-status-msg');

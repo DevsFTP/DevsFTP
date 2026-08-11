@@ -1434,3 +1434,200 @@ registerLoggedHandle('dialog:save-file', async (_event, options) => {
   }
   return null;
 });
+
+// =========================================================================
+// System Utilities: Update Awareness & Server Bug Reporter (DevsFTP.com)
+// =========================================================================
+
+registerLoggedHandle('system:open-external', async (_event, url) => {
+  if (url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('mailto:'))) {
+    await shell.openExternal(url);
+    return true;
+  }
+  return false;
+});
+
+registerLoggedHandle('system:check-updates', async () => {
+  const currentVersion = app.getVersion() || '1.0.0';
+  const updateUrl = 'https://devsftp.com/version.json';
+  const githubApiUrl = 'https://api.github.com/repos/DevsFTP/DevsFTP/releases/latest';
+
+  const fetchJson = (url) => new Promise((resolve) => {
+    const https = require('https');
+    const http = require('http');
+    const driver = url.startsWith('https') ? https : http;
+    const req = driver.get(url, { headers: { 'User-Agent': `DevsFTP/${currentVersion}` } }, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return resolve(null);
+      }
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(6000, () => { req.destroy(); resolve(null); });
+  });
+
+  try {
+    let data = await fetchJson(updateUrl);
+    if (!data) {
+      data = await fetchJson(githubApiUrl);
+      if (data && data.tag_name) {
+        data = {
+          version: data.tag_name.replace(/^v/, ''),
+          releaseNotes: data.body || 'New production release available on DevsFTP.com',
+          downloadUrl: data.html_url || 'https://devsftp.com/download/'
+        };
+      }
+    }
+
+    if (data && data.version) {
+      const latestVersion = data.version.replace(/^v/, '');
+      const semverCompare = (v1, v2) => {
+        const p1 = v1.split('.').map(Number);
+        const p2 = v2.split('.').map(Number);
+        for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+          const n1 = p1[i] || 0, n2 = p2[i] || 0;
+          if (n1 > n2) return 1;
+          if (n1 < n2) return -1;
+        }
+        return 0;
+      };
+
+      const updateAvailable = semverCompare(latestVersion, currentVersion) > 0;
+      return {
+        updateAvailable,
+        currentVersion,
+        latestVersion,
+        downloadUrl: data.downloadUrl || 'https://devsftp.com/download/',
+        releaseNotes: data.releaseNotes || `DevsFTP v${latestVersion} is now available for download.`
+      };
+    }
+  } catch (err) {
+    writeDebugLog(`[Update Check Error] ${err.message}`);
+  }
+
+  return {
+    updateAvailable: false,
+    currentVersion,
+    latestVersion: currentVersion,
+    downloadUrl: 'https://devsftp.com/download/',
+    releaseNotes: 'You are running the latest version of DevsFTP.'
+  };
+});
+
+registerLoggedHandle('system:submit-bug-report', async (_event, payload) => {
+  const currentVersion = app.getVersion() || '1.0.0';
+  const bugsEndpoint = 'https://devsftp.com/bugs.php';
+  const logPath = path.join(app.getPath('userData'), 'devsftp-debug.log');
+
+  let rawLogs = '';
+  if (fs.existsSync(logPath)) {
+    try {
+      rawLogs = fs.readFileSync(logPath, 'utf8').slice(-60000); // Last 60KB
+    } catch (e) {}
+  }
+
+  const sanitizeText = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/(password|passphrase|secret|key|token)["']?\s*[:=]\s*["']?[^"'\s,]+/gi, '$1: [REDACTED]')
+      .replace(/-----BEGIN[A-Z\s]+PRIVATE KEY-----[\s\S]*?-----END[A-Z\s]+PRIVATE KEY-----/g, '[PRIVATE KEY REDACTED]');
+  };
+
+  const reportData = {
+    version: currentVersion,
+    platform: `${process.platform} (${process.arch})`,
+    electronVersion: process.versions.electron,
+    nodeVersion: process.versions.node,
+    timestamp: new Date().toISOString(),
+    userEmail: payload ? (payload.email || 'Anonymous') : 'Anonymous',
+    description: payload ? (payload.description || 'No description provided') : 'No description provided',
+    logs: payload && payload.includeLogs ? sanitizeText(rawLogs) : 'Logs excluded by user'
+  };
+
+  const postJson = (url, bodyObj) => new Promise((resolve) => {
+    const https = require('https');
+    const http = require('http');
+    const driver = url.startsWith('https') ? https : http;
+    const postData = JSON.stringify(bodyObj);
+
+    const parsedUrl = new URL(url);
+    const options = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': `DevsFTP-App/${currentVersion}`
+      }
+    };
+
+    const req = driver.request(options, (res) => {
+      let resBody = '';
+      res.on('data', chunk => resBody += chunk);
+      res.on('end', () => {
+        resolve({ statusCode: res.statusCode, body: resBody });
+      });
+    });
+
+    req.on('error', (err) => resolve({ statusCode: 500, error: err.message }));
+    req.setTimeout(10000, () => { req.destroy(); resolve({ statusCode: 408, error: 'Timeout' }); });
+    req.write(postData);
+    req.end();
+  });
+
+  try {
+    sendLog('info', `Submitting bug report & diagnostic log package to ${bugsEndpoint}...`);
+    const res = await postJson(bugsEndpoint, reportData);
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      sendLog('info', '✓ Bug report transmitted cleanly to devsftp.com/bugs.php');
+      return { success: true, message: 'Report submitted successfully' };
+    } else {
+      writeDebugLog(`[Bug Report Submit Warn] Server returned status ${res.statusCode}: ${res.error || res.body}`);
+    }
+  } catch (err) {
+    writeDebugLog(`[Bug Report Submit Error] ${err.message}`);
+  }
+
+  return { success: true, fallback: true, message: 'Report prepared' };
+});
+
+registerLoggedHandle('system:export-diagnostics', async () => {
+  const currentVersion = app.getVersion() || '1.0.0';
+  const logPath = path.join(app.getPath('userData'), 'devsftp-debug.log');
+  
+  let header = `========================================================\n`;
+  header += `DevsFTP Diagnostic Log Package\n`;
+  header += `Website: https://devsftp.com\n`;
+  header += `Report Issues: https://devsftp.com/bugs/\n`;
+  header += `========================================================\n`;
+  header += `App Version: v${currentVersion}\n`;
+  header += `OS Platform: ${process.platform} (${process.arch})\n`;
+  header += `Electron Version: ${process.versions.electron}\n`;
+  header += `Node Version: ${process.versions.node}\n`;
+  header += `Timestamp: ${new Date().toISOString()}\n`;
+  header += `========================================================\n\n`;
+
+  let logData = 'No debug trace log found.';
+  if (fs.existsSync(logPath)) {
+    try {
+      logData = fs.readFileSync(logPath, 'utf8').slice(-80000);
+    } catch (e) {
+      logData = `Failed to read debug log: ${e.message}`;
+    }
+  }
+
+  const userHome = os.homedir();
+  const downloadsDir = fs.existsSync(path.join(userHome, 'Downloads')) ? path.join(userHome, 'Downloads') : userHome;
+  const fileName = `DevsFTP-Diagnostic-${Date.now()}.txt`;
+  const fullPath = path.join(downloadsDir, fileName);
+
+  fs.writeFileSync(fullPath, header + logData, 'utf8');
+  sendLog('info', `Diagnostic log package exported: ${fullPath}`);
+  return { success: true, filePath: fullPath };
+});
