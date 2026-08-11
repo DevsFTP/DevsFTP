@@ -168,29 +168,57 @@ window.TransferQueue = {
     }
 
     pending.forEach(item => {
-      if (window.FileBrowser) {
-        if (item.type === 'download') {
-          window.FileBrowser.downloadFile(item.source, item.dest, { resume: true, resumeOffset: item.resumeOffset });
-        } else if (item.type === 'upload') {
-          window.FileBrowser.uploadFile(item.source, item.dest, { resume: true, resumeOffset: item.resumeOffset });
+      if (!window.FileBrowser) return;
+
+      // Resolve the specific connected session for this task's profileId
+      // so we don't accidentally resume against a different active tab's session
+      const sessions = window.SessionManager ? window.SessionManager.sessions : [];
+      const targetSession = sessions.find(
+        s => s && s.profile &&
+          (s.profile.id === (item.profileId || 'default')) &&
+          s.connectionState === 'connected'
+      );
+
+      if (!targetSession) {
+        // That profile's session is not currently connected — leave as Waiting to Resume
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('warning', `⏸️ Skipped auto-resume for "${item.source}" — profile session not connected.`);
         }
+        return;
+      }
+
+      const sessId = targetSession.sessionId;
+      const opts = { resume: true, resumeOffset: item.resumeOffset, sessionId: sessId };
+
+      if (item.type === 'download') {
+        window.FileBrowser.downloadFile(item.source, item.dest, opts);
+      } else if (item.type === 'upload') {
+        window.FileBrowser.uploadFile(item.source, item.dest, opts);
       }
     });
   },
 
   addTransfer(type, sourcePath, destPath, profileId = null) {
     this.resetCancellationState();
-    const existing = this.queue.find(q => q.source === sourcePath && q.dest === destPath && q.status !== 'Completed');
-    if (existing) {
-      existing.status = 'In Progress';
-      this.render();
-      return existing.id;
-    }
 
+    // Resolve profileId before dedup check so we can compare correctly
     let targetProfileId = profileId;
     if (!targetProfileId) {
       const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
       targetProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+    }
+
+    // Dedup check is profile-aware to prevent cross-tab collision
+    const existing = this.queue.find(q =>
+      q.source === sourcePath &&
+      q.dest === destPath &&
+      (q.profileId || 'default') === (targetProfileId || 'default') &&
+      q.status !== 'Completed'
+    );
+    if (existing) {
+      existing.status = 'In Progress';
+      this.render();
+      return existing.id;
     }
 
     const id = 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);

@@ -332,9 +332,9 @@ class TransferEngine {
           }
         }
 
-        // Directories skip size verification checks
+        // Directories skip size verification checks — use NotApplicable, not Verified
         targetTask.status = 'Completed';
-        targetTask.verificationState = 'Verified';
+        targetTask.verificationState = 'NotApplicable';
         targetTask.percentage = 100;
         this.upsertQueueTask(targetTask);
         this.logHistory(targetTask, 'Success');
@@ -400,7 +400,8 @@ class TransferEngine {
       return true;
 
     } catch (err) {
-      if (targetTask.status !== 'Cancelled') {
+      // Preserve terminal states: Cancelled and Failed must not be overwritten
+      if (targetTask.status !== 'Cancelled' && targetTask.status !== 'Failed') {
         targetTask.status = 'Waiting to Resume';
         targetTask.speed = '0 KB/s';
         if (!targetTask.resumeOffset && targetTask.bytesTransferred) {
