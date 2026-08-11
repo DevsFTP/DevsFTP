@@ -269,35 +269,40 @@ class CacheWatcherService {
       const modifiedBatch = [];
 
       manifests.forEach(manifestPath => {
-        const raw = fs.readFileSync(manifestPath, 'utf8');
-        const meta = JSON.parse(raw);
-        if (meta && meta.localPath && fs.existsSync(meta.localPath)) {
-          const currentHash = this._getFileHash(meta.localPath);
-          const originalInitialHash = meta.initialSha256;
-          const hasChanges = Boolean(currentHash && originalInitialHash && currentHash !== originalInitialHash);
+        try {
+          const raw = fs.readFileSync(manifestPath, 'utf8');
+          const meta = JSON.parse(raw);
+          if (meta && meta.localPath && fs.existsSync(meta.localPath)) {
+            const currentHash = this._getFileHash(meta.localPath);
+            const originalInitialHash = meta.initialSha256;
+            const hasChanges = Boolean(currentHash && originalInitialHash && currentHash !== originalInitialHash);
 
-          logCacheDiagnostic('recoverWatchersOnStartup checking file', {
-            localPath: meta.localPath,
-            remotePath: meta.remotePath,
-            currentHash,
-            originalInitialHash,
-            hasChanges
-          });
-
-          // Re-attach chokidar watcher cleanly without popping open editor app
-          this.openAndWatch(meta.localPath, meta.remotePath, { id: meta.profileId, name: meta.profileName, host: meta.host }, 'recovered', { modifyTime: meta.remoteMtime, permissions: meta.remotePermissions }, true);
-
-          if (hasChanges) {
-            modifiedBatch.push({
+            logCacheDiagnostic('recoverWatchersOnStartup checking file', {
               localPath: meta.localPath,
               remotePath: meta.remotePath,
-              profileId: meta.profileId,
-              profileName: meta.profileName || 'Connection',
-              host: meta.host || 'localhost',
-              fileName: path.basename(meta.remotePath),
-              remoteMtime: meta.remoteMtime || null
+              currentHash,
+              originalInitialHash,
+              hasChanges
             });
+
+            // Re-attach chokidar watcher cleanly without popping open editor app
+            this.openAndWatch(meta.localPath, meta.remotePath, { id: meta.profileId, name: meta.profileName, host: meta.host }, 'recovered', { modifyTime: meta.remoteMtime, permissions: meta.remotePermissions }, true);
+
+            if (hasChanges) {
+              modifiedBatch.push({
+                localPath: meta.localPath,
+                remotePath: meta.remotePath,
+                profileId: meta.profileId,
+                profileName: meta.profileName || 'Connection',
+                host: meta.host || 'localhost',
+                fileName: path.basename(meta.remotePath),
+                remoteMtime: meta.remoteMtime || null
+              });
+            }
           }
+        } catch (manifestErr) {
+          console.error(`Error processing cache manifest ${manifestPath}:`, manifestErr);
+          logCacheDiagnostic('recoverWatchersOnStartup single manifest error', { path: manifestPath, error: manifestErr.message }, 'error');
         }
       });
 

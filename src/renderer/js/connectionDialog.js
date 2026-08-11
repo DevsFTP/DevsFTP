@@ -410,19 +410,24 @@ window.ConnectionDialog = {
       return;
     }
 
-    const saved = await api.profiles.upsert(profile);
-    this.activeProfileId = saved.id;
-    this.selectedConnectionProfile = saved;
+    try {
+      const saved = await api.profiles.upsert(profile);
+      this.activeProfileId = saved.id;
+      this.selectedConnectionProfile = saved;
 
-    await this.renderConnectionProfileList();
-    this.loadProfileIntoEditor(saved);
+      await this.renderConnectionProfileList();
+      this.loadProfileIntoEditor(saved);
 
-    // Apply color live if selected
-    if (window.DevsApp) {
-      window.DevsApp.applyWorkspaceIdentityAccent(saved.accentColor);
+      // Apply color live if selected
+      if (window.DevsApp) {
+        window.DevsApp.applyWorkspaceIdentityAccent(saved.accentColor);
+      }
+
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Saved connection profile '${profile.name}' with workspace color ${profile.accentColor}.`);
+    } catch (err) {
+      console.error('Failed to save connection profile:', err);
+      alert(`Failed to save profile: ${err.message}`);
     }
-
-    if (window.LogViewer) window.LogViewer.addEntry('info', `Saved connection profile '${profile.name}' with workspace color ${profile.accentColor}.`);
   },
 
   deleteCurrentProfile() {
@@ -445,10 +450,15 @@ window.ConnectionDialog = {
   async confirmDeleteCurrentProfile() {
     if (!this.activeProfileId) return;
     const api = this.getApi();
-    await api.profiles.delete(this.activeProfileId);
-    this.activeProfileId = null;
-    this.closeDeleteModal();
-    await this.renderConnectionProfileList();
+    try {
+      await api.profiles.delete(this.activeProfileId);
+      this.activeProfileId = null;
+      this.closeDeleteModal();
+      await this.renderConnectionProfileList();
+    } catch (err) {
+      console.error('Failed to delete connection profile:', err);
+      alert(`Failed to delete connection profile: ${err.message}`);
+    }
   },
 
   showImportDialog(title, headline, message, isError = false) {
@@ -572,7 +582,13 @@ window.ConnectionDialog = {
 
       const api = this.getApi();
       if (api && api.profiles && api.profiles.upsert) {
-        profile = await api.profiles.upsert(profile);
+        try {
+          profile = await api.profiles.upsert(profile);
+        } catch (err) {
+          console.error('Failed to save profile before connection:', err);
+          alert(`Failed to save profile settings: ${err.message}`);
+          return;
+        }
       }
     } else if (this.selectedConnectionProfile) {
       profile = this.selectedConnectionProfile;
@@ -583,7 +599,6 @@ window.ConnectionDialog = {
       alert('Please specify a Host / IP address before connecting.');
       return;
     }
-
 
     if (!profile.username || profile.username.trim() === '') {
       alert('Please specify a Username before connecting.');
@@ -615,7 +630,14 @@ window.ConnectionDialog = {
         window.SessionManager.setActiveSession(activeSession.sessionId);
       }
       if (window.connectToProfileSession) {
-        await window.connectToProfileSession(profile, activeSession.sessionId);
+        try {
+          await window.connectToProfileSession(profile, activeSession.sessionId);
+        } catch (err) {
+          console.error('Failed to initiate connection session:', err);
+          if (window.LogViewer) {
+            window.LogViewer.addEntry('error', `Failed to start connection to ${profile.name || profile.host}: ${err.message || err}`);
+          }
+        }
       }
     }
   },

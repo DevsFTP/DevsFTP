@@ -443,10 +443,15 @@ document.addEventListener('DOMContentLoaded', () => {
       btnBugExportLog.addEventListener('click', async () => {
         const api = window.devsFTP || window.pulseFTP;
         if (api && api.exportDiagnostics) {
-          const res = await api.exportDiagnostics();
-          if (res && res.filePath) {
-            if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Diagnostic log package saved to Downloads: ${res.filePath}`);
-            alert(`Diagnostic package saved to your Downloads folder:\n${res.filePath}`);
+          try {
+            const res = await api.exportDiagnostics();
+            if (res && res.filePath) {
+              if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Diagnostic log package saved to Downloads: ${res.filePath}`);
+              alert(`Diagnostic package saved to your Downloads folder:\n${res.filePath}`);
+            }
+          } catch (err) {
+            console.error('Failed to export diagnostics:', err);
+            alert(`Failed to export diagnostics: ${err.message}`);
           }
         }
       });
@@ -470,12 +475,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const includeLogs = bugIncludeLogsCb ? bugIncludeLogsCb.checked : true;
 
         const api = window.devsFTP || window.pulseFTP;
-        if (api && api.submitBugReport) {
-          await api.submitBugReport({ description: desc, email, includeLogs });
+        try {
+          if (api && api.submitBugReport) {
+            await api.submitBugReport({ description: desc, email, includeLogs });
+          }
+          if (bugFormView) bugFormView.style.display = 'none';
+          if (bugThankyouView) bugThankyouView.style.display = 'block';
+        } catch (err) {
+          console.error('Failed to submit bug report:', err);
+          alert(`Failed to submit bug report: ${err.message}`);
+          btnBugSubmit.disabled = false;
+          btnBugSubmit.textContent = '🚀 Submit Report';
         }
-
-        if (bugFormView) bugFormView.style.display = 'none';
-        if (bugThankyouView) bugThankyouView.style.display = 'block';
       });
     }
 
@@ -561,10 +572,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (exApi && exApi.saveExclusionPrefs) {
-          await exApi.saveExclusionPrefs(newPrefs);
-          if (msg) {
-            msg.style.display = 'block';
-            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+          try {
+            await exApi.saveExclusionPrefs(newPrefs);
+            if (msg) {
+              msg.style.display = 'block';
+              setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            }
+          } catch (err) {
+            console.error('Failed to save exclusion rules:', err);
+            alert(`Failed to save exclusion rules: ${err.message}`);
           }
         }
       });
@@ -581,7 +597,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       prefAutoCalcDir.addEventListener('change', async (e) => {
         if (exApi.saveDirSizePrefs) {
-          await exApi.saveDirSizePrefs({ autoCalculate: e.target.checked });
+          try {
+            await exApi.saveDirSizePrefs({ autoCalculate: e.target.checked });
+          } catch (err) {
+            console.error('Failed to save directory size calculation preferences:', err);
+          }
         }
       });
     }
@@ -1000,8 +1020,13 @@ document.addEventListener('DOMContentLoaded', () => {
     menuToolsCache.addEventListener('click', async () => {
       const api = getApi();
       if (api && api.clearCache) {
-        await api.clearCache();
-        alert('Local remote-file cache cleared successfully.');
+        try {
+          await api.clearCache();
+          alert('Local remote-file cache cleared successfully.');
+        } catch (err) {
+          console.error('Failed to clear cache:', err);
+          alert(`Failed to clear cache: ${err.message}`);
+        }
       }
     });
   }
@@ -1011,8 +1036,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btnToolsCacheClear.addEventListener('click', async () => {
       const api = getApi();
       if (api && api.clearCache) {
-        await api.clearCache();
-        alert('Local remote-file cache cleared successfully.');
+        try {
+          await api.clearCache();
+          alert('Local remote-file cache cleared successfully.');
+        } catch (err) {
+          console.error('Failed to clear cache:', err);
+          alert(`Failed to clear cache: ${err.message}`);
+        }
       }
     });
   }
@@ -1022,12 +1052,17 @@ document.addEventListener('DOMContentLoaded', () => {
     menuToolsExport.addEventListener('click', async () => {
       const api = getApi();
       if (api && api.profiles && api.profiles.export) {
-        const jsonString = await api.profiles.export();
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'devsftp-profiles-backup.json';
-        a.click();
+        try {
+          const jsonString = await api.profiles.export();
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'devsftp-profiles-backup.json';
+          a.click();
+        } catch (err) {
+          console.error('Failed to export profiles:', err);
+          alert(`Failed to export profiles: ${err.message}`);
+        }
       }
     });
   }
@@ -1148,7 +1183,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const disconnectSession = async () => {
     const api = window.devsFTP || window.pulseFTP;
     const activeSessId = window.SessionManager ? window.SessionManager.activeSessionId : 'default';
-    await api.disconnect(activeSessId);
+    try {
+      await api.disconnect(activeSessId);
+    } catch (err) {
+      console.error('Error during disconnect:', err);
+    }
 
     if (window.SessionManager) {
       window.SessionManager.updateActiveSessionConnectionState(false);
@@ -1552,38 +1591,46 @@ document.addEventListener('DOMContentLoaded', () => {
             const attemptUnlock = async () => {
               const pwd = pwdInput ? pwdInput.value : '';
               if (!pwd) return;
-              const ok = await api.profiles.master.unlock(pwd);
-              if (ok) {
-                if (unlockModal) unlockModal.classList.remove('active');
-                if (errDiv) errDiv.style.display = 'none';
-                if (lockoutDiv) lockoutDiv.style.display = 'none';
-                startNormalApp();
-                if (window.ConnectionDialog) window.ConnectionDialog.renderConnectionProfileList();
-                if (window.LogViewer) window.LogViewer.addEntry('info', '🔓 Master Password vault unlocked.');
-              } else {
-                failedAttempts++;
-                const remaining = MAX_ATTEMPTS - failedAttempts;
-
-                if (failedAttempts >= MAX_ATTEMPTS) {
-                  // Lockout: disable input, show message, quit after 3s
-                  if (pwdInput) { pwdInput.disabled = true; pwdInput.style.borderColor = 'hsl(var(--status-danger))'; }
-                  if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
+              try {
+                const ok = await api.profiles.master.unlock(pwd);
+                if (ok) {
+                  if (unlockModal) unlockModal.classList.remove('active');
                   if (errDiv) errDiv.style.display = 'none';
-                  if (lockoutDiv) lockoutDiv.style.display = 'block';
-                  setTimeout(() => {
-                    const api2 = getApi();
-                    if (api2 && api2.quit) { api2.quit(); } else { window.close(); }
-                  }, 3000);
+                  if (lockoutDiv) lockoutDiv.style.display = 'none';
+                  startNormalApp();
+                  if (window.ConnectionDialog) window.ConnectionDialog.renderConnectionProfileList();
+                  if (window.LogViewer) window.LogViewer.addEntry('info', '🔓 Master Password vault unlocked.');
                 } else {
-                  // Show remaining attempts
-                  if (errDiv) {
-                    errDiv.style.display = 'block';
-                    errDiv.textContent = `⚠️ Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`;
+                  failedAttempts++;
+                  const remaining = MAX_ATTEMPTS - failedAttempts;
+
+                  if (failedAttempts >= MAX_ATTEMPTS) {
+                    // Lockout: disable input, show message, quit after 3s
+                    if (pwdInput) { pwdInput.disabled = true; pwdInput.style.borderColor = 'hsl(var(--status-danger))'; }
+                    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; }
+                    if (errDiv) errDiv.style.display = 'none';
+                    if (lockoutDiv) lockoutDiv.style.display = 'block';
+                    setTimeout(() => {
+                      const api2 = getApi();
+                      if (api2 && api2.quit) { api2.quit(); } else { window.close(); }
+                    }, 3000);
+                  } else {
+                    // Show remaining attempts
+                    if (errDiv) {
+                      errDiv.style.display = 'block';
+                      errDiv.textContent = `⚠️ Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`;
+                    }
+                    if (pwdInput) {
+                      pwdInput.style.borderColor = 'hsl(var(--status-danger))';
+                      pwdInput.select();
+                    }
                   }
-                  if (pwdInput) {
-                    pwdInput.style.borderColor = 'hsl(var(--status-danger))';
-                    pwdInput.select();
-                  }
+                }
+              } catch (err) {
+                console.error('Master password unlock IPC call failed:', err);
+                if (errDiv) {
+                  errDiv.style.display = 'block';
+                  errDiv.textContent = `⚠️ Unlock system error: ${err.message || err}`;
                 }
               }
             };

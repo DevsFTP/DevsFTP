@@ -22,13 +22,27 @@ class TunnelService {
    */
   async startTunnel(rule, onLog = () => {}) {
     const tunnelId = rule.id || `tun_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    if (!this._startingTunnels) {
+      this._startingTunnels = new Set();
+    }
+    if (this._startingTunnels.has(tunnelId)) {
+      throw new Error(`Tunnel '${rule.name || tunnelId}' is already in the process of starting.`);
+    }
+
     if (this.tunnels.has(tunnelId)) {
       const existing = this.tunnels.get(tunnelId);
       if (existing.status === 'active') {
         throw new Error(`Tunnel '${rule.name || tunnelId}' is already active.`);
       }
-      await this.stopTunnel(tunnelId, onLog);
+      this._startingTunnels.add(tunnelId);
+      try {
+        await this.stopTunnel(tunnelId, onLog);
+      } finally {
+        this._startingTunnels.delete(tunnelId);
+      }
     }
+
 
     const tunnelObj = {
       id: tunnelId,
@@ -46,7 +60,18 @@ class TunnelService {
 
     this.tunnels.set(tunnelId, tunnelObj);
 
+    this._startingTunnels.add(tunnelId);
+
     return new Promise((resolve, reject) => {
+      const cleanResolve = (val) => {
+        if (this._startingTunnels) this._startingTunnels.delete(tunnelId);
+        resolve(val);
+      };
+      const cleanReject = (err) => {
+        if (this._startingTunnels) this._startingTunnels.delete(tunnelId);
+        reject(err);
+      };
+
       onLog('info', `[SSH Tunnel] Establishing SSH transport connection for rule '${rule.name}' (${rule.type.toUpperCase()})...`);
 
       const sshClient = new Client();
@@ -56,16 +81,16 @@ class TunnelService {
         onLog('info', `[SSH Tunnel] SSH transport established to ${rule.profileConfig.host}:${rule.profileConfig.port || 22}`);
 
         if (rule.type === 'local') {
-          this._startLocalForwarding(tunnelObj, onLog, resolve, reject);
+          this._startLocalForwarding(tunnelObj, onLog, cleanResolve, cleanReject);
         } else if (rule.type === 'remote') {
-          this._startRemoteForwarding(tunnelObj, onLog, resolve, reject);
+          this._startRemoteForwarding(tunnelObj, onLog, cleanResolve, cleanReject);
         } else if (rule.type === 'dynamic') {
-          this._startDynamicSocksProxy(tunnelObj, onLog, resolve, reject);
+          this._startDynamicSocksProxy(tunnelObj, onLog, cleanResolve, cleanReject);
         } else {
           tunnelObj.status = 'error';
           tunnelObj.error = `Unsupported tunnel type '${rule.type}'`;
           sshClient.end();
-          reject(new Error(tunnelObj.error));
+          cleanReject(new Error(tunnelObj.error));
         }
       });
 
@@ -74,10 +99,11 @@ class TunnelService {
         tunnelObj.status = 'error';
         tunnelObj.error = err.message;
         this.stopTunnel(tunnelId);
-        reject(err);
+        cleanReject(err);
       });
 
       sshClient.on('close', () => {
+        if (this._startingTunnels) this._startingTunnels.delete(tunnelId);
         if (tunnelObj.status === 'active' || tunnelObj.status === 'connecting') {
           onLog('warning', `[SSH Tunnel] Connection closed for '${rule.name}'`);
           tunnelObj.status = 'stopped';
@@ -131,6 +157,22 @@ class TunnelService {
       tunnelObj.activeSockets.add(socket);
       socket.statsCleanedUp = false;
 
+      const preCleanup = (err) => {
+        if (err) {
+          onLog('error', `[SSH Tunnel] Socket connection error: ${err.message}`);
+        }
+        socket.destroy();
+        if (!socket.statsCleanedUp) {
+          socket.statsCleanedUp = true;
+          tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+          tunnelObj.activeSockets.delete(socket);
+        }
+      };
+
+      // Handle socket errors immediately to prevent main process crashes
+      socket.on('error', preCleanup);
+      socket.on('close', preCleanup);
+
       onLog('info', `[SSH Tunnel] Local connection received on ${localHost}:${localPort}. Forwarding to ${targetHost}:${targetPort}...`);
 
       sshClient.forwardOut(
@@ -141,14 +183,13 @@ class TunnelService {
         (err, stream) => {
           if (err) {
             onLog('error', `[SSH Tunnel] ForwardOut error for ${targetHost}:${targetPort}: ${err.message}`);
-            socket.destroy();
-            if (!socket.statsCleanedUp) {
-              socket.statsCleanedUp = true;
-              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-              tunnelObj.activeSockets.delete(socket);
-            }
+            preCleanup();
             return;
           }
+
+          // Remove the temporary handlers now that we are piping
+          socket.off('error', preCleanup);
+          socket.off('close', preCleanup);
 
           socket.on('data', (chunk) => { tunnelObj.bytesRead += chunk.length; });
           stream.on('data', (chunk) => { tunnelObj.bytesWritten += chunk.length; });
@@ -157,6 +198,8 @@ class TunnelService {
           stream.pipe(socket);
 
           const cleanup = () => {
+            socket.destroy();
+            stream.destroy();
             if (!socket.statsCleanedUp) {
               socket.statsCleanedUp = true;
               tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
@@ -166,8 +209,14 @@ class TunnelService {
 
           socket.on('close', cleanup);
           stream.on('close', cleanup);
-          socket.on('error', cleanup);
-          stream.on('error', cleanup);
+          socket.on('error', (e) => {
+            onLog('error', `[SSH Tunnel] Active socket error: ${e.message}`);
+            cleanup();
+          });
+          stream.on('error', (e) => {
+            onLog('error', `[SSH Tunnel] Active stream error: ${e.message}`);
+            cleanup();
+          });
         }
       );
     });
@@ -277,16 +326,27 @@ class TunnelService {
       tunnelObj.activeConnections++;
       tunnelObj.activeSockets.add(socket);
       socket.statsCleanedUp = false;
+
+      const preCleanup = (err) => {
+        if (err) {
+          onLog('error', `[SOCKS5 Error] Connection handshake error: ${err.message}`);
+        }
+        socket.destroy();
+        if (!socket.statsCleanedUp) {
+          socket.statsCleanedUp = true;
+          tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+          tunnelObj.activeSockets.delete(socket);
+        }
+      };
+
+      // Handle socket errors immediately to prevent main process crashes
+      socket.on('error', preCleanup);
+      socket.on('close', preCleanup);
       
       // SOCKS5 Handshake & Proxy Tunnel Implementation
       socket.once('data', (data) => {
         if (data[0] !== 0x05) {
-          socket.destroy();
-          if (!socket.statsCleanedUp) {
-            socket.statsCleanedUp = true;
-            tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-            tunnelObj.activeSockets.delete(socket);
-          }
+          preCleanup();
           return;
         }
 
@@ -296,12 +356,7 @@ class TunnelService {
         socket.once('data', (request) => {
           if (request[0] !== 0x05 || request[1] !== 0x01) { // 0x01 = CONNECT
             socket.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0])); // Command not supported
-            socket.destroy();
-            if (!socket.statsCleanedUp) {
-              socket.statsCleanedUp = true;
-              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-              tunnelObj.activeSockets.delete(socket);
-            }
+            preCleanup();
             return;
           }
 
@@ -319,12 +374,7 @@ class TunnelService {
             offset = 5 + len;
           } else if (addrType === 0x04) { // IPv6
             socket.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0]));
-            socket.destroy();
-            if (!socket.statsCleanedUp) {
-              socket.statsCleanedUp = true;
-              tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-              tunnelObj.activeSockets.delete(socket);
-            }
+            preCleanup();
             return;
           }
 
@@ -339,14 +389,13 @@ class TunnelService {
               if (err) {
                 onLog('error', `[SOCKS5 Error] Failed to forward to ${destHost}:${destPort}: ${err.message}`);
                 socket.write(Buffer.from([0x05, 0x04, 0x00, 0x01, 0,0,0,0, 0,0])); // Host unreachable
-                socket.destroy();
-                if (!socket.statsCleanedUp) {
-                  socket.statsCleanedUp = true;
-                  tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-                  tunnelObj.activeSockets.delete(socket);
-                }
+                preCleanup();
                 return;
               }
+
+              // Remove the temporary handlers now that we are piping
+              socket.off('error', preCleanup);
+              socket.off('close', preCleanup);
 
               // Success response: 0x05 (ver), 0x00 (granted), 0x00 (rsv), 0x01 (ipv4)
               socket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 127,0,0,1, 0,0]));
@@ -358,6 +407,8 @@ class TunnelService {
               stream.pipe(socket);
 
               const cleanup = () => {
+                socket.destroy();
+                stream.destroy();
                 if (!socket.statsCleanedUp) {
                   socket.statsCleanedUp = true;
                   tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
@@ -367,8 +418,14 @@ class TunnelService {
 
               socket.on('close', cleanup);
               stream.on('close', cleanup);
-              socket.on('error', cleanup);
-              stream.on('error', cleanup);
+              socket.on('error', (e) => {
+                onLog('error', `[SOCKS5 Tunnel] Active socket error: ${e.message}`);
+                cleanup();
+              });
+              stream.on('error', (e) => {
+                onLog('error', `[SOCKS5 Tunnel] Active stream error: ${e.message}`);
+                cleanup();
+              });
             }
           );
         });

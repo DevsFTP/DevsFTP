@@ -63,6 +63,13 @@ window.SessionManager = {
     setTimeout(() => {
       this.restoreWorkspaceSessionState();
     }, 150);
+
+    window.addEventListener('beforeunload', () => {
+      if (this._saveSessionTimeout) {
+        clearTimeout(this._saveSessionTimeout);
+        this.saveWorkspaceSessionState();
+      }
+    });
   },
 
   createDefaultSession() {

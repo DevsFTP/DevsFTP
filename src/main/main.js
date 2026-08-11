@@ -646,6 +646,14 @@ if (!gotTheLock) {
 
     createWindow();
     createSystemTray();
+  }).catch((err) => {
+    console.error('Error during app initialization:', err);
+    writeDebugLog({
+      scope: 'main',
+      event: 'startup-failure',
+      level: 'error',
+      message: `Failed to initialize app: ${err.message}`
+    });
   });
 }
 
@@ -693,6 +701,22 @@ app.on('before-quit', () => {
           try { t.sshClient.end(); } catch (err) {}
         }
       });
+    } catch (err) {}
+  }
+
+  // 14.4 Active Session Teardowns
+  for (const item of activeSessions.values()) {
+    try {
+      if (item && item.session && typeof item.session.disconnect === 'function') {
+        item.session.disconnect();
+      }
+    } catch (err) {}
+  }
+  activeSessions.clear();
+
+  if (sshTerminalService && typeof sshTerminalService.disconnect === 'function') {
+    try {
+      sshTerminalService.disconnect();
     } catch (err) {}
   }
 });
@@ -1157,7 +1181,13 @@ registerLoggedHandle('local:delete', async (_event, localPath) => {
 });
 registerLoggedHandle('local:list', async (_event, targetPath) => {
   const localDir = targetPath || process.env.USERPROFILE || 'C:\\';
-  const files = fs.readdirSync(localDir, { withFileTypes: true });
+  let files = [];
+  try {
+    files = fs.readdirSync(localDir, { withFileTypes: true });
+  } catch (err) {
+    sendLog('error', `Failed to list local directory ${localDir}: ${err.message}`);
+    throw err;
+  }
 
   const items = files.map(f => {
     const fullPath = path.join(localDir, f.name);

@@ -22,6 +22,7 @@ class KnownHostsStore {
     }
     this.filePath = path.join(userDataPath, 'known_hosts.json');
     this.encryptionKey = this._getOrCreateMasterKey(userDataPath);
+    this.hasLoadError = false;
     this.hosts = this._load();
   }
 
@@ -71,14 +72,29 @@ class KnownHostsStore {
     try {
       const raw = fs.readFileSync(this.filePath, 'utf8');
       const decrypted = this._decrypt(raw);
+      if (raw && !decrypted) {
+        throw new Error('Decryption failed (empty result)');
+      }
       return decrypted ? JSON.parse(decrypted) : {};
     } catch (err) {
       console.error('Error loading known host keys:', err);
+      try {
+        const backupPath = `${this.filePath}.corrupt-${Date.now()}`;
+        fs.writeFileSync(backupPath, fs.readFileSync(this.filePath));
+        console.error(`Backed up corrupted known_hosts file to: ${backupPath}`);
+      } catch (backupErr) {
+        console.error('Failed to create corrupted backup file:', backupErr);
+      }
+      this.hasLoadError = true;
       return {};
     }
   }
 
   save() {
+    if (this.hasLoadError) {
+      console.error('Blocking save of known hosts to prevent data loss due to corrupted file on disk.');
+      return;
+    }
     try {
       const json = JSON.stringify(this.hosts, null, 2);
       const encrypted = this._encrypt(json);

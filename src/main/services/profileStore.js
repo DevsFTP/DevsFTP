@@ -27,6 +27,8 @@ class ProfileStore {
     this.masterConfig = this._loadMasterConfig();
     this.isUnlocked = false;
 
+    this.hasLoadError = false;
+
     if (this.masterConfig && this.masterConfig.enabled) {
       // Master Password is ON: Require explicit unlock before decrypting profiles
       this.encryptionKey = null;
@@ -130,12 +132,24 @@ class ProfileStore {
       }));
     } catch (err) {
       console.error('Error loading connection profiles:', err);
+      try {
+        const backupPath = `${this.filePath}.corrupt-${Date.now()}`;
+        fs.writeFileSync(backupPath, fs.readFileSync(this.filePath));
+        console.error(`Backed up corrupted profiles file to: ${backupPath}`);
+      } catch (backupErr) {
+        console.error('Failed to create corrupted backup file:', backupErr);
+      }
+      this.hasLoadError = true;
       return [];
     }
   }
 
   save() {
     if (!this.isUnlocked || !this.encryptionKey) return;
+    if (this.hasLoadError) {
+      console.error('Blocking save of connection profiles to prevent data loss due to corrupted profiles on disk.');
+      return;
+    }
     const serialized = this.profiles.map(p => ({
       ...p,
       password: this._encrypt(p.password),
