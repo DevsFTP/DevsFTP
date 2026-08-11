@@ -113,8 +113,11 @@ window.ConnectionDialog = {
         const authGroup = document.getElementById('prof-authtype');
         const keyOption = authGroup ? authGroup.querySelector('option[value="key"]') : null;
 
-        if (hostGroup) hostGroup.style.display = '';
-        if (portGroup) portGroup.style.display = '';
+        const s3Group = document.getElementById('group-s3-settings');
+
+        if (hostGroup) hostGroup.style.display = proto === 's3' ? 'none' : '';
+        if (portGroup) portGroup.style.display = proto === 's3' ? 'none' : '';
+        if (s3Group) s3Group.style.display = proto === 's3' ? 'flex' : 'none';
 
         if (proto === 'sftp') {
           portField.value = '22';
@@ -128,6 +131,10 @@ window.ConnectionDialog = {
         } else if (proto === 'webdav') {
           portField.value = '80';
           if (webdavPathGroup) webdavPathGroup.style.display = '';
+          if (keyOption) keyOption.style.display = 'none';
+          if (authGroup && authGroup.value === 'key') authGroup.value = 'password';
+        } else if (proto === 's3') {
+          if (webdavPathGroup) webdavPathGroup.style.display = 'none';
           if (keyOption) keyOption.style.display = 'none';
           if (authGroup && authGroup.value === 'key') authGroup.value = 'password';
         }
@@ -279,14 +286,26 @@ window.ConnectionDialog = {
     const webdavPathEl = document.getElementById('prof-webdav-path');
     if (webdavPathEl) webdavPathEl.value = profile.webdavPath || profile.webdavUrl || '';
 
-    // Keep Host & Port visible for all protocols (SFTP, FTP, WebDAV)
+    // S3 Fields
+    const s3BucketEl = document.getElementById('prof-s3-bucket');
+    const s3RegionEl = document.getElementById('prof-s3-region');
+    const s3EndpointEl = document.getElementById('prof-s3-endpoint');
+    if (s3BucketEl) s3BucketEl.value = profile.s3Bucket || '';
+    if (s3RegionEl) s3RegionEl.value = profile.s3Region || 'us-east-1';
+    if (s3EndpointEl) s3EndpointEl.value = profile.s3Endpoint || '';
+
+    // Keep Host & Port visible for all protocols except S3
     const isWebDAV = profile.protocol === 'webdav';
+    const isS3 = profile.protocol === 's3';
     const hostGroup = document.getElementById('group-host');
     const portGroup = document.getElementById('group-port');
     const webdavPathGroup = document.getElementById('group-webdav-path');
-    if (hostGroup) hostGroup.style.display = '';
-    if (portGroup) portGroup.style.display = '';
+    const s3Group = document.getElementById('group-s3-settings');
+
+    if (hostGroup) hostGroup.style.display = isS3 ? 'none' : '';
+    if (portGroup) portGroup.style.display = isS3 ? 'none' : '';
     if (webdavPathGroup) webdavPathGroup.style.display = isWebDAV ? '' : 'none';
+    if (s3Group) s3Group.style.display = isS3 ? 'flex' : 'none';
 
     const pTypeEl = document.getElementById('prof-proxy-type');
     const pHostEl = document.getElementById('prof-proxy-host');
@@ -331,13 +350,22 @@ window.ConnectionDialog = {
     const webdavPathNew = document.getElementById('prof-webdav-path');
     if (webdavPathNew) webdavPathNew.value = '';
 
-    // Reset WebDAV field visibility
+    // Reset WebDAV and S3 field visibility
     const hostGroupNew = document.getElementById('group-host');
     const portGroupNew = document.getElementById('group-port');
     const webdavPathGroupNew = document.getElementById('group-webdav-path');
+    const s3GroupNew = document.getElementById('group-s3-settings');
     if (hostGroupNew) hostGroupNew.style.display = '';
     if (portGroupNew) portGroupNew.style.display = '';
     if (webdavPathGroupNew) webdavPathGroupNew.style.display = 'none';
+    if (s3GroupNew) s3GroupNew.style.display = 'none';
+
+    const s3BucketEl = document.getElementById('prof-s3-bucket');
+    const s3RegionEl = document.getElementById('prof-s3-region');
+    const s3EndpointEl = document.getElementById('prof-s3-endpoint');
+    if (s3BucketEl) s3BucketEl.value = '';
+    if (s3RegionEl) s3RegionEl.value = 'us-east-1';
+    if (s3EndpointEl) s3EndpointEl.value = '';
 
     const pTypeEl = document.getElementById('prof-proxy-type');
     const pHostEl = document.getElementById('prof-proxy-host');
@@ -383,6 +411,9 @@ window.ConnectionDialog = {
 
     const hostVal = document.getElementById('prof-host').value.trim();
     const webdavPathVal = document.getElementById('prof-webdav-path') ? document.getElementById('prof-webdav-path').value.trim() : '';
+    const s3BucketVal = document.getElementById('prof-s3-bucket') ? document.getElementById('prof-s3-bucket').value.trim() : '';
+    const s3RegionVal = document.getElementById('prof-s3-region') ? document.getElementById('prof-s3-region').value.trim() : 'us-east-1';
+    const s3EndpointVal = document.getElementById('prof-s3-endpoint') ? document.getElementById('prof-s3-endpoint').value.trim() : '';
 
     const profile = {
       id: this.activeProfileId,
@@ -395,6 +426,9 @@ window.ConnectionDialog = {
       password: finalPassword,
       privateKeyPath: document.getElementById('prof-keypath').value,
       webdavPath: webdavPathVal,
+      s3Bucket: s3BucketVal,
+      s3Region: s3RegionVal,
+      s3Endpoint: s3EndpointVal,
       accentColor: this.activeAccentColor || '#F59E0B',
       remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
       localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
@@ -405,8 +439,12 @@ window.ConnectionDialog = {
       proxyPassword: pPassEl ? pPassEl.value : ''
     };
 
-    if (!profile.host) {
+    if (profile.protocol !== 's3' && !profile.host) {
       alert('Please specify a Host / IP address.');
+      return;
+    }
+    if (profile.protocol === 's3' && !profile.s3Bucket) {
+      alert('Please specify an S3 Bucket Name.');
       return;
     }
 

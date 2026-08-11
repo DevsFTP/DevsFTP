@@ -1052,6 +1052,7 @@
                   <option value="ftp">FTP (Plain)</option>
                   <option value="ftps">FTPS (Explicit)</option>
                   <option value="webdav">WebDAV (HTTP / HTTPS)</option>
+                  <option value="s3">S3 Cloud Storage (AWS / Compatible)</option>
                 </select>
               </div>
               <div class="form-group" id="group-host" style="min-width: 0;">
@@ -1098,6 +1099,24 @@
               </div>
             </div>
 
+            <div class="form-group" id="group-s3-settings" style="display: none; border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 12px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 11px; font-weight: 700; color: var(--accent-primary-hex, #F59E0B); text-transform: uppercase; letter-spacing: 0.5px;">🪣 Amazon S3 / Compatible Configuration</span>
+              <div class="form-group">
+                <label class="form-label" for="prof-s3-bucket">S3 Bucket Name</label>
+                <input type="text" id="prof-s3-bucket" class="form-control" placeholder="my-app-assets">
+              </div>
+              <div class="form-row-grid-2">
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" for="prof-s3-region">Region</label>
+                  <input type="text" id="prof-s3-region" class="form-control" placeholder="us-east-1" value="us-east-1">
+                </div>
+                <div class="form-group" style="min-width: 0;">
+                  <label class="form-label" for="prof-s3-endpoint">Custom Endpoint URL (Optional)</label>
+                  <input type="text" id="prof-s3-endpoint" class="form-control" placeholder="https://nyc3.digitaloceanspaces.com">
+                </div>
+              </div>
+              <span style="font-size: 10px; color: hsl(var(--text-muted));">Enter Access Key in "Username" and Secret Key in "Password" fields above. Custom endpoint is required for MinIO, DO Spaces, Backblaze B2, R2, Wasabi, etc.</span>
+            </div>
 
             <!-- Workspace Identity Accent System Selector -->
             <div class="form-group">

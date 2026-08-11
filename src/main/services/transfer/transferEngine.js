@@ -9,6 +9,7 @@ const path = require('path');
 const SFTPAdapter = require('./sftpAdapter');
 const FTPAdapter = require('./ftpAdapter');
 const WebDAVAdapter = require('./webdavAdapter');
+const S3Adapter = require('./s3Adapter');
 
 let app = null;
 try {
@@ -169,6 +170,7 @@ class TransferEngine {
     if (name === 'SFTPService') return new SFTPAdapter(session);
     if (name === 'FTPService') return new FTPAdapter(session);
     if (name === 'WebDAVService') return new WebDAVAdapter(session);
+    if (name === 'S3Service') return new S3Adapter(session);
     
     // Fallback checks
     if (session.sftp) return new SFTPAdapter(session);

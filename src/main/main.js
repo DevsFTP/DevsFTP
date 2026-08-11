@@ -69,6 +69,7 @@ const KnownHostsStore = require('./services/knownHostsStore');
 const SFTPService = require('./services/sftpService');
 const FTPService = require('./services/ftpService');
 const WebDAVService = require('./services/webdavService');
+const S3Service = require('./services/s3Service');
 const SSHTerminalService = require('./services/sshTerminalService');
 const CacheWatcherService = require('./services/cacheWatcherService');
 const tunnelService = require('./services/tunnelService');
@@ -112,6 +113,17 @@ function isSafeLocalPath(targetPath) {
   if (userHome && lower === path.resolve(userHome).toLowerCase()) return false;
   
   return true;
+}
+
+function isProtectedSystemPath(targetPath) {
+  if (!targetPath) return true;
+  const resolved = path.resolve(targetPath);
+  const lower = resolved.toLowerCase();
+  
+  if (lower.startsWith('c:\\windows') || lower.startsWith('c:\\program files') || lower.startsWith('c:\\program files (x86)')) {
+    return true;
+  }
+  return false;
 }
 
 function stringifyDiagnosticValue(value, seen = new WeakSet()) {
@@ -941,6 +953,9 @@ function triggerAutoReconnect(sessionId, config, protocol) {
       } else if (protocol === 'webdav') {
         newSession = new WebDAVService();
         await newSession.connect(config, (type, msg) => sendLog(type, msg));
+      } else if (protocol === 's3') {
+        newSession = new S3Service();
+        await newSession.connect(config, (type, msg) => sendLog(type, msg));
       } else {
         newSession = new FTPService();
         await newSession.connect(config, (type, msg) => sendLog(type, msg));
@@ -1042,6 +1057,21 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
       return { success: true, protocol: 'webdav', sessionId: sessId };
     } catch (err) {
       sendLog('error', `WebDAV Connection failed for tab [${sessId}]: ${err.message}`);
+      throw err;
+    }
+  } else if (protocol === 's3') {
+    session = new S3Service();
+    try {
+      await session.connect(config, (type, msg) => sendLog(type, msg));
+      session.onUnexpectedClose = () => triggerAutoReconnect(sessId, config, protocol);
+      activeSessions.set(sessId, { session, config, protocol });
+      if (cacheWatcherService) {
+        cacheWatcherService.updateWatcherSessionId(config.id, sessId, Array.from(activeSessions.keys()));
+      }
+      sendLog('info', `S3 Session established cleanly for tab [${sessId}] on bucket '${config.s3Bucket}'`);
+      return { success: true, protocol: 's3', sessionId: sessId };
+    } catch (err) {
+      sendLog('error', `S3 Connection failed for tab [${sessId}]: ${err.message}`);
       throw err;
     }
   } else {
@@ -1150,12 +1180,18 @@ registerLoggedHandle('remote:create-file', async (_event, remotePath, sessionId,
 
 // Local File Operations
 registerLoggedHandle('local:create-file', async (_event, localPath) => {
+  if (isProtectedSystemPath(localPath)) {
+    throw new Error(`Permission denied: Cannot create file in system-protected directory '${localPath}'.`);
+  }
   fs.writeFileSync(localPath, '');
   sendLog('info', `Created local file: ${localPath}`);
   return true;
 });
 
 registerLoggedHandle('local:mkdir', async (_event, localPath) => {
+  if (isProtectedSystemPath(localPath)) {
+    throw new Error(`Permission denied: Cannot create directory in system-protected path '${localPath}'.`);
+  }
   if (!fs.existsSync(localPath)) {
     fs.mkdirSync(localPath, { recursive: true });
   }
@@ -1164,6 +1200,9 @@ registerLoggedHandle('local:mkdir', async (_event, localPath) => {
 });
 
 registerLoggedHandle('local:rename', async (_event, oldPath, newPath) => {
+  if (isProtectedSystemPath(oldPath) || isProtectedSystemPath(newPath)) {
+    throw new Error(`Permission denied: System-protected path operations are not permitted.`);
+  }
   fs.renameSync(oldPath, newPath);
   sendLog('info', `Renamed local item ${oldPath} -> ${newPath}`);
   return true;
@@ -1181,6 +1220,9 @@ registerLoggedHandle('local:delete', async (_event, localPath) => {
 });
 registerLoggedHandle('local:list', async (_event, targetPath) => {
   const localDir = targetPath || process.env.USERPROFILE || 'C:\\';
+  if (isProtectedSystemPath(localDir)) {
+    throw new Error(`Permission denied: '${localDir}' is a system-protected directory.`);
+  }
   let files = [];
   try {
     files = fs.readdirSync(localDir, { withFileTypes: true });
@@ -1462,6 +1504,8 @@ registerLoggedHandle('transfer:background-upload-batch', async (_event, payload)
       Driver = FTPService;
     } else if (profile.protocol === 'webdav') {
       Driver = WebDAVService;
+    } else if (profile.protocol === 's3') {
+      Driver = S3Service;
     } else {
       Driver = SFTPService; // sftp (default)
     }
