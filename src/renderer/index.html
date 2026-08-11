@@ -1540,6 +1540,41 @@
               </div>
             </div>
 
+            <!-- Card 4: Smart Exclusion Rules & Ignore Filters -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🛡️</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Smart Exclusion Rules & Ignore Filters</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically skip build artifacts, version control folders, and secret files during transfers & live edits.</div>
+                  </div>
+                </div>
+                <span id="exclusion-policy-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                  <input type="checkbox" id="pref-exclusion-enabled" checked>
+                  Enable Smart Exclusion Engine (Bypass matching patterns during transfers & watcher sync)
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; color: hsl(var(--text-secondary)); margin-left: 20px;">
+                  <input type="checkbox" id="pref-exclusion-gitignore" checked>
+                  Automatically parse and honor local project <code>.gitignore</code> files
+                </label>
+
+                <div style="margin-top: 4px;">
+                  <label class="form-label" for="pref-exclusion-patterns" style="font-size: 11px; font-weight: 700; color: hsl(var(--text-muted)); text-transform: uppercase;">Excluded Patterns (One per line)</label>
+                  <textarea id="pref-exclusion-patterns" class="form-control" rows="4" style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;" placeholder=".git&#10;.gitignore&#10;node_modules&#10;.env&#10;vendor&#10;.DS_Store&#10;Thumbs.db&#10;*.tmp&#10;*.log"></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
+                  <button id="btn-save-exclusion-rules" class="btn btn-primary" style="padding: 5px 14px; font-size: 11px; font-weight: 600;">⚡ Save Exclusion Preferences</button>
+                </div>
+                <div id="exclusion-save-msg" style="display: none; font-size: 11px; color: #34D399; text-align: right;">✓ Exclusion rules saved cleanly!</div>
+              </div>
+            </div>
+
           </div>
 
           <!-- SECTION 5: Security -->

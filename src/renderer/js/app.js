@@ -570,6 +570,49 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Exclusion Rules Preference Wiring
+    const exApi = getApi();
+    if (exApi && exApi.getExclusionPrefs) {
+      exApi.getExclusionPrefs().then(prefs => {
+        if (!prefs) return;
+        const cbEnabled = document.getElementById('pref-exclusion-enabled');
+        const cbGitignore = document.getElementById('pref-exclusion-gitignore');
+        const txtPatterns = document.getElementById('pref-exclusion-patterns');
+        if (cbEnabled) cbEnabled.checked = Boolean(prefs.enabled);
+        if (cbGitignore) cbGitignore.checked = Boolean(prefs.honorGitignore);
+        if (txtPatterns && Array.isArray(prefs.patterns)) {
+          txtPatterns.value = prefs.patterns.join('\n');
+        }
+      }).catch(e => {});
+    }
+
+    const btnSaveExclusion = document.getElementById('btn-save-exclusion-rules');
+    if (btnSaveExclusion) {
+      btnSaveExclusion.addEventListener('click', async () => {
+        const cbEnabled = document.getElementById('pref-exclusion-enabled');
+        const cbGitignore = document.getElementById('pref-exclusion-gitignore');
+        const txtPatterns = document.getElementById('pref-exclusion-patterns');
+        const msg = document.getElementById('exclusion-save-msg');
+
+        const rawPatterns = txtPatterns ? txtPatterns.value : '';
+        const patterns = rawPatterns.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+
+        const newPrefs = {
+          enabled: cbEnabled ? cbEnabled.checked : true,
+          honorGitignore: cbGitignore ? cbGitignore.checked : true,
+          patterns
+        };
+
+        if (exApi && exApi.saveExclusionPrefs) {
+          await exApi.saveExclusionPrefs(newPrefs);
+          if (msg) {
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+          }
+        }
+      });
+    }
+
     const btnDirCompare = document.getElementById('btn-dir-compare');
     if (btnDirCompare) {
       btnDirCompare.addEventListener('click', () => {

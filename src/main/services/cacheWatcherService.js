@@ -356,6 +356,20 @@ class CacheWatcherService {
     }
   }
 
+  markUploaded(localPath) {
+    if (!localPath || !fs.existsSync(localPath)) return;
+    const currentHash = this._getFileHash(localPath);
+    const existingMeta = this.readManifest(localPath);
+    if (existingMeta && currentHash) {
+      this.writeManifest(localPath, {
+        ...existingMeta,
+        initialSha256: currentHash,
+        lastSha256: currentHash
+      });
+      logCacheDiagnostic('marked file uploaded baseline', { localPath, currentHash });
+    }
+  }
+
   dismissBatch(items) {
     if (!Array.isArray(items)) return;
     items.forEach(item => {

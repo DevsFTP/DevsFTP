@@ -121,7 +121,11 @@ const devsFTPApi = {
     runNow: (id) => ipcRenderer.invoke('jobs:run-now', id),
     toggle: (id, enabled) => ipcRenderer.invoke('jobs:toggle', id, enabled)
   },
-  onJobsUpdated: (callback) => ipcRenderer.on('jobs:updated', (_event, jobs) => callback(jobs))
+  onJobsUpdated: (callback) => ipcRenderer.on('jobs:updated', (_event, jobs) => callback(jobs)),
+
+  // Exclusion Rules & Ignore Filters IPC
+  getExclusionPrefs: () => ipcRenderer.invoke('system:get-exclusion-prefs'),
+  saveExclusionPrefs: (prefs) => ipcRenderer.invoke('system:save-exclusion-prefs', prefs)
 };
 
 contextBridge.exposeInMainWorld('devsFTP', devsFTPApi);

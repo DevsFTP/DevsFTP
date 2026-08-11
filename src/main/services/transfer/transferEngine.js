@@ -20,6 +20,7 @@ class TransferEngine {
   constructor(ipcWindow, logFn) {
     this.ipcWindow = ipcWindow;
     this.logFn = logFn || console.log;
+    this.cacheWatcherService = null;
 
     const userDataPath = app ? app.getPath('userData') : path.join(process.cwd(), '.devs_userData');
     if (!fs.existsSync(userDataPath)) {
@@ -273,6 +274,9 @@ class TransferEngine {
       targetTask.percentage = 100;
       this.upsertQueueTask(targetTask);
       this.logHistory(targetTask, 'Success');
+      if (targetTask.type === 'upload' && this.cacheWatcherService) {
+        this.cacheWatcherService.markUploaded(targetTask.source);
+      }
       this.logFn('info', `✅ [TransferEngine] Verified & Completed: ${targetTask.dest}`);
       return true;
 

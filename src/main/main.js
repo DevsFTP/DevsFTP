@@ -78,6 +78,8 @@ const TransferEngine = require('./services/transfer/transferEngine');
 const { parseSSHConfigFile } = require('./services/sshConfigParser');
 const { normalizePOSIXPath } = require('./services/pathUtils');
 
+const ExclusionService = require('./services/exclusionService');
+
 let mainWindow = null;
 let profileStore = null;
 let knownHostsStore = null;
@@ -88,6 +90,7 @@ let activeSession = null; // sftpService or ftpService
 let activeConfig = null;
 let sshTerminalService = null;
 let cacheWatcherService = null;
+let exclusionService = null;
 
 function redactSensitiveText(text) {
   return String(text)
@@ -481,6 +484,7 @@ function createWindow() {
     });
   });
 
+  exclusionService = new ExclusionService();
   profileStore = new ProfileStore();
   knownHostsStore = new KnownHostsStore();
   transferEngine = new TransferEngine(mainWindow, sendLog);
@@ -488,6 +492,7 @@ function createWindow() {
   jobRunnerService = new JobRunnerService(mainWindow, scheduledJobStore, profileStore, sendLog);
   jobRunnerService.start();
   cacheWatcherService = new CacheWatcherService(mainWindow);
+  if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
   sshTerminalService = new SSHTerminalService(mainWindow);
 }
 
@@ -1294,6 +1299,9 @@ registerLoggedHandle('transfer:background-upload-batch', async (_event, payload)
           sendLog('info', `Background uploading ${item.fileName} -> ${item.remotePath} on ${profile.name}...`);
           await bgDriver.uploadFile(item.localPath, item.remotePath, null);
           uploadedCount++;
+          if (cacheWatcherService) {
+            cacheWatcherService.markUploaded(item.localPath);
+          }
           sendLog('info', `✓ Background upload successful for ${item.fileName} on ${profile.name}.`);
         }
       }
@@ -1596,4 +1604,17 @@ registerLoggedHandle('system:export-diagnostics', async () => {
   fs.writeFileSync(fullPath, header + logData, 'utf8');
   sendLog('info', `Diagnostic log package exported: ${fullPath}`);
   return { success: true, filePath: fullPath };
+});
+
+registerLoggedHandle('system:get-exclusion-prefs', async () => {
+  return exclusionService ? exclusionService.getPrefs() : { enabled: true, honorGitignore: true, patterns: ['.git', '.gitignore', 'node_modules', '.env', 'vendor', '.DS_Store', 'Thumbs.db', '*.tmp', '*.log', '*.bak'] };
+});
+
+registerLoggedHandle('system:save-exclusion-prefs', async (_event, prefs) => {
+  if (exclusionService) {
+    exclusionService.savePrefs(prefs);
+    sendLog('info', 'Smart exclusion rules and ignore preferences saved cleanly.');
+    return { success: true };
+  }
+  return { success: false };
 });
