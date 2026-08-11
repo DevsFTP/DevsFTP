@@ -81,6 +81,17 @@ window.FileBrowser = {
         }
       });
     }
+    const btnRemoteReconnect = document.getElementById('btn-remote-reconnect');
+    if (btnRemoteReconnect) {
+      btnRemoteReconnect.addEventListener('click', () => {
+        const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+        if (activeSess && activeSess.connectionState === 'disconnected' && activeSess.profile) {
+          if (window.connectToProfileSession) {
+            window.connectToProfileSession(activeSess.profile, activeSess.sessionId);
+          }
+        }
+      });
+    }
     document.getElementById('btn-remote-up').addEventListener('click', () => this.remoteUp());
     document.getElementById('remote-path-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.refreshRemote(e.target.value);
@@ -964,11 +975,16 @@ window.FileBrowser = {
     if (input) input.value = this.remotePath;
 
     const btnRemoteDisconnect = document.getElementById('btn-remote-disconnect');
+    const btnRemoteReconnect = document.getElementById('btn-remote-reconnect');
     const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
     const isConnected = activeSess && activeSess.connectionState === 'connected';
+    const hasProfile = activeSess && !!activeSess.profile;
 
     if (btnRemoteDisconnect) {
       btnRemoteDisconnect.style.display = isConnected ? 'inline-block' : 'none';
+    }
+    if (btnRemoteReconnect) {
+      btnRemoteReconnect.style.display = (!isConnected && hasProfile) ? 'inline-block' : 'none';
     }
 
     this.renderRemoteTable(this.remoteFiles);
@@ -1122,6 +1138,37 @@ window.FileBrowser = {
     const tbody = document.getElementById('remote-file-tbody');
     tbody.innerHTML = '';
     this.selectedRemoteFiles = this.selectedRemoteFiles.filter(item => files && files.some(f => f.path === item.path));
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const isDisconnected = activeSess && activeSess.connectionState === 'disconnected';
+
+    if (isDisconnected) {
+      const profileName = activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server';
+      const accentHue = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '24'; // default accent color hue
+
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 64px 24px; color: hsl(var(--text-secondary));">
+            <div style="margin-bottom: 16px;">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: hsl(${accentHue}, 90%, 55%); filter: drop-shadow(0 2px 8px hsl(${accentHue}, 90%, 55%, 0.3)); display: inline-block;">
+                <path d="M18.66 10.5H21a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-2.34"></path>
+                <path d="M5.34 10.5H3a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2.34"></path>
+                <path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <path d="M12 4v4"></path>
+                <path d="M16 10.5v5.5a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-5.5"></path>
+                <line x1="1" y1="1" x2="23" y2="23" style="stroke: hsl(var(--destructive)); stroke-width: 2.5;"></line>
+              </svg>
+            </div>
+            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 4px;">Session Disconnected</div>
+            <div style="font-size: 12px; color: hsl(var(--text-muted)); margin-bottom: 20px;">You are currently disconnected from ${profileName}.</div>
+            <button class="btn btn-primary" onclick="const active = window.SessionManager.getActiveSession(); if (active && window.connectToProfileSession) window.connectToProfileSession(active.profile, active.sessionId);" style="background-color: hsl(${accentHue}, 90%, 45%); color: #fff; font-weight: 600; padding: 6px 16px; border-radius: 4px; border: none; cursor: pointer; transition: background-color 0.2s;">
+              Reconnect
+            </button>
+          </td>
+        </tr>
+      `;
+      return;
+    }
 
     if (!files || files.length === 0) {
       tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Directory is empty. Right-click to create new files or folders.</td></tr>';
@@ -1426,6 +1473,11 @@ window.FileBrowser = {
   },
 
   async downloadFile(remoteFilePath, customLocalDest = null, options = {}) {
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    if (activeSess && activeSess.connectionState === 'disconnected') {
+      alert(`Cannot download file: The remote session "${activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server'}" is disconnected. Please reconnect before transferring files.`);
+      return;
+    }
     if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) return;
     const api = this.getApi();
     const cleanRemotePath = remoteFilePath.replace(/\/+$/, '');
@@ -1528,6 +1580,11 @@ window.FileBrowser = {
   },
 
   async uploadFile(localFilePath, customRemoteDest = null, options = {}) {
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    if (activeSess && activeSess.connectionState === 'disconnected') {
+      alert(`Cannot upload file: The remote session "${activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server'}" is disconnected. Please reconnect before transferring files.`);
+      return;
+    }
     if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) return;
     const api = this.getApi();
     const fileName = localFilePath.split('\\').pop();
