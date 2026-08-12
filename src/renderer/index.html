@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DevsFTP — The SFTP & FTP Client for Windows</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/icon.svg">
-  <link rel="stylesheet" href="styles/main.css">
+  <link rel="stylesheet" href="styles/main.css?v=20260812004200">
   <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css">
 </head>
 <body>
@@ -396,7 +396,7 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="new-item-modal-title">📄 Create New File</span>
-        <button id="btn-new-item-cancel-icon" class="btn btn-sm">✕ Close</button>
+        <button id="btn-new-item-cancel-icon" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -449,7 +449,7 @@
           </div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+        <div class="modal-footer">
           <button id="btn-new-item-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Create Item</button>
         </div>
       </div>
@@ -463,7 +463,7 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="chmod-modal-title">🔐 File Permissions (CHMOD)</span>
-        <button id="btn-chmod-close-icon" class="btn btn-sm">✕ Close</button>
+        <button id="btn-chmod-close-icon" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -516,7 +516,7 @@
           </div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+        <div class="modal-footer">
           <button id="btn-chmod-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Apply Permissions</button>
         </div>
       </div>
@@ -530,7 +530,7 @@
     <div class="modal-card" style="width: 500px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="error-modal-title">⚠️ Operation Error</span>
-        <button id="btn-error-close-icon" class="btn btn-sm">✕ Close</button>
+        <button id="btn-error-close-icon" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -549,7 +549,7 @@
           <span class="detail-value" id="error-modal-action" style="font-size: 12px; line-height: 1.4;">Please navigate your left file manager to a writable directory (e.g. Downloads or project folder) or launch DevsFTP using 'Run as Administrator'.</span>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+        <div class="modal-footer">
           <button id="btn-error-ok" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">Okay</button>
         </div>
       </div>
@@ -565,7 +565,7 @@
 
       <div class="pref-modal-header">
         <span class="modal-title" id="delete-modal-title">🗑 Delete Connection Profile</span>
-        <button id="btn-delete-modal-close" class="btn btn-sm">✕ Close</button>
+        <button id="btn-delete-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -579,7 +579,7 @@
           <span class="detail-value" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">Are you sure you want to delete this saved connection profile? This action cannot be undone.</span>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-delete-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-delete-modal-confirm" class="btn btn-danger" style="padding: 8px 20px; font-weight: 600;">🗑 Delete Profile</button>
         </div>
@@ -608,7 +608,7 @@
           <input type="text" id="rename-item-name-input" class="form-control" placeholder="Enter new item name" style="width: 100%;">
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-rename-cancel" class="btn" type="button" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-rename-submit" class="btn btn-primary" type="button" style="padding: 8px 24px; font-weight: 600;">⚡ Rename Item</button>
         </div>
@@ -623,7 +623,7 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="confirm-delete-modal-title">🗑 Delete Item</span>
-        <button id="btn-confirm-delete-close" class="btn btn-sm">✕ Close</button>
+        <button id="btn-confirm-delete-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -637,7 +637,7 @@
           <span class="detail-value" id="confirm-delete-modal-warning" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary));">Are you sure you want to delete this item? This action cannot be undone.</span>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-confirm-delete-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-confirm-delete-submit" class="btn btn-danger" style="padding: 8px 24px; font-weight: 600;">🗑 Delete Item</button>
         </div>
@@ -652,10 +652,10 @@
     <div class="modal-card" style="width: 580px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="job-modal-title">⏰ Configure Scheduled Job</span>
-        <button id="btn-job-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-job-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+      <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
         <input type="hidden" id="job-edit-id" value="">
 
         <div class="form-group">
@@ -784,7 +784,7 @@
           </div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-job-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-job-modal-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Save Scheduled Job</button>
         </div>
@@ -799,10 +799,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title">🗑️ Delete Scheduled Job</span>
-        <button id="btn-delete-job-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-delete-job-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div style="display: flex; align-items: flex-start; gap: 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 14px;">
           <span style="font-size: 28px;">⚠️</span>
           <div>
@@ -817,8 +817,8 @@
           <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Frequency:</span> <span id="del-job-val-freq" style="color: var(--accent-primary-hex, #F59E0B); font-weight: 600;">Startup</span></div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="btn-delete-job-cancel" class="btn" style="padding: 8px 16px;">✕ Keep Job</button>
+        <div class="modal-footer">
+          <button id="btn-delete-job-cancel" class="btn btn-sm modal-close-btn" title="Keep Job">✕ Keep Job</button>
           <button id="btn-delete-job-confirm" class="btn btn-danger" style="padding: 8px 22px; font-weight: 700; background-color: #EF4444; border-color: #DC2626; color: #FFFFFF;">🗑 Delete Job</button>
         </div>
       </div>
@@ -832,10 +832,10 @@
     <div class="modal-card" style="width: 560px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="tunnel-modal-title">🔀 Configure SSH Tunnel Rule</span>
-        <button id="btn-tunnel-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-tunnel-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+      <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
         <input type="hidden" id="tunnel-edit-id" value="">
 
         <div class="form-group">
@@ -882,7 +882,7 @@
           </div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-tunnel-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-tunnel-modal-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Start SSH Tunnel</button>
         </div>
@@ -897,10 +897,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title">🗑 Delete SSH Tunnel Rule</span>
-        <button id="btn-delete-tunnel-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-delete-tunnel-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Tunnel Rule</span>
           <span class="detail-value" id="delete-tunnel-modal-name" style="font-size: 13px; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">Rule Name</span>
@@ -911,7 +911,7 @@
           <span class="detail-value" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">Are you sure you want to delete this SSH Tunnel rule? Active connections will be terminated immediately.</span>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-delete-tunnel-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-delete-tunnel-confirm" class="btn btn-danger" style="padding: 8px 20px; font-weight: 600;">🗑 Delete Tunnel</button>
         </div>
@@ -923,10 +923,10 @@
     <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title">⚠️ Interrupted Transfers Detected</span>
-        <button id="btn-interrupted-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-interrupted-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 12px 16px;">
           <span class="detail-label">Session Summary</span>
           <span class="detail-value" id="interrupted-modal-msg" style="font-size: 13px; line-height: 1.5; color: hsl(var(--text-primary));">
@@ -934,7 +934,7 @@
           </span>
         </div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-interrupted-dismiss" class="btn" style="padding: 8px 16px;">Dismiss</button>
           <button id="btn-interrupted-goto-queue" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">📊 Go to Transfers Queue</button>
         </div>
@@ -949,10 +949,10 @@
     <div class="modal-card" style="width: 680px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="dir-compare-modal-title">🔍 Directory Comparison Analysis</span>
-        <button id="btn-dir-compare-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-dir-compare-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto;">
+      <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
         <div id="dir-compare-modal-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
           <!-- Summary cards populated dynamically -->
         </div>
@@ -974,8 +974,8 @@
           </table>
         </div>
 
-        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="btn-dir-compare-modal-ok" class="btn" style="padding: 8px 16px;">✕ Close</button>
+        <div class="modal-footer">
+          <button id="btn-dir-compare-modal-ok" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
           <button id="btn-dir-compare-modal-sync" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Sync Selected Files</button>
         </div>
       </div>
@@ -989,10 +989,10 @@
     <div class="modal-card" style="width: 560px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="batch-upload-modal-title">⚡ Unsaved Remote Edits Detected</span>
-        <button id="btn-batch-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-batch-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Background Sync Summary</span>
           <span class="detail-value" id="batch-upload-summary" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">The following modified files were saved while DevsFTP was closed. Would you like to sync them back to their remote servers in the background?</span>
@@ -1002,7 +1002,7 @@
           <!-- Populated dynamically -->
         </div>
 
-        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
+        <div class="modal-footer">
           <button id="btn-batch-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-batch-modal-confirm" class="btn btn-primary" style="padding: 8px 20px; font-weight: 600;">⚡ Upload All in Background</button>
         </div>
@@ -1017,7 +1017,7 @@
     <div class="modal-card connection-modal-card">
       <div class="pref-modal-header">
         <span class="modal-title">⚡ Session Launcher & Profile Manager</span>
-        <button id="btn-conn-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-conn-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="connection-dialog-layout">
@@ -1206,7 +1206,7 @@
     <div class="modal-card pref-modal-card">
       <div class="pref-modal-header">
         <span class="modal-title">DevsFTP Settings</span>
-        <button id="btn-pref-close" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Close">✕ Close</button>
+        <button id="btn-pref-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="pref-layout">
@@ -1726,11 +1726,11 @@
     <div class="modal-card" style="max-width: 520px; width: 92%; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog" aria-modal="true">
       <div class="pref-modal-header">
         <span class="modal-title">🐛 Submit Bug Report / Feedback</span>
-        <button id="btn-bug-report-close" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Close">✕ Close</button>
+        <button id="btn-bug-report-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <!-- Form View -->
-      <div id="bug-report-form-view" class="modal-body" style="padding: 16px;">
+      <div id="bug-report-form-view" class="modal-body">
         <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 14px; line-height: 1.5;">
           Describe what went wrong or send feedback. Your diagnostic trace logs will be sent directly to <strong>devsftp.com/bugs.php</strong> to help fix issues.
         </p>
@@ -1750,7 +1750,7 @@
           <span>Include sanitized system specs & diagnostic logs (devsftp-debug.log)</span>
         </label>
 
-        <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; border-top: 1px solid hsl(var(--border-subtle)); padding-top: 12px;">
+        <div class="modal-footer" style="justify-content: space-between; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
           <div style="display: flex; gap: 6px;">
             <button id="btn-bug-report-export-log" class="btn" style="padding: 6px 12px; font-size: 11px;" title="Export diagnostic log package to file">📄 Export Log</button>
             <button id="btn-bug-report-web-link" class="btn" style="padding: 6px 12px; font-size: 11px;" title="Open devsftp.com/bugs/ in browser">🌐 Open Web</button>
@@ -1760,7 +1760,7 @@
       </div>
 
       <!-- Thank You View -->
-      <div id="bug-report-thankyou-view" class="modal-body" style="padding: 24px; text-align: center; display: none;">
+      <div id="bug-report-thankyou-view" class="modal-body" style="text-align: center; display: none;">
         <div style="font-size: 48px; margin-bottom: 12px;">✅</div>
         <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">Thank You for Helping Improve DevsFTP!</h3>
         <p style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.6; max-width: 400px; margin: 0 auto 20px auto;">
@@ -1779,10 +1779,10 @@
     <div class="modal-card" style="max-width: 480px; width: 92%; padding: 0; overflow: hidden; border: 1px solid hsl(var(--border-color)); border-radius: 12px; background: hsl(var(--bg-secondary));" role="dialog" aria-modal="true">
       <div class="pref-modal-header">
         <span class="modal-title" style="font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px;">🚀 DevsFTP Update Available</span>
-        <button id="btn-update-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Close">✕ Close</button>
+        <button id="btn-update-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div class="modal-body" style="padding: 24px 20px; text-align: center;">
+      <div class="modal-body" style="text-align: center;">
         <div style="font-size: 38px; margin-bottom: 8px;">🎉</div>
         <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 4px;" id="update-modal-version-title">DevsFTP v1.0.2 Available!</h3>
         <p style="font-size: 12px; color: hsl(var(--text-muted)); margin-bottom: 16px;">
@@ -1814,7 +1814,7 @@
               <div class="modal-title" id="upload-save-modal-title">Upload Saved Changes?</div>
             </div>
           </div>
-        <button id="btn-upload-save-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-upload-save-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="upload-save-body">
@@ -1848,10 +1848,10 @@
   <!-- Host Key Verification Dialog (AES-256-GCM Encrypted Host Fingerprints)    -->
   <!-- ========================================================================= -->
   <div id="host-key-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card" style="max-width: 500px;" role="dialog">
-      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
+    <div class="modal-card" style="width: 500px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header">
         <span class="modal-title" id="host-key-modal-title">🔐 SSH Host Key Verification</span>
-        <button id="btn-host-key-close" class="btn btn-sm">✕ Cancel</button>
+        <button id="btn-host-key-close" class="btn btn-sm modal-close-btn" title="Cancel">✕ Cancel</button>
       </div>
 
       <div class="modal-body">
@@ -1878,8 +1878,8 @@
           Do you want to trust this host key and proceed with the SSH connection?
         </p>
 
-        <div class="modal-footer" style="margin-top: 4px;">
-          <button id="btn-host-key-reject" class="btn">✕ Cancel</button>
+        <div class="modal-footer">
+          <button id="btn-host-key-reject" class="btn btn-sm modal-close-btn" title="Cancel">✕ Cancel</button>
           <button id="btn-host-key-trust-once" class="btn">Connect Once</button>
           <button id="btn-host-key-trust-save" class="btn btn-primary">🔐 Trust & Encrypt Save</button>
         </div>
@@ -1891,10 +1891,10 @@
   <!-- File Conflict Resolution Dialog                                          -->
   <!-- ========================================================================= -->
   <div id="file-conflict-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card" style="max-width: 520px;" role="dialog">
-      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
+    <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header">
         <span class="modal-title">⚠️ File Overwrite Conflict</span>
-        <button id="btn-conflict-close" class="btn btn-sm">✕ Skip</button>
+        <button id="btn-conflict-close" class="btn btn-sm modal-close-btn" title="Skip">✕ Skip</button>
       </div>
 
       <div class="modal-body">
@@ -1926,7 +1926,7 @@
           </label>
         </div>
 
-        <div class="modal-footer" style="flex-wrap: wrap; margin-top: 4px;">
+        <div class="modal-footer" style="flex-wrap: wrap; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
           <button id="btn-conflict-skip" class="btn">⏭️ Skip File</button>
           <button id="btn-conflict-newer" class="btn">🕒 Overwrite If Newer</button>
           <button id="btn-conflict-rename" class="btn">✏️ Auto-Rename</button>
@@ -1940,10 +1940,10 @@
   <!-- Import Notification & Error Modal (Theme-Aware Dialog)                   -->
   <!-- ========================================================================= -->
   <div id="import-error-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card" style="max-width: 480px;" role="dialog">
-      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header">
         <span class="modal-title" id="import-modal-title">📥 SSH Config Import</span>
-        <button id="btn-import-modal-close" class="btn btn-sm">✕ Close</button>
+        <button id="btn-import-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
@@ -1956,7 +1956,7 @@
           Status details...
         </p>
 
-        <div class="modal-footer" style="margin-top: 4px;">
+        <div class="modal-footer">
           <button id="btn-import-modal-ok" class="btn btn-primary">OK</button>
         </div>
       </div>
@@ -1983,11 +1983,11 @@
   <!-- ========================================================================= -->
   <div id="master-unlock-modal" class="modal-overlay" style="z-index: 10000;">
     <div class="modal-card" style="width: 440px; max-width: 95vw;">
-      <div class="pref-modal-header" style="background: hsl(var(--bg-primary));">
+      <div class="pref-modal-header">
         <span class="modal-title">🔒 Unlock DevsFTP Workspace</span>
       </div>
 
-      <div class="modal-body" style="padding: 24px;">
+      <div class="modal-body">
         <div style="text-align: center;">
           <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
           <div style="font-size: 14px; font-weight: 700; color: hsl(var(--text-primary));">Master Password Required</div>
@@ -2001,7 +2001,7 @@
           <div id="master-unlock-lockout" style="color: #EF4444; font-size: 12px; font-weight: 700; margin-top: 6px; display: none; text-align: center; padding: 8px; background: rgba(239,68,68,0.1); border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);">🚫 Too many failed attempts. Access to connection profiles is locked.</div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); flex-direction: column;">
+        <div class="modal-footer" style="flex-direction: column; gap: 8px;">
           <button id="btn-master-unlock-submit" class="btn btn-primary" style="width: 100%; padding: 10px; font-weight: 700;">⚡ Unlock Workspace</button>
           <button id="btn-master-lockout-exit" class="btn btn-danger" style="width: 100%; padding: 10px; font-weight: 700; display: none; margin: 0;">✕ Close Application</button>
         </div>
@@ -2013,13 +2013,13 @@
   <!-- Master Password Configuration Modal (#master-config-modal)                -->
   <!-- ========================================================================= -->
   <div id="master-config-modal" class="modal-overlay" style="z-index: 9500;">
-    <div class="modal-card" style="width: 460px; max-width: 95vw;">
+    <div class="modal-card" style="width: 460px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="master-config-title">🔒 Enable Master Password</span>
-        <button id="btn-master-config-close" class="btn btn-sm">✕ Close</button>
+        <button id="btn-master-config-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div class="modal-body" style="padding: 24px;">
+      <div class="modal-body">
         <div id="master-config-mode-enable" style="display: flex; flex-direction: column; gap: 12px;">
           <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin: 0;">
             Creating a Master Password encrypts all server passwords and SSH keys with PBKDF2-SHA256 (100,000 rounds). You will be prompted to unlock DevsFTP whenever you open the application.
@@ -2046,7 +2046,7 @@
 
         <div id="master-config-error" style="color: #EF4444; font-size: 11px; display: none;">⚠️ Passwords do not match.</div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+        <div class="modal-footer">
           <button id="btn-master-config-cancel" class="btn">Cancel</button>
           <button id="btn-master-config-submit" class="btn btn-primary">⚡ Apply Changes</button>
         </div>
@@ -2061,10 +2061,10 @@
     <div class="modal-card" style="width: 440px; max-width: 95vw;">
       <div class="pref-modal-header">
         <span class="modal-title">Purge Temporary Cache & Data</span>
-        <button id="btn-clear-cache-modal-close" class="btn btn-sm">✕ Close</button>
+        <button id="btn-clear-cache-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div class="modal-body" style="padding: 20px;">
+      <div class="modal-body">
         <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin: 0;">
           Select the temporary application data you wish to purge:
         </p>
@@ -2091,7 +2091,7 @@
 
         <div id="clear-cache-modal-success" style="display: none; font-size: 11px; color: #34D399; font-weight: 600;">✓ Selected temporary data successfully purged!</div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+        <div class="modal-footer">
           <button id="btn-clear-cache-modal-cancel" class="btn">Cancel</button>
           <button id="btn-clear-cache-modal-submit" class="btn btn-primary">🧹 Purge Selected</button>
         </div>
@@ -2101,3 +2101,4 @@
 
 </body>
 </html>
+

@@ -963,15 +963,16 @@ input[type="number"] {
 
 .modal-card {
   background-color: hsl(var(--bg-secondary));
-  border: 1px solid var(--glass-border);
+  border: 1px solid hsl(var(--border-color));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-main);
   width: 540px;
   max-width: 90vw;
-  padding: 24px;
+  padding: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   box-sizing: border-box;
 }
 
@@ -1181,15 +1182,7 @@ input[type="number"] {
   border-top: 1px solid hsl(var(--border-color));
 }
 
-.pref-modal-header {
-  height: 42px;
-  background-color: hsl(var(--bg-secondary));
-  border-bottom: 1px solid hsl(var(--border-color));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-}
+
 
 .pref-layout {
   flex: 1;
@@ -1303,8 +1296,9 @@ input[type="number"] {
 }
 
 .modal-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
+  color: hsl(var(--text-primary));
 }
 
 .form-group {
@@ -1347,9 +1341,12 @@ input[type="number"] {
 
 .modal-footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid hsl(var(--border-color));
 }
 
 /* Upload Confirmation Dialog */
