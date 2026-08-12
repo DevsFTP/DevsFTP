@@ -1055,7 +1055,7 @@
               </select>
             </div>
 
-            <div class="form-row-grid-2">
+            <div class="form-row-grid-2" id="row-host-port">
               <!-- Cell 1: Host / IP Address -->
               <div class="form-group" id="cell-host" style="min-width: 0;">
                 <label class="form-label" id="lbl-prof-host">Host / IP Address</label>
@@ -1073,14 +1073,16 @@
                   <input type="text" id="prof-s3-bucket" class="form-control" placeholder="e.g. my-app-assets">
                 </div>
               </div>
+            </div>
 
+            <div class="form-row-grid-2" id="row-user-auth">
               <!-- Cell 3: Username -->
               <div class="form-group" id="group-username" style="min-width: 0;">
                 <label class="form-label" id="lbl-prof-username">Username</label>
                 <input type="text" id="prof-username" class="form-control" placeholder="root or ubuntu">
               </div>
 
-              <!-- Cell 4: Auth Method OR S3 Region OR WebDAV Path -->
+              <!-- Cell 4: Auth Method OR S3 Region -->
               <div class="form-group" style="min-width: 0;">
                 <div id="group-authtype">
                   <label class="form-label">Auth Method</label>
@@ -1093,12 +1095,10 @@
                   <label class="form-label">S3 Region</label>
                   <input type="text" id="prof-s3-region" class="form-control" placeholder="us-east-1" value="us-east-1">
                 </div>
-                <div id="group-webdav-path" style="display: none;">
-                  <label class="form-label">WebDAV Remote Path / Endpoint (Optional)</label>
-                  <input type="text" id="prof-webdav-path" class="form-control" placeholder="/webdav/ or /remote.php/dav/files/username/">
-                </div>
               </div>
+            </div>
 
+            <div class="form-row-grid-2" id="row-pass-key">
               <!-- Cell 5: Password -->
               <div class="form-group" id="group-password" style="min-width: 0;">
                 <label class="form-label" id="lbl-prof-password">Password</label>
@@ -1113,6 +1113,13 @@
                   <button id="btn-browse-key" class="btn">Browse...</button>
                 </div>
               </div>
+            </div>
+
+            <!-- WebDAV Remote Path / Subpath Field (shown only when WebDAV protocol is selected) -->
+            <div class="form-group" id="group-webdav-path" style="display: none;">
+              <label class="form-label">WebDAV Remote Path / Endpoint (Optional)</label>
+              <input type="text" id="prof-webdav-path" class="form-control" placeholder="/webdav/ or /remote.php/dav/files/username/">
+              <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-top: 4px; display: block;">Remote path/subpath for WebDAV. Defaults to / or /webdav/. Nextcloud: /remote.php/dav/files/&lt;username&gt;/</span>
             </div>
 
             <!-- Workspace Identity Accent System Selector -->

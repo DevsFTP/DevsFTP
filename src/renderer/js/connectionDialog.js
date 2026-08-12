@@ -107,39 +107,26 @@ window.ConnectionDialog = {
       profProto.addEventListener('change', (e) => {
         const proto = e.target.value;
         const portField = document.getElementById('prof-port');
-        const hostGroup = document.getElementById('group-host');
-        const portGroup = document.getElementById('group-port');
-        const webdavPathGroup = document.getElementById('group-webdav-path');
         const authGroup = document.getElementById('prof-authtype');
         const keyOption = authGroup ? authGroup.querySelector('option[value="key"]') : null;
 
-        const s3Group = document.getElementById('group-s3-settings');
-
-        if (hostGroup) hostGroup.style.display = proto === 's3' ? 'none' : '';
-        if (portGroup) portGroup.style.display = proto === 's3' ? 'none' : '';
-        if (s3Group) s3Group.style.display = proto === 's3' ? 'flex' : 'none';
-
-        this.updateFormLabels(proto);
-
         if (proto === 'sftp') {
           portField.value = '22';
-          if (webdavPathGroup) webdavPathGroup.style.display = 'none';
           if (keyOption) keyOption.style.display = '';
         } else if (proto === 'ftp' || proto === 'ftps') {
           portField.value = '21';
-          if (webdavPathGroup) webdavPathGroup.style.display = 'none';
           if (keyOption) keyOption.style.display = 'none';
           if (authGroup && authGroup.value === 'key') authGroup.value = 'password';
         } else if (proto === 'webdav') {
           portField.value = '80';
-          if (webdavPathGroup) webdavPathGroup.style.display = '';
           if (keyOption) keyOption.style.display = 'none';
           if (authGroup && authGroup.value === 'key') authGroup.value = 'password';
         } else if (proto === 's3') {
-          if (webdavPathGroup) webdavPathGroup.style.display = 'none';
           if (keyOption) keyOption.style.display = 'none';
           if (authGroup && authGroup.value === 'key') authGroup.value = 'password';
         }
+
+        this.updateFormLabels(proto);
       });
     }
 
@@ -147,10 +134,8 @@ window.ConnectionDialog = {
     if (profAuth) {
       profAuth.addEventListener('change', (e) => {
         const type = e.target.value;
-        const groupPass = document.getElementById('group-password');
-        const groupKey = document.getElementById('group-key');
-        if (groupPass) groupPass.style.display = type === 'password' ? 'flex' : 'none';
-        if (groupKey) groupKey.style.display = type === 'key' ? 'flex' : 'none';
+        const proto = document.getElementById('prof-protocol').value;
+        this.updateFormLabels(proto, type);
       });
     }
 
@@ -307,15 +292,9 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = profile.proxyUsername || '';
     if (pPassEl) pPassEl.value = profile.proxyPassword || '';
 
-    const isKey = profile.authType === 'key';
-    const groupPass = document.getElementById('group-password');
-    const groupKey = document.getElementById('group-key');
-    if (groupPass) groupPass.style.display = isKey ? 'none' : 'flex';
-    if (groupKey) groupKey.style.display = isKey ? 'flex' : 'none';
-
     this.setIdentityColor(profile.accentColor || '#68a063');
 
-    this.updateFormLabels(profile.protocol || 'sftp');
+    this.updateFormLabels(profile.protocol || 'sftp', profile.authType || 'password');
 
     const btnConnect = document.getElementById('btn-conn-connect');
     if (btnConnect) btnConnect.disabled = false;
@@ -359,68 +338,106 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = '';
     if (pPassEl) pPassEl.value = '';
 
-    const groupPass = document.getElementById('group-password');
-    const groupKey = document.getElementById('group-key');
-    if (groupPass) groupPass.style.display = 'flex';
-    if (groupKey) groupKey.style.display = 'none';
-
     this.setIdentityColor('#68a063');
 
-    this.updateFormLabels('sftp');
+    this.updateFormLabels('sftp', 'password');
 
     const btnConnect = document.getElementById('btn-conn-connect');
     if (btnConnect) btnConnect.disabled = false;
   },
 
-  updateFormLabels(proto) {
+  updateFormLabels(proto, forceAuthType) {
     const lblHost = document.getElementById('lbl-prof-host');
     const txtHost = document.getElementById('prof-host');
     const groupPort = document.getElementById('group-port');
+    const groupBucket = document.getElementById('group-s3-bucket');
+    const rowHostPort = document.getElementById('row-host-port');
 
     const lblUser = document.getElementById('lbl-prof-username');
     const txtUser = document.getElementById('prof-username');
+    const groupUser = document.getElementById('group-username');
     const groupAuth = document.getElementById('group-authtype');
-    const groupBucket = document.getElementById('group-s3-bucket');
+    const groupRegion = document.getElementById('group-s3-region');
+    const groupWebdavPath = document.getElementById('group-webdav-path');
 
     const lblPass = document.getElementById('lbl-prof-password');
     const txtPass = document.getElementById('prof-password');
-    const groupRegion = document.getElementById('group-s3-region');
-    const groupWebdavPath = document.getElementById('group-webdav-path');
+    const groupPass = document.getElementById('group-password');
+    const groupKey = document.getElementById('group-key');
+
+    const authSelect = document.getElementById('prof-authtype');
+    const currentAuthType = forceAuthType || (authSelect ? authSelect.value : 'password');
 
     if (proto === 's3') {
       if (lblHost) lblHost.textContent = 'S3 Endpoint URL (Optional)';
       if (txtHost) txtHost.placeholder = 'https://nyc3.digitaloceanspaces.com (Default: AWS)';
       if (groupPort) groupPort.style.display = 'none';
       if (groupBucket) groupBucket.style.display = '';
+      if (rowHostPort) rowHostPort.style.gridTemplateColumns = '1fr 1fr';
 
       if (lblUser) lblUser.textContent = 'Access Key ID';
       if (txtUser) txtUser.placeholder = 'AKIAIOSFODNN7EXAMPLE';
+      if (groupUser) groupUser.style.gridColumn = '';
       if (groupAuth) groupAuth.style.display = 'none';
       if (groupWebdavPath) groupWebdavPath.style.display = 'none';
       if (groupRegion) groupRegion.style.display = '';
 
       if (lblPass) lblPass.textContent = 'Secret Access Key';
       if (txtPass) txtPass.placeholder = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
+      if (groupPass) {
+        groupPass.style.display = '';
+        groupPass.style.gridColumn = 'span 2';
+      }
+      if (groupKey) groupKey.style.display = 'none';
     } else {
       if (lblHost) lblHost.textContent = 'Host / IP Address';
       if (txtHost) txtHost.placeholder = 'appvark.com or 192.168.1.100';
       if (groupPort) groupPort.style.display = '';
       if (groupBucket) groupBucket.style.display = 'none';
+      if (rowHostPort) rowHostPort.style.gridTemplateColumns = '1fr 80px';
 
       if (lblUser) lblUser.textContent = 'Username';
       if (txtUser) txtUser.placeholder = 'root or ubuntu';
-
-      if (proto === 'webdav') {
-        if (groupAuth) groupAuth.style.display = 'none';
-        if (groupWebdavPath) groupWebdavPath.style.display = '';
-      } else {
-        if (groupAuth) groupAuth.style.display = '';
-        if (groupWebdavPath) groupWebdavPath.style.display = 'none';
-      }
       if (groupRegion) groupRegion.style.display = 'none';
 
-      if (lblPass) lblPass.textContent = 'Password';
-      if (txtPass) txtPass.placeholder = '••••••••';
+      if (proto === 'webdav') {
+        if (groupUser) groupUser.style.gridColumn = 'span 2';
+        if (groupAuth) groupAuth.style.display = 'none';
+        if (groupWebdavPath) groupWebdavPath.style.display = '';
+
+        if (lblPass) lblPass.textContent = 'Password';
+        if (txtPass) txtPass.placeholder = '••••••••';
+        if (groupPass) {
+          groupPass.style.display = '';
+          groupPass.style.gridColumn = 'span 2';
+        }
+        if (groupKey) groupKey.style.display = 'none';
+      } else {
+        // SFTP / FTP / FTPS
+        if (groupUser) groupUser.style.gridColumn = '';
+        if (groupAuth) groupAuth.style.display = '';
+        if (groupWebdavPath) groupWebdavPath.style.display = 'none';
+
+        if (lblPass) lblPass.textContent = 'Password';
+        if (txtPass) txtPass.placeholder = '••••••••';
+
+        // SSH Key vs Password Auth Layout Spanning (SFTP only, since FTP/FTPS only use Password auth)
+        const isSftpKey = proto === 'sftp' && currentAuthType === 'key';
+
+        if (isSftpKey) {
+          if (groupPass) groupPass.style.display = 'none';
+          if (groupKey) {
+            groupKey.style.display = '';
+            groupKey.style.gridColumn = 'span 2';
+          }
+        } else {
+          if (groupPass) {
+            groupPass.style.display = '';
+            groupPass.style.gridColumn = 'span 2';
+          }
+          if (groupKey) groupKey.style.display = 'none';
+        }
+      }
     }
   },
 
