@@ -294,16 +294,7 @@ window.ConnectionDialog = {
     if (s3BucketEl) s3BucketEl.value = profile.s3Bucket || '';
     if (s3RegionEl) s3RegionEl.value = profile.s3Region || 'us-east-1';
 
-    // Keep Host & Port visible for all protocols except S3
-    const isWebDAV = profile.protocol === 'webdav';
-    const isS3 = profile.protocol === 's3';
-    const hostGroup = document.getElementById('group-host');
-    const portGroup = document.getElementById('group-port');
-    const webdavPathGroup = document.getElementById('group-webdav-path');
-
-    if (hostGroup) hostGroup.style.display = isS3 ? 'none' : '';
-    if (portGroup) portGroup.style.display = isS3 ? 'none' : '';
-    if (webdavPathGroup) webdavPathGroup.style.display = isWebDAV ? '' : 'none';
+    // Let updateFormLabels manage standard grid visibility rules
 
     const pTypeEl = document.getElementById('prof-proxy-type');
     const pHostEl = document.getElementById('prof-proxy-host');
@@ -350,13 +341,7 @@ window.ConnectionDialog = {
     const webdavPathNew = document.getElementById('prof-webdav-path');
     if (webdavPathNew) webdavPathNew.value = '';
 
-    // Reset WebDAV and S3 field visibility
-    const hostGroupNew = document.getElementById('group-host');
-    const portGroupNew = document.getElementById('group-port');
-    const webdavPathGroupNew = document.getElementById('group-webdav-path');
-    if (hostGroupNew) hostGroupNew.style.display = '';
-    if (portGroupNew) portGroupNew.style.display = '';
-    if (webdavPathGroupNew) webdavPathGroupNew.style.display = 'none';
+    // Reset S3 field values
 
     const s3BucketEl = document.getElementById('prof-s3-bucket');
     const s3RegionEl = document.getElementById('prof-s3-region');
@@ -399,37 +384,43 @@ window.ConnectionDialog = {
 
     const lblPass = document.getElementById('lbl-prof-password');
     const txtPass = document.getElementById('prof-password');
-    const groupPass = document.getElementById('group-password');
     const groupRegion = document.getElementById('group-s3-region');
+    const groupWebdavPath = document.getElementById('group-webdav-path');
 
     if (proto === 's3') {
       if (lblHost) lblHost.textContent = 'S3 Endpoint URL (Optional)';
       if (txtHost) txtHost.placeholder = 'https://nyc3.digitaloceanspaces.com (Default: AWS)';
       if (groupPort) groupPort.style.display = 'none';
+      if (groupBucket) groupBucket.style.display = '';
 
       if (lblUser) lblUser.textContent = 'Access Key ID';
       if (txtUser) txtUser.placeholder = 'AKIAIOSFODNN7EXAMPLE';
       if (groupAuth) groupAuth.style.display = 'none';
-      if (groupBucket) groupBucket.style.display = '';
+      if (groupWebdavPath) groupWebdavPath.style.display = 'none';
+      if (groupRegion) groupRegion.style.display = '';
 
       if (lblPass) lblPass.textContent = 'Secret Access Key';
       if (txtPass) txtPass.placeholder = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
-      if (groupPass) groupPass.style.gridColumn = '';
-      if (groupRegion) groupRegion.style.display = '';
     } else {
       if (lblHost) lblHost.textContent = 'Host / IP Address';
       if (txtHost) txtHost.placeholder = 'appvark.com or 192.168.1.100';
       if (groupPort) groupPort.style.display = '';
+      if (groupBucket) groupBucket.style.display = 'none';
 
       if (lblUser) lblUser.textContent = 'Username';
       if (txtUser) txtUser.placeholder = 'root or ubuntu';
-      if (groupAuth) groupAuth.style.display = '';
-      if (groupBucket) groupBucket.style.display = 'none';
+
+      if (proto === 'webdav') {
+        if (groupAuth) groupAuth.style.display = 'none';
+        if (groupWebdavPath) groupWebdavPath.style.display = '';
+      } else {
+        if (groupAuth) groupAuth.style.display = '';
+        if (groupWebdavPath) groupWebdavPath.style.display = 'none';
+      }
+      if (groupRegion) groupRegion.style.display = 'none';
 
       if (lblPass) lblPass.textContent = 'Password';
       if (txtPass) txtPass.placeholder = '••••••••';
-      if (groupPass) groupPass.style.gridColumn = 'span 2';
-      if (groupRegion) groupRegion.style.display = 'none';
     }
   },
 

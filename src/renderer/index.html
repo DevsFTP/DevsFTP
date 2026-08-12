@@ -1044,68 +1044,74 @@
               <input type="text" id="prof-name" class="form-control" placeholder="e.g. Appvark Production">
             </div>
 
-            <div class="form-row-grid">
-              <div class="form-group" style="min-width: 0;">
-                <label class="form-label">Protocol</label>
-                <select id="prof-protocol" class="form-control">
-                  <option value="sftp">SFTP (SSH)</option>
-                  <option value="ftp">FTP (Plain)</option>
-                  <option value="ftps">FTPS (Explicit)</option>
-                  <option value="webdav">WebDAV (HTTP / HTTPS)</option>
-                  <option value="s3">S3 Cloud Storage (AWS / Compatible)</option>
-                </select>
-              </div>
-              <div class="form-group" id="group-host" style="min-width: 0;">
-                <label class="form-label" id="lbl-prof-host">Host / IP Address</label>
-                <input type="text" id="prof-host" class="form-control" placeholder="appvark.com or 192.168.1.100">
-              </div>
-              <div class="form-group" id="group-port" style="min-width: 0;">
-                <label class="form-label">Port</label>
-                <input type="text" inputmode="numeric" id="prof-port" class="form-control port-input-field" value="22" placeholder="22" maxlength="5">
-              </div>
+            <div class="form-group">
+              <label class="form-label">Protocol</label>
+              <select id="prof-protocol" class="form-control">
+                <option value="sftp">SFTP (SSH)</option>
+                <option value="ftp">FTP (Plain)</option>
+                <option value="ftps">FTPS (Explicit)</option>
+                <option value="webdav">WebDAV (HTTP / HTTPS)</option>
+                <option value="s3">S3 Cloud Storage (AWS / Compatible)</option>
+              </select>
             </div>
 
             <div class="form-row-grid-2">
+              <!-- Cell 1: Host / IP Address -->
+              <div class="form-group" id="cell-host" style="min-width: 0;">
+                <label class="form-label" id="lbl-prof-host">Host / IP Address</label>
+                <input type="text" id="prof-host" class="form-control" placeholder="appvark.com or 192.168.1.100">
+              </div>
+
+              <!-- Cell 2: Port OR S3 Bucket -->
+              <div class="form-group" style="min-width: 0;">
+                <div id="group-port">
+                  <label class="form-label">Port</label>
+                  <input type="text" inputmode="numeric" id="prof-port" class="form-control port-input-field" value="22" placeholder="22" maxlength="5">
+                </div>
+                <div id="group-s3-bucket" style="display: none;">
+                  <label class="form-label">S3 Bucket Name</label>
+                  <input type="text" id="prof-s3-bucket" class="form-control" placeholder="e.g. my-app-assets">
+                </div>
+              </div>
+
+              <!-- Cell 3: Username -->
               <div class="form-group" id="group-username" style="min-width: 0;">
                 <label class="form-label" id="lbl-prof-username">Username</label>
                 <input type="text" id="prof-username" class="form-control" placeholder="root or ubuntu">
               </div>
-              <div class="form-group" id="group-authtype" style="min-width: 0;">
-                <label class="form-label">Auth Method</label>
-                <select id="prof-authtype" class="form-control">
-                  <option value="password">Password</option>
-                  <option value="key">SSH Private Key File (.pem, .ppk, id_rsa)</option>
-                </select>
-              </div>
-              <div class="form-group" id="group-s3-bucket" style="min-width: 0; display: none;">
-                <label class="form-label">S3 Bucket Name</label>
-                <input type="text" id="prof-s3-bucket" class="form-control" placeholder="e.g. my-app-assets">
-              </div>
-            </div>
 
-            <div class="form-row-grid-2" id="row-credentials-2">
-              <div class="form-group" id="group-password" style="min-width: 0; grid-column: span 2;">
+              <!-- Cell 4: Auth Method OR S3 Region OR WebDAV Path -->
+              <div class="form-group" style="min-width: 0;">
+                <div id="group-authtype">
+                  <label class="form-label">Auth Method</label>
+                  <select id="prof-authtype" class="form-control">
+                    <option value="password">Password</option>
+                    <option value="key">SSH Private Key File (.pem, .ppk, id_rsa)</option>
+                  </select>
+                </div>
+                <div id="group-s3-region" style="display: none;">
+                  <label class="form-label">S3 Region</label>
+                  <input type="text" id="prof-s3-region" class="form-control" placeholder="us-east-1" value="us-east-1">
+                </div>
+                <div id="group-webdav-path" style="display: none;">
+                  <label class="form-label">WebDAV Remote Path / Endpoint (Optional)</label>
+                  <input type="text" id="prof-webdav-path" class="form-control" placeholder="/webdav/ or /remote.php/dav/files/username/">
+                </div>
+              </div>
+
+              <!-- Cell 5: Password -->
+              <div class="form-group" id="group-password" style="min-width: 0;">
                 <label class="form-label" id="lbl-prof-password">Password</label>
                 <input type="password" id="prof-password" class="form-control" placeholder="••••••••">
               </div>
-              <div class="form-group" id="group-s3-region" style="min-width: 0; display: none;">
-                <label class="form-label">S3 Region</label>
-                <input type="text" id="prof-s3-region" class="form-control" placeholder="us-east-1" value="us-east-1">
-              </div>
-            </div>
 
-            <!-- WebDAV Remote Path / Subpath Field (shown only when WebDAV protocol is selected) -->
-            <div class="form-group" id="group-webdav-path" style="display: none;">
-              <label class="form-label">WebDAV Remote Path / Endpoint (Optional)</label>
-              <input type="text" id="prof-webdav-path" class="form-control" placeholder="/webdav/ or /remote.php/dav/files/username/">
-              <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-top: 4px; display: block;">Remote path/subpath for WebDAV. Defaults to / or /webdav/. Nextcloud: /remote.php/dav/files/&lt;username&gt;/</span>
-            </div>
-
-            <div class="form-group" id="group-key" style="display: none;">
-              <label class="form-label">Private Key File (.pem, .ppk, id_rsa)</label>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" id="prof-keypath" class="form-control" placeholder="C:\Users\...\.ssh\id_rsa" readonly>
-                <button id="btn-browse-key" class="btn">Browse...</button>
+              <!-- Cell 6: Private Key File -->
+              <div class="form-group" id="group-key" style="min-width: 0; display: none;">
+                <label class="form-label">Private Key File (.pem, .ppk, id_rsa)</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="prof-keypath" class="form-control" placeholder="C:\Users\...\.ssh\id_rsa" readonly>
+                  <button id="btn-browse-key" class="btn">Browse...</button>
+                </div>
               </div>
             </div>
 
