@@ -89,10 +89,10 @@ const devsFTPApi = {
   respondHostKeyVerify: (response) => ipcRenderer.send('ssh:host-key-verify-response', response),
 
   // SSH Terminal IPC
-  sshTerminalConnect: (config) => ipcRenderer.invoke('ssh:terminal-connect', config),
-  sshTerminalWrite: (data) => ipcRenderer.send('ssh:terminal-write', data),
-  sshTerminalResize: (cols, rows) => ipcRenderer.send('ssh:terminal-resize', { cols, rows }),
-  onSSHTerminalData: (callback) => ipcRenderer.on('ssh:terminal-data', (_event, data) => callback(data)),
+  sshTerminalConnect: (config, sessionId) => ipcRenderer.invoke('ssh:terminal-connect', config, sessionId),
+  sshTerminalWrite: (data, sessionId) => ipcRenderer.send('ssh:terminal-write', data, sessionId),
+  sshTerminalResize: (cols, rows, sessionId) => ipcRenderer.send('ssh:terminal-resize', { cols, rows }, sessionId),
+  onSSHTerminalData: (callback) => ipcRenderer.on('ssh:terminal-data', (_event, payload) => callback(payload)),
 
   // SSH Tunneling & Port Forwarding IPC
   tunnels: {

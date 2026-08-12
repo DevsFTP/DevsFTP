@@ -89,7 +89,7 @@ let scheduledJobStore = null;
 let jobRunnerService = null;
 let transferEngine = null;
 let activeConfig = null;
-let sshTerminalService = null;
+const sshTerminalServices = new Map();
 let cacheWatcherService = null;
 let exclusionService = null;
 let dirSizeService = null;
@@ -726,11 +726,10 @@ app.on('before-quit', () => {
   }
   activeSessions.clear();
 
-  if (sshTerminalService && typeof sshTerminalService.disconnect === 'function') {
-    try {
-      sshTerminalService.disconnect();
-    } catch (err) {}
+  for (const service of sshTerminalServices.values()) {
+    try { service.disconnect(); } catch (err) {}
   }
+  sshTerminalServices.clear();
 });
 
 app.on('window-all-closed', () => {
@@ -739,7 +738,10 @@ app.on('window-all-closed', () => {
       if (item && item.session) item.session.disconnect();
     }
     activeSessions.clear();
-    if (sshTerminalService) sshTerminalService.disconnect();
+    for (const service of sshTerminalServices.values()) {
+      try { service.disconnect(); } catch (err) {}
+    }
+    sshTerminalServices.clear();
     app.quit();
   }
 });
@@ -1105,8 +1107,16 @@ registerLoggedHandle('connection:disconnect', async (_event, sessionId) => {
     if (item && item.session) item.session.disconnect();
     activeSessions.delete(sessId);
   }
-  if (sshTerminalService && activeSessions.size === 0) {
-    sshTerminalService.disconnect();
+  const termService = sshTerminalServices.get(sessId);
+  if (termService) {
+    try { termService.disconnect(); } catch (err) {}
+    sshTerminalServices.delete(sessId);
+  }
+  if (activeSessions.size === 0) {
+    for (const service of sshTerminalServices.values()) {
+      try { service.disconnect(); } catch (err) {}
+    }
+    sshTerminalServices.clear();
   }
   sendLog('warning', `Remote session [${sessId}] disconnected.`);
   return true;
@@ -1606,20 +1616,28 @@ registerLoggedHandle('transfer:check-conflict', async (_event, { type, localPath
 });
 
 // SSH Terminal IPC
-registerLoggedHandle('ssh:terminal-connect', async (_event, config) => {
-  if (sshTerminalService) sshTerminalService.disconnect();
-  sshTerminalService = new SSHTerminalService(mainWindow);
-  await sshTerminalService.connect(config || activeConfig, handleHostKeyVerification);
-  sendLog('info', 'SSH Terminal session initiated.');
+registerLoggedHandle('ssh:terminal-connect', async (_event, config, sessionId) => {
+  const sessId = sessionId || 'default';
+  const existing = sshTerminalServices.get(sessId);
+  if (existing) existing.disconnect();
+
+  const termService = new SSHTerminalService(mainWindow, sessId);
+  sshTerminalServices.set(sessId, termService);
+  await termService.connect(config || activeConfig, handleHostKeyVerification);
+  sendLog('info', `SSH Terminal session initiated for tab [${sessId}].`);
   return true;
 });
 
-registerLoggedOn('ssh:terminal-write', (_event, data) => {
-  if (sshTerminalService) sshTerminalService.write(data);
+registerLoggedOn('ssh:terminal-write', (_event, data, sessionId) => {
+  const sessId = sessionId || 'default';
+  const termService = sshTerminalServices.get(sessId);
+  if (termService) termService.write(data);
 });
 
-registerLoggedOn('ssh:terminal-resize', (_event, { cols, rows }) => {
-  if (sshTerminalService) sshTerminalService.resize(cols, rows);
+registerLoggedOn('ssh:terminal-resize', (_event, { cols, rows }, sessionId) => {
+  const sessId = sessionId || 'default';
+  const termService = sshTerminalServices.get(sessId);
+  if (termService) termService.resize(cols, rows);
 });
 
 // File Dialog Pickers

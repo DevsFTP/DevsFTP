@@ -50,7 +50,7 @@ class S3Adapter {
 
   async downloadStream(remotePath, localPath, offset = 0, onProgress) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
-    return await this.service.downloadFile(remotePath, localPath, onProgress);
+    return await this.service.downloadFile(remotePath, localPath, onProgress, offset);
   }
 
   async uploadStream(localPath, remotePath, offset = 0, onProgress) {

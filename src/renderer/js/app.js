@@ -1134,7 +1134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (profile.protocol === 'sftp') {
         try {
-          await api.sshTerminalConnect(profile);
+          await api.sshTerminalConnect(profile, sessId);
         } catch (termErr) {
           if (window.LogViewer) window.LogViewer.addEntry('warning', `SSH Terminal PTY open note: ${termErr.message}`);
         }

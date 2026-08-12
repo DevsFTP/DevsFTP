@@ -70,18 +70,26 @@ window.SSHTerminal = {
     // Listen to user keyboard input in terminal -> send to Main IPC
     this.term.onData((data) => {
       const api = window.devsFTP || window.pulseFTP;
+      const sessId = window.SessionManager ? window.SessionManager.activeSessionId : 'default';
       if (api && api.sshTerminalWrite) {
-        api.sshTerminalWrite(data);
+        api.sshTerminalWrite(data, sessId);
       }
     });
 
     // Listen to remote PTY data from Main IPC -> write to Xterm
     const api = window.devsFTP || window.pulseFTP;
     if (api && api.onSSHTerminalData) {
-      api.onSSHTerminalData((data) => {
-        if (this.term) {
+      api.onSSHTerminalData((payload) => {
+        const { sessionId, data } = payload || {};
+        if (!sessionId) return;
+
+        if (!this.buffers) this.buffers = {};
+        if (!this.buffers[sessionId]) this.buffers[sessionId] = '';
+        this.buffers[sessionId] += data;
+
+        const activeSessId = window.SessionManager ? window.SessionManager.activeSessionId : 'default';
+        if (sessionId === activeSessId && this.term) {
           this.term.write(data);
-          this.focus();
         }
       });
     }
@@ -124,11 +132,21 @@ window.SSHTerminal = {
       try {
         this.fitAddon.fit();
         const api = window.devsFTP || window.pulseFTP;
+        const sessId = window.SessionManager ? window.SessionManager.activeSessionId : 'default';
         if (api && api.sshTerminalResize && this.term) {
-          api.sshTerminalResize(this.term.cols, this.term.rows);
+          api.sshTerminalResize(this.term.cols, this.term.rows, sessId);
         }
       } catch (e) {}
     }
+  },
+
+  switchSession(sessionId) {
+    if (!this.term) return;
+    this.term.clear();
+    if (!this.buffers) this.buffers = {};
+    const buffer = this.buffers[sessionId] || '\x1b[36mDevsFTP SSH Session Terminal\x1b[0m\r\n';
+    this.term.write(buffer);
+    this.resize();
   },
 
   clear() {

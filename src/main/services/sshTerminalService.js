@@ -7,8 +7,9 @@ const { Client } = require('ssh2');
 const fs = require('fs');
 
 class SSHTerminalService {
-  constructor(ipcWindow) {
+  constructor(ipcWindow, sessionId) {
     this.ipcWindow = ipcWindow;
+    this.sessionId = sessionId;
     this.sshClient = null;
     this.shellStream = null;
     this.connected = false;
@@ -31,14 +32,20 @@ class SSHTerminalService {
           // Stream data from remote shell back to renderer xterm.js
           stream.on('data', (data) => {
             if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
-              this.ipcWindow.webContents.send('ssh:terminal-data', data.toString('utf8'));
+              this.ipcWindow.webContents.send('ssh:terminal-data', {
+                sessionId: this.sessionId,
+                data: data.toString('utf8')
+              });
             }
           });
 
           stream.on('close', () => {
             this.connected = false;
             if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
-              this.ipcWindow.webContents.send('ssh:terminal-data', '\r\n\x1b[33m[SSH Terminal session closed]\x1b[0m\r\n');
+              this.ipcWindow.webContents.send('ssh:terminal-data', {
+                sessionId: this.sessionId,
+                data: '\r\n\x1b[33m[SSH Terminal session closed]\x1b[0m\r\n'
+              });
             }
           });
 

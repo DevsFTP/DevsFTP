@@ -109,56 +109,68 @@ class S3Service {
     }
 
     try {
-      const command = new ListObjectsV2Command({
-        Bucket: this.bucket,
-        Prefix: prefix,
-        Delimiter: '/',
-      });
-
-      const response = await this.client.send(command);
       const items = [];
+      let continuationToken = undefined;
 
-      // 1. Map CommonPrefixes to virtual folders
-      if (response.CommonPrefixes) {
-        response.CommonPrefixes.forEach(cp => {
-          const key = cp.Prefix;
-          // Extract directory name (e.g., "assets/js/" -> "js")
-          const cleanKey = key.endsWith('/') ? key.slice(0, -1) : key;
-          const parts = cleanKey.split('/');
-          const name = parts[parts.length - 1];
-
-          items.push({
-            name,
-            path: this._keyToPath(key),
-            isDir: true,
-            size: 0,
-            modifyTime: new Date().toISOString(),
-          });
+      do {
+        const command = new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          Delimiter: '/',
+          ContinuationToken: continuationToken,
         });
-      }
 
-      // 2. Map Contents to files
-      if (response.Contents) {
-        response.Contents.forEach(obj => {
-          const key = obj.Key;
-          // Filter out the directory placeholder itself
-          if (key === prefix) return;
+        const response = await this.client.send(command);
 
-          const parts = key.split('/');
-          const name = parts[parts.length - 1];
+        // 1. Map CommonPrefixes to virtual folders
+        if (response.CommonPrefixes) {
+          response.CommonPrefixes.forEach(cp => {
+            const key = cp.Prefix;
+            // Extract directory name (e.g., "assets/js/" -> "js")
+            const cleanKey = key.endsWith('/') ? key.slice(0, -1) : key;
+            const parts = cleanKey.split('/');
+            const name = parts[parts.length - 1];
 
-          // Skip nested objects that shouldn't appear at this depth
-          if (!name && key.endsWith('/')) return; 
-
-          items.push({
-            name,
-            path: this._keyToPath(key),
-            isDir: false,
-            size: obj.Size || 0,
-            modifyTime: obj.LastModified ? obj.LastModified.toISOString() : new Date().toISOString(),
+            // Avoid adding duplicates across pages if any
+            if (!items.find(item => item.path === this._keyToPath(key))) {
+              items.push({
+                name,
+                path: this._keyToPath(key),
+                isDir: true,
+                size: 0,
+                modifyTime: new Date().toISOString(),
+              });
+            }
           });
-        });
-      }
+        }
+
+        // 2. Map Contents to files
+        if (response.Contents) {
+          response.Contents.forEach(obj => {
+            const key = obj.Key;
+            // Filter out the directory placeholder itself
+            if (key === prefix) return;
+
+            const parts = key.split('/');
+            const name = parts[parts.length - 1];
+
+            // Skip nested objects that shouldn't appear at this depth
+            if (!name && key.endsWith('/')) return; 
+
+            if (!items.find(item => item.path === this._keyToPath(key))) {
+              items.push({
+                name,
+                path: this._keyToPath(key),
+                isDir: false,
+                size: obj.Size || 0,
+                modifyTime: obj.LastModified ? obj.LastModified.toISOString() : new Date().toISOString(),
+              });
+            }
+          });
+        }
+
+        continuationToken = response.NextContinuationToken;
+      } while (continuationToken);
 
       return items;
     } catch (err) {
@@ -166,7 +178,7 @@ class S3Service {
     }
   }
 
-  async downloadFile(remotePath, localPath, onProgress) {
+  async downloadFile(remotePath, localPath, onProgress, offset = 0) {
     if (!this.connected || !this.client) {
       throw new Error('S3 client is not connected.');
     }
@@ -174,11 +186,16 @@ class S3Service {
     const key = this._pathToKey(remotePath);
 
     try {
-      const command = new GetObjectCommand({
+      const getParams = {
         Bucket: this.bucket,
         Key: key,
-      });
+      };
 
+      if (offset > 0) {
+        getParams.Range = `bytes=${offset}-`;
+      }
+
+      const command = new GetObjectCommand(getParams);
       const response = await this.client.send(command);
       if (!response.Body) {
         throw new Error('Empty body returned from S3 GetObject.');
@@ -187,10 +204,12 @@ class S3Service {
       // Ensure directory exists
       fs.mkdirSync(path.dirname(localPath), { recursive: true });
 
-      const writeStream = fs.createWriteStream(localPath);
+      const writeStream = fs.createWriteStream(localPath, {
+        flags: offset > 0 ? 'a' : 'w'
+      });
       
-      let downloadedBytes = 0;
-      const totalBytes = response.ContentLength || 0;
+      let downloadedBytes = offset;
+      const totalBytes = (response.ContentLength || 0) + offset;
 
       await new Promise((resolve, reject) => {
         response.Body.on('data', chunk => {

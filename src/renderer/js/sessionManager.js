@@ -227,6 +227,11 @@ window.SessionManager = {
 
     // 5. Render Tab Bar
     this.renderTabs();
+
+    // Refresh SSH Terminal buffer for the newly active session tab
+    if (window.SSHTerminal && typeof window.SSHTerminal.switchSession === 'function') {
+      window.SSHTerminal.switchSession(sessionId);
+    }
   },
 
   updateActiveSessionRemoteState(remoteFiles, remotePath) {
