@@ -1338,10 +1338,10 @@ input[type="number"] {
 }
 
 .modal-body {
-  padding: 16px 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   box-sizing: border-box;
 }
 

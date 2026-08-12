@@ -396,10 +396,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="new-item-modal-title">📄 Create New File</span>
-        <button id="btn-new-item-cancel-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-new-item-cancel-icon" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div class="form-group">
           <label class="form-label" for="new-item-name-input">Item Name</label>
           <input type="text" id="new-item-name-input" class="form-control" placeholder="e.g. index.html" style="width: 100%;">
@@ -463,10 +463,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="chmod-modal-title">🔐 File Permissions (CHMOD)</span>
-        <button id="btn-chmod-close-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-chmod-close-icon" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Item</span>
           <span class="detail-value" id="chmod-modal-target-path" style="font-size: 12px; word-break: break-all;">/path/to/item</span>
@@ -530,10 +530,10 @@
     <div class="modal-card" style="width: 500px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="error-modal-title">⚠️ Operation Error</span>
-        <button id="btn-error-close-icon" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-error-close-icon" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Attempted Target</span>
           <span class="detail-value" id="error-modal-target" style="font-size: 12px; word-break: break-all; color: var(--accent-primary-hex, #F59E0B); font-family: var(--font-mono); font-weight: 600;">C:\file.ext</span>
@@ -565,10 +565,10 @@
 
       <div class="pref-modal-header">
         <span class="modal-title" id="delete-modal-title">🗑 Delete Connection Profile</span>
-        <button id="btn-delete-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-delete-modal-close" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Profile</span>
           <span class="detail-value" id="delete-modal-profile-name" style="font-size: 13px; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">Profile Name</span>
@@ -594,10 +594,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="rename-modal-title">✏️ Rename Item</span>
-        <button id="btn-rename-modal-close" class="btn" type="button" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-rename-modal-close" class="btn btn-sm" type="button">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Current Path</span>
           <span class="detail-value" id="rename-modal-target-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: hsl(var(--text-muted));">/path/to/item</span>
@@ -623,10 +623,10 @@
     <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
         <span class="modal-title" id="confirm-delete-modal-title">🗑 Delete Item</span>
-        <button id="btn-confirm-delete-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-confirm-delete-close" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Path</span>
           <span class="detail-value" id="confirm-delete-modal-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: var(--accent-primary-hex, #F59E0B);">/path/to/item</span>
