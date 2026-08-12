@@ -86,7 +86,7 @@
 
       <div class="connection-toolbar">
         <button id="btn-dir-compare" class="btn" title="Compare active local and remote directory contents">🔍 Compare</button>
-        <button id="btn-header-new-session" class="btn btn-primary">⚡ New Session</button>
+        <button id="btn-header-new-session" class="btn">⚡ New Session</button>
         <button id="btn-open-preferences" class="btn">⚙️ Preferences</button>
         <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙</button>
       </div>
@@ -1563,25 +1563,8 @@
               </div>
             </div>
 
-            <!-- Card 3: Default Local Navigation Directory -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 24px;">📁</span>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700;">Default Local Start Directory</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Initial folder path loaded in the left local file browser pane when launching DevsFTP.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-group" style="margin: 0;">
-                <input type="text" id="pref-local-dir" class="form-control" value="C:\" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
-              </div>
-            </div>
-
             <!-- Card 4: Smart Exclusion Rules & Ignore Filters -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                   <span style="font-size: 24px;">🛡️</span>
@@ -1660,8 +1643,9 @@
                 </div>
               </div>
 
-              <div style="display: flex; gap: 8px; margin-top: 4px;">
-                <button id="btn-tools-cache-clear" class="btn" style="font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                <button id="btn-tools-cache-clear" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
+                <span id="clear-cache-msg" style="font-size: 11px; color: #10B981; display: none; font-weight: 600;">✓ Local file cache cleared!</span>
               </div>
             </div>
 

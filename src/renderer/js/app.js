@@ -1038,7 +1038,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (api && api.clearCache) {
         try {
           await api.clearCache();
-          alert('Local remote-file cache cleared successfully.');
+          const msg = document.getElementById('clear-cache-msg');
+          if (msg) {
+            msg.style.display = 'inline-block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+          }
+          if (window.LogViewer) window.LogViewer.addEntry('info', '[Cache Clean] Local remote-file cache cleared cleanly.');
         } catch (err) {
           console.error('Failed to clear cache:', err);
           alert(`Failed to clear cache: ${err.message}`);
