@@ -1858,37 +1858,37 @@
     <div class="modal-card" style="max-width: 500px;" role="dialog">
       <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
         <span class="modal-title" id="host-key-modal-title">🔐 SSH Host Key Verification</span>
-        <button id="btn-host-key-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Cancel</button>
+        <button id="btn-host-key-close" class="btn btn-sm">✕ Cancel</button>
       </div>
 
-      <div style="padding: 16px;">
-        <div id="host-key-warning-alert" style="display: none; padding: 10px; margin-bottom: 12px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 6px; color: #FCA5A5; font-size: 12px; line-height: 1.4;">
+      <div class="modal-body">
+        <div id="host-key-warning-alert" style="display: none; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; border-radius: 6px; color: #FCA5A5; font-size: 12px; line-height: 1.4;">
           <strong>⚠️ WARNING: POTENTIAL SECURITY RISK!</strong><br>
           The host key for this server has changed since your last connection. This could indicate a Man-in-the-Middle attack or a server re-configuration.
         </div>
 
-        <p id="host-key-modal-msg" style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 12px; line-height: 1.5;">
+        <p id="host-key-modal-msg" style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.5; margin: 0;">
           The authenticity of host <strong id="host-key-val-host" style="color: hsl(var(--text-primary));">host</strong> cannot be established.
         </p>
 
-        <div style="background: rgba(0,0,0,0.3); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-family: var(--font-mono); font-size: 11px; margin-bottom: 16px;">
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-family: var(--font-mono); font-size: 11px;">
           <div style="margin-bottom: 6px;"><span style="color: hsl(var(--text-muted));">Host/Port:</span> <span id="host-key-val-endpoint" style="color: hsl(var(--text-primary));">127.0.0.1:22</span></div>
           <div style="margin-bottom: 6px;"><span style="color: hsl(var(--text-muted));">SHA-256 Fingerprint:</span></div>
-          <div id="host-key-val-fingerprint" style="word-break: break-all; color: var(--accent-primary-hex, #F59E0B); font-weight: 700;">SHA256:...</div>
+          <div id="host-key-val-fingerprint" style="word-break: break-all; color: var(--accent-primary-hex, #68a063); font-weight: 700;">SHA256:...</div>
           <div id="host-key-stored-container" style="display: none; margin-top: 6px; border-top: 1px dashed hsl(var(--border-subtle)); padding-top: 6px;">
             <span style="color: #F87171;">Previously Stored Fingerprint:</span>
             <div id="host-key-val-stored" style="word-break: break-all; color: #FCA5A5;">SHA256:...</div>
           </div>
         </div>
 
-        <p style="font-size: 11px; color: hsl(var(--text-muted)); margin: 0 0 16px 0;">
+        <p style="font-size: 11px; color: hsl(var(--text-muted)); margin: 0;">
           Do you want to trust this host key and proceed with the SSH connection?
         </p>
 
-        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-          <button id="btn-host-key-reject" class="btn" style="padding: 6px 12px; font-size: 12px;">✕ Cancel</button>
-          <button id="btn-host-key-trust-once" class="btn" style="padding: 6px 12px; font-size: 12px;">Connect Once</button>
-          <button id="btn-host-key-trust-save" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px; font-weight: 600;">🔐 Trust & Encrypt Save</button>
+        <div class="modal-footer" style="margin-top: 4px;">
+          <button id="btn-host-key-reject" class="btn">✕ Cancel</button>
+          <button id="btn-host-key-trust-once" class="btn">Connect Once</button>
+          <button id="btn-host-key-trust-save" class="btn btn-primary">🔐 Trust & Encrypt Save</button>
         </div>
       </div>
     </div>
@@ -1901,15 +1901,15 @@
     <div class="modal-card" style="max-width: 520px;" role="dialog">
       <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
         <span class="modal-title">⚠️ File Overwrite Conflict</span>
-        <button id="btn-conflict-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Skip</button>
+        <button id="btn-conflict-close" class="btn btn-sm">✕ Skip</button>
       </div>
 
-      <div style="padding: 16px;">
-        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 12px;">
+      <div class="modal-body">
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin: 0;">
           The destination file already exists. Choose how to resolve this conflict:
         </p>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-size: 11px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-size: 11px;">
           <div>
             <div style="font-weight: 700; color: #38BDF8; margin-bottom: 4px;">Source File</div>
             <div id="conflict-src-name" style="font-weight: 600; color: hsl(var(--text-primary));">file.txt</div>
@@ -1924,7 +1924,7 @@
           </div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 12px;">
+        <div class="form-group">
           <label class="upload-save-checkbox">
             <input type="checkbox" id="conflict-apply-batch">
             <span class="upload-save-checkbox-copy">
@@ -1933,11 +1933,11 @@
           </label>
         </div>
 
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-          <button id="btn-conflict-skip" class="btn" style="padding: 6px 12px; font-size: 11px;">⏭️ Skip File</button>
-          <button id="btn-conflict-newer" class="btn" style="padding: 6px 12px; font-size: 11px;">🕒 Overwrite If Newer</button>
-          <button id="btn-conflict-rename" class="btn" style="padding: 6px 12px; font-size: 11px;">✏️ Auto-Rename</button>
-          <button id="btn-conflict-overwrite" class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">⚡ Overwrite</button>
+        <div class="modal-footer" style="flex-wrap: wrap; margin-top: 4px;">
+          <button id="btn-conflict-skip" class="btn">⏭️ Skip File</button>
+          <button id="btn-conflict-newer" class="btn">🕒 Overwrite If Newer</button>
+          <button id="btn-conflict-rename" class="btn">✏️ Auto-Rename</button>
+          <button id="btn-conflict-overwrite" class="btn btn-primary">⚡ Overwrite</button>
         </div>
       </div>
     </div>
@@ -1947,24 +1947,24 @@
   <!-- Import Notification & Error Modal (Theme-Aware Dialog)                   -->
   <!-- ========================================================================= -->
   <div id="import-error-modal" class="modal-overlay" aria-hidden="true">
-    <div class="modal-card" style="max-width: 480px; padding: 0;" role="dialog">
-      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle)); padding: 12px 16px;">
+    <div class="modal-card" style="max-width: 480px;" role="dialog">
+      <div class="pref-modal-header" style="border-bottom: 1px solid hsl(var(--border-subtle));">
         <span class="modal-title" id="import-modal-title">📥 SSH Config Import</span>
-        <button id="btn-import-modal-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-import-modal-close" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 16px;">
-        <div id="import-modal-badge" style="display: flex; align-items: center; gap: 8px; padding: 10px; margin-bottom: 12px; border-radius: 6px; font-size: 12px; line-height: 1.4; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; color: #FCA5A5;">
+      <div class="modal-body">
+        <div id="import-modal-badge" style="display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; background: rgba(239, 68, 68, 0.15); border: 1px solid #EF4444; color: #FCA5A5;">
           <span id="import-modal-icon" style="font-size: 16px;">⚠️</span>
           <span id="import-modal-headline" style="font-weight: 600;">Import Status</span>
         </div>
 
-        <p id="import-modal-body" style="font-size: 12px; color: hsl(var(--text-secondary)); margin-bottom: 16px; line-height: 1.5; word-break: break-word;">
+        <p id="import-modal-body" style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.5; word-break: break-word; margin: 0;">
           Status details...
         </p>
 
-        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-          <button id="btn-import-modal-ok" class="btn btn-primary" style="padding: 6px 16px; font-size: 12px; font-weight: 600;">OK</button>
+        <div class="modal-footer" style="margin-top: 4px;">
+          <button id="btn-import-modal-ok" class="btn btn-primary">OK</button>
         </div>
       </div>
     </div>
@@ -1989,13 +1989,13 @@
   <!-- Startup Master Password Unlock Modal (#master-unlock-modal)                -->
   <!-- ========================================================================= -->
   <div id="master-unlock-modal" class="modal-overlay" style="z-index: 10000;">
-    <div class="modal-card" style="width: 440px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+    <div class="modal-card" style="width: 440px; max-width: 95vw;">
       <div class="pref-modal-header" style="background: hsl(var(--bg-primary));">
         <span class="modal-title">🔒 Unlock DevsFTP Workspace</span>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div style="text-align: center; padding-bottom: 8px;">
+      <div class="modal-body" style="padding: 24px;">
+        <div style="text-align: center;">
           <div style="font-size: 32px; margin-bottom: 8px;">🔐</div>
           <div style="font-size: 14px; font-weight: 700; color: hsl(var(--text-primary));">Master Password Required</div>
           <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 4px;">Enter your Master Password to decrypt and unlock your saved server profiles.</div>
@@ -2003,14 +2003,14 @@
 
         <div class="form-group">
           <label class="form-label" for="master-unlock-password">Master Password</label>
-          <input type="password" id="master-unlock-password" class="form-control" placeholder="••••••••" style="width: 100%; font-size: 14px;">
+          <input type="password" id="master-unlock-password" class="form-control" placeholder="••••••••" style="font-size: 14px;">
           <div id="master-unlock-error" style="color: #EF4444; font-size: 11px; margin-top: 4px; display: none;">⚠️ Incorrect Master Password. Please try again.</div>
           <div id="master-unlock-lockout" style="color: #EF4444; font-size: 12px; font-weight: 700; margin-top: 6px; display: none; text-align: center; padding: 8px; background: rgba(239,68,68,0.1); border-radius: 6px; border: 1px solid rgba(239,68,68,0.3);">🚫 Too many failed attempts. Access to connection profiles is locked.</div>
         </div>
 
-        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="btn-master-unlock-submit" class="btn btn-primary" style="width: 100%; padding: 10px; font-weight: 700; font-size: 13px;">⚡ Unlock Workspace</button>
-          <button id="btn-master-lockout-exit" class="btn btn-danger" style="width: 100%; padding: 10px; font-weight: 700; font-size: 13px; display: none;">✕ Close Application</button>
+        <div class="modal-footer" style="margin-top: 4px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); flex-direction: column;">
+          <button id="btn-master-unlock-submit" class="btn btn-primary" style="width: 100%; padding: 10px; font-weight: 700;">⚡ Unlock Workspace</button>
+          <button id="btn-master-lockout-exit" class="btn btn-danger" style="width: 100%; padding: 10px; font-weight: 700; display: none; margin: 0;">✕ Close Application</button>
         </div>
       </div>
     </div>
@@ -2020,42 +2020,42 @@
   <!-- Master Password Configuration Modal (#master-config-modal)                -->
   <!-- ========================================================================= -->
   <div id="master-config-modal" class="modal-overlay" style="z-index: 9500;">
-    <div class="modal-card" style="width: 460px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+    <div class="modal-card" style="width: 460px; max-width: 95vw;">
       <div class="pref-modal-header">
         <span class="modal-title" id="master-config-title">🔒 Enable Master Password</span>
-        <button id="btn-master-config-close" class="btn" style="padding: 2px 8px; font-size: 11px;">✕ Close</button>
+        <button id="btn-master-config-close" class="btn btn-sm">✕ Close</button>
       </div>
 
-      <div style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
-        <div id="master-config-mode-enable">
-          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin-bottom: 12px;">
+      <div class="modal-body" style="padding: 24px;">
+        <div id="master-config-mode-enable" style="display: flex; flex-direction: column; gap: 12px;">
+          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin: 0;">
             Creating a Master Password encrypts all server passwords and SSH keys with PBKDF2-SHA256 (100,000 rounds). You will be prompted to unlock DevsFTP whenever you open the application.
           </p>
-          <div class="form-group" style="margin-bottom: 12px;">
+          <div class="form-group">
             <label class="form-label" for="master-cfg-new-pass">New Master Password</label>
-            <input type="password" id="master-cfg-new-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+            <input type="password" id="master-cfg-new-pass" class="form-control" placeholder="••••••••">
           </div>
           <div class="form-group">
             <label class="form-label" for="master-cfg-confirm-pass">Confirm Master Password</label>
-            <input type="password" id="master-cfg-confirm-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+            <input type="password" id="master-cfg-confirm-pass" class="form-control" placeholder="••••••••">
           </div>
         </div>
 
-        <div id="master-config-mode-auth" style="display: none;">
-          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin-bottom: 12px;" id="master-config-auth-desc">
+        <div id="master-config-mode-auth" style="display: none; flex-direction: column; gap: 12px;">
+          <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin: 0;" id="master-config-auth-desc">
             Enter your current Master Password to confirm this change.
           </p>
           <div class="form-group">
             <label class="form-label" for="master-cfg-current-pass">Current Master Password</label>
-            <input type="password" id="master-cfg-current-pass" class="form-control" placeholder="••••••••" style="width: 100%;">
+            <input type="password" id="master-cfg-current-pass" class="form-control" placeholder="••••••••">
           </div>
         </div>
 
         <div id="master-config-error" style="color: #EF4444; font-size: 11px; display: none;">⚠️ Passwords do not match.</div>
 
-        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color)); display: flex; justify-content: flex-end; gap: 8px;">
-          <button id="btn-master-config-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
-          <button id="btn-master-config-submit" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Apply Changes</button>
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+          <button id="btn-master-config-cancel" class="btn">Cancel</button>
+          <button id="btn-master-config-submit" class="btn btn-primary">⚡ Apply Changes</button>
         </div>
       </div>
     </div>

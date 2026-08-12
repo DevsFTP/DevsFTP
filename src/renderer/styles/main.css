@@ -10,12 +10,14 @@
   --bg-surface: 216 12% 15%;       /* #22262B - Layered Slate Panel Surfaces */
   --bg-hover: 214 12% 20%;         /* #2C3138 - Hover Highlight Surface */
   --bg-selected: 216 12% 22%;      /* #2F343B - Dark Neutral Slate Selection */
+  --bg-terminal: #111315;
 
   --text-primary: 0 0% 90%;        /* #E6E6E6 - High Contrast Soft White */
   --text-secondary: 216 10% 75%;   /* #B8BDC5 - Muted Silver Text */
   --text-muted: 215 6% 52%;        /* #7D838C - Subdued Text */
 
   --accent-primary-hex: #68a063;
+  --accent-hover-hex: #578952;
   --accent-primary: 115 24% 51%;    /* #68a063 - Identity Brand Accent */
   --accent-hover: 115 29% 45%;      /* #578952 - Identity Accent Hover */
 
@@ -44,14 +46,16 @@
   --bg-surface: 0 0% 100%;        /* #ffffff */
   --bg-hover: 210 16% 88%;        /* #cbd5e1 */
   --bg-selected: 210 16% 84%;      /* #cbd5e1 */
+  --bg-terminal: #ffffff;
 
   --text-primary: 222 47% 11%;    /* #0f172a - Dark Slate Text */
   --text-secondary: 215 25% 27%;  /* #334155 - Medium Dark Text */
   --text-muted: 215 16% 47%;      /* #64748b - Muted Gray Text */
 
-  --accent-primary-hex: #d97706;
-  --accent-primary: 38 92% 48%;   /* #d97706 */
-  --accent-hover: 38 92% 40%;
+  --accent-primary-hex: #68a063;
+  --accent-hover-hex: #578952;
+  --accent-primary: 115 24% 51%;
+  --accent-hover: 115 29% 45%;
 
   --border-color: 214 32% 85%;    /* #cbd5e1 */
   --border-subtle: 214 32% 91%;   /* #e2e8f0 */
@@ -478,30 +482,30 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .btn:hover {
   background-color: hsl(var(--bg-hover));
-  border-color: var(--accent-primary-hex, #F59E0B);
-  color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #68a063);
+  color: var(--accent-primary-hex, #68a063);
 }
 
 .btn:focus {
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #68a063);
   outline: none;
 }
 
 .btn-primary {
-  background-color: hsl(var(--bg-surface));
-  color: hsl(var(--text-primary));
-  border: 1px solid hsl(var(--border-color));
+  background-color: var(--accent-primary-hex, #68a063) !important;
+  color: #FFFFFF !important;
+  border: 1px solid var(--accent-primary-hex, #68a063) !important;
   font-weight: 600;
 }
 
 .btn-primary:hover {
-  background-color: hsl(var(--bg-hover));
-  border-color: var(--accent-primary-hex, #F59E0B);
-  color: var(--accent-primary-hex, #F59E0B);
+  background-color: var(--accent-hover-hex, #578952) !important;
+  border-color: var(--accent-hover-hex, #578952) !important;
+  color: #FFFFFF !important;
 }
 
 .btn-primary:focus {
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-hover-hex, #578952) !important;
   outline: none;
 }
 
@@ -513,6 +517,16 @@ select option:hover, select option:focus, select option:active, select option:ch
   border-color: hsl(var(--status-danger));
   color: hsl(var(--status-danger));
   background-color: hsl(var(--status-danger) / 0.1);
+}
+
+.btn-sm {
+  padding: 3px 8px !important;
+  font-size: 11px !important;
+}
+
+.modal-footer .btn {
+  padding: 8px 18px;
+  font-size: 12px;
 }
 
 .theme-toggle-btn {
@@ -798,7 +812,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 #terminal-container {
   width: 100%;
   height: 100%;
-  background-color: #111315;
+  background-color: var(--bg-terminal);
   padding: 4px;
 }
 
@@ -1321,6 +1335,14 @@ input[type="number"] {
 
 .form-control:focus {
   border-color: var(--accent-primary-hex, #F59E0B);
+}
+
+.modal-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
 }
 
 .modal-footer {
