@@ -1316,6 +1316,7 @@ input[type="number"] {
   border-radius: var(--radius-md);
   outline: none;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .form-control:focus {
