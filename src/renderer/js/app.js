@@ -283,8 +283,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && uploadPromptModal && uploadPromptModal.classList.contains('active')) {
-      closeUploadPrompt(false);
+    if (event.key === 'Escape') {
+      if (uploadPromptModal && uploadPromptModal.classList.contains('active')) {
+        closeUploadPrompt(false);
+      }
+      const clearCacheModal = document.getElementById('clear-cache-modal');
+      if (clearCacheModal && clearCacheModal.classList.contains('active')) {
+        clearCacheModal.classList.remove('active');
+      }
+    }
+    if (event.ctrlKey && event.shiftKey && (event.key === 'Delete' || event.key === 'Del')) {
+      event.preventDefault();
+      if (window.openClearCacheModal) {
+        window.openClearCacheModal();
+      }
     }
   });
 
@@ -1015,18 +1027,89 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.updateTransfersBadges();
 
+  const closeClearCacheModal = () => {
+    const modal = document.getElementById('clear-cache-modal');
+    if (modal) modal.classList.remove('active');
+  };
+
+  window.openClearCacheModal = () => {
+    const modal = document.getElementById('clear-cache-modal');
+    if (modal) {
+      modal.classList.add('active');
+      const chkFiles = document.getElementById('chk-clear-remote-files');
+      const chkSessions = document.getElementById('chk-clear-sessions');
+      const chkLogs = document.getElementById('chk-clear-logs');
+      if (chkFiles) chkFiles.checked = true;
+      if (chkSessions) chkSessions.checked = false;
+      if (chkLogs) chkLogs.checked = false;
+      const successMsg = document.getElementById('clear-cache-modal-success');
+      if (successMsg) successMsg.style.display = 'none';
+    }
+  };
+
   const menuToolsCache = document.getElementById('menu-tools-cache');
   if (menuToolsCache) {
-    menuToolsCache.addEventListener('click', async () => {
-      const api = getApi();
-      if (api && api.clearCache) {
-        try {
-          await api.clearCache();
-          alert('Local remote-file cache cleared successfully.');
-        } catch (err) {
-          console.error('Failed to clear cache:', err);
-          alert(`Failed to clear cache: ${err.message}`);
+    menuToolsCache.addEventListener('click', () => {
+      window.openClearCacheModal();
+    });
+  }
+
+  const btnClearCacheClose = document.getElementById('btn-clear-cache-modal-close');
+  const btnClearCacheCancel = document.getElementById('btn-clear-cache-modal-cancel');
+  if (btnClearCacheClose) btnClearCacheClose.addEventListener('click', closeClearCacheModal);
+  if (btnClearCacheCancel) btnClearCacheCancel.addEventListener('click', closeClearCacheModal);
+
+  const btnClearCacheSubmit = document.getElementById('btn-clear-cache-modal-submit');
+  if (btnClearCacheSubmit) {
+    btnClearCacheSubmit.addEventListener('click', async () => {
+      const chkFiles = document.getElementById('chk-clear-remote-files');
+      const chkSessions = document.getElementById('chk-clear-sessions');
+      const chkLogs = document.getElementById('chk-clear-logs');
+
+      let hasClearedAny = false;
+
+      // 1. Clear Files
+      if (chkFiles && chkFiles.checked) {
+        const api = getApi();
+        if (api && api.clearCache) {
+          try {
+            await api.clearCache();
+            hasClearedAny = true;
+            if (window.LogViewer) window.LogViewer.addEntry('info', '[Cache Modal] Local remote-file cache cleared cleanly.');
+          } catch (err) {
+            console.error('Failed to clear remote files cache:', err);
+          }
         }
+      }
+
+      // 2. Clear Sessions
+      if (chkSessions && chkSessions.checked) {
+        localStorage.removeItem('devsftp_workspace_saved_tabs');
+        hasClearedAny = true;
+        if (window.LogViewer) window.LogViewer.addEntry('info', '[Cache Modal] Saved workspace sessions storage cleared.');
+      }
+
+      // 3. Clear Logs
+      if (chkLogs && chkLogs.checked) {
+        if (window.LogViewer && window.LogViewer.clear) {
+          window.LogViewer.clear();
+          hasClearedAny = true;
+        }
+      }
+
+      if (hasClearedAny) {
+        const successMsg = document.getElementById('clear-cache-modal-success');
+        if (successMsg) {
+          successMsg.style.display = 'block';
+          setTimeout(() => {
+            successMsg.style.display = 'none';
+            closeClearCacheModal();
+          }, 1500);
+        } else {
+          closeClearCacheModal();
+        }
+      } else {
+        closeClearCacheModal();
       }
     });
   }

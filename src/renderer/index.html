@@ -28,10 +28,19 @@
       <div class="menu-item-dropdown" id="menu-tools">
         <button class="menu-item-btn">Tools</button>
         <div class="menu-dropdown-content">
-          <div class="dropdown-action" id="menu-tools-cache">🧹 Clear Temp Cache</div>
+          <div class="dropdown-action" id="menu-tools-cache">
+            <span>🧹 Clear Temp Cache...</span>
+            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+Del</span>
+          </div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-action" id="menu-tools-export">📤 Export Profiles (JSON)</div>
-          <div class="dropdown-action" id="menu-tools-import">📥 Import Profiles (JSON)</div>
+          <div class="dropdown-action" id="menu-tools-export">
+            <span>📤 Export Profiles (JSON)</span>
+            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+E</span>
+          </div>
+          <div class="dropdown-action" id="menu-tools-import">
+            <span>📥 Import Profiles (JSON)</span>
+            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+I</span>
+          </div>
         </div>
       </div>
 
@@ -2040,6 +2049,51 @@
         <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
           <button id="btn-master-config-cancel" class="btn">Cancel</button>
           <button id="btn-master-config-submit" class="btn btn-primary">⚡ Apply Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Clear Temporary Cache & Data Modal (#clear-cache-modal)                  -->
+  <!-- ========================================================================= -->
+  <div id="clear-cache-modal" class="modal-overlay" style="z-index: 9000;">
+    <div class="modal-card" style="width: 440px; max-width: 95vw;">
+      <div class="pref-modal-header">
+        <span class="modal-title">Purge Temporary Cache & Data</span>
+        <button id="btn-clear-cache-modal-close" class="btn btn-sm">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px;">
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin: 0;">
+          Select the temporary application data you wish to purge:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,0.15); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 12px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="chk-clear-remote-files" checked>
+            <strong>Local Remote-File Cache</strong>
+          </label>
+          <span style="font-size: 11px; color: hsl(var(--text-muted)); margin-left: 20px;">Cached copies of remote files opened in external editors.</span>
+
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; margin-top: 6px;">
+            <input type="checkbox" id="chk-clear-sessions">
+            <strong>Saved Workspace Sessions</strong>
+          </label>
+          <span style="font-size: 11px; color: hsl(var(--text-muted)); margin-left: 20px;">Workspace tab restoration state and folder navigation history.</span>
+
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; margin-top: 6px;">
+            <input type="checkbox" id="chk-clear-logs">
+            <strong>Console Diagnostics & Logs</strong>
+          </label>
+          <span style="font-size: 11px; color: hsl(var(--text-muted)); margin-left: 20px;">Cached runtime info/error entries shown in the bottom log console.</span>
+        </div>
+
+        <div id="clear-cache-modal-success" style="display: none; font-size: 11px; color: #34D399; font-weight: 600;">✓ Selected temporary data successfully purged!</div>
+
+        <div class="modal-footer" style="margin-top: 8px; padding-top: 14px; border-top: 1px solid hsl(var(--border-color));">
+          <button id="btn-clear-cache-modal-cancel" class="btn">Cancel</button>
+          <button id="btn-clear-cache-modal-submit" class="btn btn-primary">🧹 Purge Selected</button>
         </div>
       </div>
     </div>
