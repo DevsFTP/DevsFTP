@@ -633,9 +633,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const DEFAULT_PANEL_PREFS = {
     activeTab: 'tab-terminal',
     panels: {
-      'tab-terminal': { height: 320, collapsed: false },
+      'tab-terminal': { height: 200, collapsed: false },
       'tab-queue': { height: 200, collapsed: false },
-      'tab-logs': { height: 180, collapsed: false }
+      'tab-logs': { height: 200, collapsed: false }
     }
   };
 
