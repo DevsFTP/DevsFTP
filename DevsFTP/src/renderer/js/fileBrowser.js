@@ -1219,7 +1219,7 @@ window.FileBrowser = {
 
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 72px 24px; color: hsl(var(--text-secondary));">
+          <td colspan="4" style="text-align: center; padding: 80px 24px; color: hsl(var(--text-secondary));">
             <div style="margin-bottom: 20px; display: inline-flex; align-items: center; justify-content: center; width: 88px; height: 88px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); box-shadow: 0 0 32px rgba(16, 185, 129, 0.15);">
               <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 8px ${accentColor}50); display: block;">
                 <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
@@ -1230,24 +1230,10 @@ window.FileBrowser = {
               </svg>
             </div>
             <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 6px;">${this.escapeHTML(profileName)} Disconnected</div>
-            <div style="font-size: 12px; color: hsl(var(--text-muted)); max-width: 360px; margin: 0 auto 20px; line-height: 1.5;">The remote session is currently offline. Reconnect to resume file transfers and live remote editing.</div>
-            <button id="btn-reconnect-disconnected-view" class="btn btn-primary" style="padding: 8px 22px; font-weight: 700; font-size: 12px; background: #10B981; color: #052E16; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
-              ⚡ Reconnect Session
-            </button>
+            <div style="font-size: 12px; color: hsl(var(--text-muted)); max-width: 360px; margin: 0 auto; line-height: 1.5;">The remote session is currently offline.</div>
           </td>
         </tr>
       `;
-
-      setTimeout(() => {
-        const btn = tbody.querySelector('#btn-reconnect-disconnected-view');
-        if (btn) {
-          btn.addEventListener('click', () => {
-            if (window.SessionManager && activeSess.profile) {
-              window.SessionManager.connectProfile(activeSess.profile);
-            }
-          });
-        }
-      }, 50);
       return;
     }
 
