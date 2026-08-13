@@ -171,6 +171,10 @@ window.ConnectionDialog = {
     document.querySelectorAll('.swatch-btn').forEach(btn => {
       btn.classList.toggle('active', btn.getAttribute('data-color').toUpperCase() === hexColor.toUpperCase());
     });
+
+    if (window.DevsApp) {
+      window.DevsApp.applyWorkspaceIdentityAccent(hexColor);
+    }
   },
 
   openConnectionDialog() {
@@ -184,6 +188,11 @@ window.ConnectionDialog = {
     this.connModal = document.getElementById('connection-modal');
     if (this.connModal) {
       this.connModal.classList.remove('active');
+    }
+    if (window.SessionManager && window.DevsApp) {
+      const activeSess = window.SessionManager.getActiveSession();
+      const activeColor = activeSess && activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '#68a063';
+      window.DevsApp.applyWorkspaceIdentityAccent(activeColor);
     }
   },
 
