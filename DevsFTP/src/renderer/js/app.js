@@ -1228,34 +1228,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Show/hide SSH Terminal drawer tab based on protocol
-      // WebDAV and FTP do not support PTY terminal shells or tunneling
-      const termTab = document.querySelector('.drawer-tab[data-tab="tab-terminal"]');
-      if (termTab) {
-        const hasTerminal = profile.protocol === 'sftp';
-        termTab.style.display = hasTerminal ? '' : 'none';
-        // If terminal tab was active but protocol has no terminal, switch to queue tab
-        if (!hasTerminal) {
-          const activeTab = document.querySelector('.drawer-tab.active');
-          if (!activeTab || activeTab.getAttribute('data-tab') === 'tab-terminal') {
-            const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
-            if (queueTab) queueTab.click();
-          }
-        }
-      }
+      // Show/hide SSH Terminal and SSH Tunnels tabs based on protocol
+      // SFTP: show all tabs, default to SSH Terminal
+      // FTP/WebDAV/S3: hide SSH Terminal + SSH Tunnels, default to Transfers
+      const isSFTP = profile.protocol === 'sftp';
 
-      // Show/hide SSH Tunnels drawer tab based on protocol
+      const termTab = document.querySelector('.drawer-tab[data-tab="tab-terminal"]');
       const tunnelsTab = document.querySelector('.drawer-tab[data-tab="tab-tunnels"]');
-      if (tunnelsTab) {
-        const hasTunnels = profile.protocol === 'sftp';
-        tunnelsTab.style.display = hasTunnels ? '' : 'none';
-        if (!hasTunnels) {
-          const activeTab = document.querySelector('.drawer-tab.active');
-          if (activeTab && activeTab.getAttribute('data-tab') === 'tab-tunnels') {
-            const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
-            if (queueTab) queueTab.click();
-          }
-        }
+
+      if (termTab) termTab.style.display = isSFTP ? '' : 'none';
+      if (tunnelsTab) tunnelsTab.style.display = isSFTP ? '' : 'none';
+
+      if (isSFTP) {
+        // Default to SSH Terminal for SFTP connections
+        const sshTab = document.querySelector('.drawer-tab[data-tab="tab-terminal"]');
+        if (sshTab) sshTab.click();
+      } else {
+        // Default to Transfers for all other protocols
+        const queueTab = document.querySelector('.drawer-tab[data-tab="tab-queue"]');
+        if (queueTab) queueTab.click();
       }
 
     } catch (err) {

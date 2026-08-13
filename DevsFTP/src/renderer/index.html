@@ -210,11 +210,10 @@
       <div class="drawer-tab-bar">
         <div class="tab-group">
           <button class="drawer-tab active" data-tab="tab-terminal">🖥️ SSH Terminal</button>
-          <button class="drawer-tab" data-tab="tab-queue">📊 Transfer Queue <span id="queue-badge" class="tag-badge">0</span></button>
-          <button class="drawer-tab" data-tab="tab-schedules">⏰ Scheduled Jobs <span id="jobs-badge" class="tag-badge">0</span></button>
           <button class="drawer-tab" data-tab="tab-tunnels" id="drawer-tab-tunnels">🔀 SSH Tunnels <span id="tunnels-badge" class="tag-badge">0</span></button>
-          <button class="drawer-tab" data-tab="tab-logs">📜 Protocol Logs</button>
-          <button class="drawer-tab" data-tab="tab-editor-debug">🐞 Editor Debug</button>
+          <button class="drawer-tab" data-tab="tab-queue">📊 Transfers <span id="queue-badge" class="tag-badge">0</span></button>
+          <button class="drawer-tab" data-tab="tab-schedules">⏰ Scheduled <span id="jobs-badge" class="tag-badge">0</span></button>
+          <button class="drawer-tab" data-tab="tab-logs">📜 Logs</button>
         </div>
         <button id="btn-toggle-drawer" class="btn" style="padding: 2px 8px; font-size: 11px;">▼ Minimize</button>
       </div>
@@ -331,20 +330,6 @@
           </div>
           <div class="log-stream" id="log-container" style="flex: 1; overflow-y: auto;">
             <div class="log-entry info">[00:00:00] DevsFTP ready. Select a profile to initiate session.</div>
-          </div>
-        </div>
-
-        <!-- Live Editor Sync Debug Panel -->
-        <div class="drawer-panel" id="tab-editor-debug">
-          <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
-            <span style="font-size: 11px; font-weight: 700; color: #68a063;">🐞 Remote Editor & Live Save Diagnostic Console</span>
-            <div style="display: flex; gap: 6px;">
-              <button id="btn-copy-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">📋 Copy Debug Log</button>
-              <button id="btn-clear-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">Clear Debug Log</button>
-            </div>
-          </div>
-          <div class="log-stream" id="editor-debug-stream" style="flex: 1; overflow-y: auto; padding: 8px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; background: rgba(0,0,0,0.25);">
-            <div class="log-entry info" style="color: hsl(var(--text-muted));">[READY] Editor Debug panel ready. Double-click or edit a file to view real-time diagnostics.</div>
           </div>
         </div>
       </div>
