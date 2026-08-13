@@ -1215,27 +1215,39 @@ window.FileBrowser = {
 
     if (isDisconnected) {
       const profileName = activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server';
-      const accentColor = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '#10B981';
+      const accentColor = (activeSess.profile && activeSess.profile.accentColor) ? activeSess.profile.accentColor : '#10B981';
 
       tbody.innerHTML = `
         <tr>
-          <td colspan="4" style="text-align: center; padding: 96px 24px; color: hsl(var(--text-secondary));">
-            <div style="margin-bottom: 16px;">
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 4px 12px ${accentColor}40); display: inline-block;">
-                <line x1="2" y1="2" x2="22" y2="22" stroke="hsl(var(--destructive))" stroke-width="2.5"></line>
-                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5"></path>
-                <path d="M5 12.5a10.94 10.94 0 0 1 5.83-2.84"></path>
-                <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"></path>
-                <path d="M8.58 13.72a5 5 0 0 1 2.24-1.22"></path>
-                <path d="M13.18 12.5a5 5 0 0 1 2.24 1.22"></path>
-                <path d="M16.28 5.69A18.89 18.89 0 0 1 22 8"></path>
-                <path d="M2 8a18.89 18.89 0 0 1 7.72-2.31"></path>
+          <td colspan="4" style="text-align: center; padding: 72px 24px; color: hsl(var(--text-secondary));">
+            <div style="margin-bottom: 20px; display: inline-flex; align-items: center; justify-content: center; width: 88px; height: 88px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); box-shadow: 0 0 32px rgba(16, 185, 129, 0.15);">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 2px 8px ${accentColor}50); display: block;">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6" stroke-width="3"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18" stroke-width="3"></line>
+                <line x1="2" y1="2" x2="22" y2="22" stroke="#EF4444" stroke-width="2.5"></line>
               </svg>
             </div>
-            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary));">${profileName} Disconnected</div>
+            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary)); margin-bottom: 6px;">${this.escapeHTML(profileName)} Disconnected</div>
+            <div style="font-size: 12px; color: hsl(var(--text-muted)); max-width: 360px; margin: 0 auto 20px; line-height: 1.5;">The remote session is currently offline. Reconnect to resume file transfers and live remote editing.</div>
+            <button id="btn-reconnect-disconnected-view" class="btn btn-primary" style="padding: 8px 22px; font-weight: 700; font-size: 12px; background: #10B981; color: #052E16; border: none; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+              ⚡ Reconnect Session
+            </button>
           </td>
         </tr>
       `;
+
+      setTimeout(() => {
+        const btn = tbody.querySelector('#btn-reconnect-disconnected-view');
+        if (btn) {
+          btn.addEventListener('click', () => {
+            if (window.SessionManager && activeSess.profile) {
+              window.SessionManager.connectProfile(activeSess.profile);
+            }
+          });
+        }
+      }, 50);
       return;
     }
 
