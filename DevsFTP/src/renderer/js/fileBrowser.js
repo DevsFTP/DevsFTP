@@ -1222,7 +1222,7 @@ window.FileBrowser = {
             <div style="margin-bottom: 16px;">
               <img src="../../assets/branding/disconnected.png" width="80" height="80" style="display: inline-block; opacity: 0.85; object-fit: contain;" alt="Disconnected">
             </div>
-            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary));">${this.escapeHTML(profileName)} Disconnected</div>
+            <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary));">${profileName} Disconnected</div>
           </td>
         </tr>
       `;
