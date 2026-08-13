@@ -118,7 +118,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary-hex, #F59E0B);
+  background: var(--accent-primary-hex, #10B981);
   border-radius: 0;
 }
 
@@ -178,7 +178,7 @@ body {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background-color: var(--accent-primary-hex, #F59E0B);
+  background-color: var(--accent-primary-hex, #10B981);
   flex-shrink: 0;
 }
 
@@ -282,7 +282,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .dropdown-action:hover {
   background-color: hsl(var(--bg-hover));
-  color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
 }
 
 .dropdown-divider {
@@ -345,7 +345,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .session-tab.active {
   background-color: hsl(var(--bg-primary));
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
   color: hsl(var(--text-primary));
   font-weight: 600;
 }
@@ -430,7 +430,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .brand-logo:hover {
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
 }
 
 .brand-title {
@@ -542,8 +542,8 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .theme-toggle-btn:hover {
   background-color: hsl(var(--bg-hover));
-  border-color: var(--accent-primary-hex, #F59E0B);
-  color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #10B981);
 }
 
 /* Dual File Manager Workspace */
@@ -600,7 +600,7 @@ select option:hover, select option:focus, select option:active, select option:ch
   font-weight: 700;
   background-color: hsl(var(--bg-surface));
   border: 1px solid hsl(var(--border-color));
-  color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
 }
 
 .breadcrumb-bar {
@@ -629,7 +629,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .path-input:focus {
   background-color: hsl(var(--bg-primary));
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
   outline: none;
 }
 
@@ -713,7 +713,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 .file-row.selected {
   background-color: hsl(var(--bg-selected)) !important;
   color: hsl(var(--text-primary)) !important;
-  border-left: 4px solid var(--accent-primary-hex, #F59E0B) !important;
+  border-left: 4px solid var(--accent-primary-hex, #10B981) !important;
 }
 
 .file-name-cell {
@@ -744,7 +744,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .splitter-bar:hover, .splitter-bar.dragging {
-  background-color: var(--accent-primary-hex, #F59E0B);
+  background-color: var(--accent-primary-hex, #10B981);
 }
 
 /* Bottom Drawer (Terminal / Queue / Logs) */
@@ -787,8 +787,8 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .drawer-tab.active {
-  color: var(--accent-primary-hex, #F59E0B);
-  border-bottom-color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
+  border-bottom-color: var(--accent-primary-hex, #10B981);
   background-color: hsl(var(--bg-secondary));
 }
 
@@ -846,7 +846,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .progress-bar-fill {
   height: 100%;
-  background: var(--accent-primary-hex, #F59E0B);
+  background: var(--accent-primary-hex, #10B981);
   width: 0%;
   transition: width 0.2s ease;
 }
@@ -1101,7 +1101,7 @@ input[type="number"] {
 
 .profile-card-item.selected {
   background-color: hsl(var(--bg-secondary));
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
 }
 
 .profile-card-info {
@@ -1224,8 +1224,8 @@ input[type="number"] {
 
 .pref-nav-btn.active {
   background-color: hsl(var(--bg-surface));
-  color: var(--accent-primary-hex, #F59E0B);
-  border-left: 3px solid var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
+  border-left: 3px solid var(--accent-primary-hex, #10B981);
 }
 
 /* Right Content Area */
@@ -1328,7 +1328,7 @@ input[type="number"] {
 }
 
 .form-control:focus {
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
 }
 
 .modal-body {
@@ -1391,7 +1391,7 @@ input[type="number"] {
   justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
   background-color: hsl(var(--accent-primary) / 0.14);
   border: 1px solid hsl(var(--accent-primary) / 0.24);
 }
@@ -1456,7 +1456,7 @@ input[type="number"] {
 
 .upload-save-checkbox input[type="checkbox"] {
   margin-top: 2px;
-  accent-color: var(--accent-primary-hex, #F59E0B);
+  accent-color: var(--accent-primary-hex, #10B981);
 }
 
 .upload-save-checkbox-copy {
@@ -1503,7 +1503,7 @@ input[type="number"] {
 
 .context-menu-item:hover {
   background-color: hsl(var(--bg-hover));
-  color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
 }
 
 /* New Item Creation Modal & CHMOD Styling */
@@ -1594,12 +1594,12 @@ input[type="number"] {
 }
 
 .chmod-checkbox-label input[type="checkbox"]:hover {
-  border-color: var(--accent-primary-hex, #F59E0B);
+  border-color: var(--accent-primary-hex, #10B981);
 }
 
 .chmod-checkbox-label input[type="checkbox"]:checked {
-  background-color: var(--accent-primary-hex, #F59E0B);
-  border-color: var(--accent-primary-hex, #F59E0B);
+  background-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #10B981);
 }
 
 .chmod-checkbox-label input[type="checkbox"]:checked::before {
@@ -1627,7 +1627,7 @@ input[type="number"] {
 .chmod-octal-badge {
   background-color: hsl(var(--bg-surface));
   border: 1px solid hsl(var(--border-color));
-  color: var(--accent-primary-hex, #F59E0B);
+  color: var(--accent-primary-hex, #10B981);
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
@@ -1638,7 +1638,7 @@ input[type="number"] {
 
 /* Dual-Pane Drag & Drop Transfer Dropzone Highlight */
 .dropzone-active {
-  background-color: rgba(245, 158, 11, 0.05) !important;
+  background-color: rgba(16, 185, 129, 0.05) !important;
   position: relative;
 }
 
@@ -1648,7 +1648,7 @@ input[type="number"] {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--accent-primary-hex, #F59E0B);
+  background-color: var(--accent-primary-hex, #10B981);
   color: #000000;
   font-size: 11px;
   font-weight: 700;
@@ -1673,7 +1673,7 @@ input[type="number"] {
   background-color: rgba(96, 165, 250, 0.15) !important;
 }
 .diff-row-mismatch {
-  background-color: rgba(245, 158, 11, 0.15) !important;
+  background-color: rgba(16, 185, 129, 0.15) !important;
 }
 
 .diff-badge {
@@ -1713,9 +1713,9 @@ input[type="number"] {
 }
 
 .badge-size-mismatch {
-  background-color: rgba(245, 158, 11, 0.2);
+  background-color: rgba(16, 185, 129, 0.2);
   color: #FBBF24;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
 /* Transfer Queue Table Action Buttons */
@@ -1733,7 +1733,7 @@ input[type="number"] {
 
 .btn-qaction:hover {
   background-color: hsl(var(--bg-hover)) !important;
-  border-color: var(--accent-primary-hex, #F59E0B) !important;
+  border-color: var(--accent-primary-hex, #10B981) !important;
 }
 
 .btn-qaction.btn-qdanger:hover {

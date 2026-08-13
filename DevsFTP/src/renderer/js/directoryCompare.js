@@ -188,7 +188,7 @@ window.DirectoryCompare = {
     const btn = document.getElementById('btn-dir-compare');
     if (btn) {
       btn.classList.add('active');
-      btn.style.background = 'rgba(245, 158, 11, 0.2)';
+      btn.style.background = 'rgba(16, 185, 129, 0.2)';
     }
 
     if (window.FileBrowser) {
@@ -351,7 +351,7 @@ window.DirectoryCompare = {
             bg = 'rgba(14, 165, 233, 0.15)';
             fg = '#38BDF8';
           } else if (item.status === 'size_mismatch') {
-            bg = 'rgba(245, 158, 11, 0.15)';
+            bg = 'rgba(16, 185, 129, 0.15)';
             fg = '#FBBF24';
           }
 

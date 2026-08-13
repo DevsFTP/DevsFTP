@@ -495,11 +495,11 @@ window.TransferQueue = {
       fg = '#38BDF8';
       label = 'Verifying... 🔍';
     } else if (status === 'Waiting to Resume') {
-      bg = 'rgba(245, 158, 11, 0.25)';
+      bg = 'rgba(16, 185, 129, 0.25)';
       fg = '#FBBF24';
       label = 'Waiting to Resume ⏳';
     } else if (status === 'Paused') {
-      bg = 'rgba(245, 158, 11, 0.2)';
+      bg = 'rgba(16, 185, 129, 0.2)';
       fg = '#FBBF24';
     } else if (status === 'Cancelled' || status === 'Failed') {
       bg = 'rgba(239, 68, 68, 0.2)';
@@ -644,7 +644,7 @@ window.TransferQueue = {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
               <span class="progress-percent" style="font-size: 10px; color: hsl(var(--text-muted));">${item.percentage}%</span>
-              ${item.resumeOffset ? `<span style="font-size: 9px; color: var(--accent-primary-hex, #F59E0B); font-family: var(--font-mono);">Resumed ${this.formatBytes(item.resumeOffset)}</span>` : ''}
+              ${item.resumeOffset ? `<span style="font-size: 9px; color: var(--accent-primary-hex, #10B981); font-family: var(--font-mono);">Resumed ${this.formatBytes(item.resumeOffset)}</span>` : ''}
             </div>
           </td>
           <td class="speed-cell" style="font-family: var(--font-mono); font-size: 11px;">${item.speed}</td>

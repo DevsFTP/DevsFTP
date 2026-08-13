@@ -78,7 +78,7 @@ window.SessionManager = {
       name: 'Local Workspace',
       protocol: 'sftp',
       host: 'localhost',
-      accentColor: '#F59E0B',
+      accentColor: '#10B981',
       remotePath: '/',
       localPath: 'C:\\'
     };
@@ -96,7 +96,7 @@ window.SessionManager = {
       remotePath: profile.remotePath || '/',
       localPath: profile.localPath || defaultLocal,
       remoteFiles: [],
-      accentColor: profile.accentColor || '#F59E0B'
+      accentColor: profile.accentColor || '#10B981'
     };
 
     this.sessions.push(session);
@@ -249,7 +249,7 @@ window.SessionManager = {
       if (profile) {
         sess.profile = { ...profile };
         sess.profileId = profile.id;
-        sess.accentColor = profile.accentColor || '#F59E0B';
+        sess.accentColor = profile.accentColor || '#10B981';
       }
       if (sessionId === this.activeSessionId) {
         this.setActiveSession(sessionId);

@@ -407,7 +407,7 @@ window.ScheduledJobs = {
       bg = 'rgba(16, 185, 129, 0.2)';
       fg = '#34D399';
     } else if (status === 'Running') {
-      bg = 'rgba(245, 158, 11, 0.2)';
+      bg = 'rgba(16, 185, 129, 0.2)';
       fg = '#FBBF24';
     } else if (status === 'Failed') {
       bg = 'rgba(239, 68, 68, 0.2)';

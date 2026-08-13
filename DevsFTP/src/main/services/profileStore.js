@@ -123,7 +123,7 @@ class ProfileStore {
       const raw = fs.readFileSync(this.filePath, 'utf8');
       const data = JSON.parse(raw);
       return data.map(p => ({
-        accentColor: '#F59E0B',
+        accentColor: '#10B981',
         remotePath: '/',
         localPath: 'C:\\',
         ...p,

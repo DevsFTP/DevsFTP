@@ -1215,7 +1215,7 @@ window.FileBrowser = {
 
     if (isDisconnected) {
       const profileName = activeSess.profile ? (activeSess.profile.name || activeSess.profile.host) : 'Server';
-      const accentColor = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '#F59E0B';
+      const accentColor = activeSess.profile && activeSess.profile.accentColor ? activeSess.profile.accentColor : '#10B981';
 
       tbody.innerHTML = `
         <tr>

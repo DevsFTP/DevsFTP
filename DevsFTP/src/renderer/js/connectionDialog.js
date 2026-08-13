@@ -479,7 +479,7 @@ window.ConnectionDialog = {
       webdavPath: webdavPathVal,
       s3Bucket: s3BucketVal,
       s3Region: s3RegionVal,
-      accentColor: this.activeAccentColor || '#F59E0B',
+      accentColor: this.activeAccentColor || '#10B981',
       remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
       localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
       proxyType: pTypeEl ? pTypeEl.value : 'none',

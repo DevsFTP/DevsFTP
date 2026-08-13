@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('devsftp_pref_theme', next);
     } catch (e) {}
 
-    const activeAccent = html.style.getPropertyValue('--accent-primary-hex') || '#F59E0B';
+    const activeAccent = html.style.getPropertyValue('--accent-primary-hex') || '#10B981';
     if (window.SSHTerminal) {
       window.SSHTerminal.setTheme(next, activeAccent);
     }
