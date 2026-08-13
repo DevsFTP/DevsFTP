@@ -69,7 +69,7 @@ window.DevsApp = {
     }
 
     const hsl = this.hexToHsl(colorHex);
-    const hoverL = Math.min(100, hsl.l + 8);
+    const hoverL = Math.max(0, hsl.l - 6);
     const hoverHex = this.hslToHex(hsl.h, hsl.s, hoverL);
     const root = document.documentElement;
 
@@ -1261,33 +1261,34 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       const msg = err && err.message ? err.message : String(err);
       if (window.LogViewer) window.LogViewer.addEntry('error', `Connection error: ${msg}`);
-      if (!isAutoRestore) {
-        const errorModal = document.getElementById('connection-error-modal');
-        const errorBody = document.getElementById('conn-error-modal-body');
-        const errorDetails = document.getElementById('conn-error-host-details');
-        
-        if (errorModal && errorBody) {
-          errorBody.textContent = msg;
-          if (errorDetails) {
-            const proto = profile.protocol ? profile.protocol.toUpperCase() : 'SFTP';
-            errorDetails.textContent = `${proto}://` + (profile.host || '127.0.0.1') + (profile.port ? `:${profile.port}` : '');
-          }
-          errorModal.classList.add('active');
-          errorModal.setAttribute('aria-hidden', 'false');
-          
-          const dismiss = () => {
-            errorModal.classList.remove('active');
-            errorModal.setAttribute('aria-hidden', 'true');
-          };
-          
-          const btnOk = document.getElementById('btn-conn-error-ok');
-          const btnClose = document.getElementById('btn-conn-error-close');
-          if (btnOk) btnOk.onclick = dismiss;
-          if (btnClose) btnClose.onclick = dismiss;
-        } else {
-          alert(`Connection failed: ${msg}`);
+      
+      const errorModal = document.getElementById('connection-error-modal');
+      const errorBody = document.getElementById('conn-error-modal-body');
+      const errorDetails = document.getElementById('conn-error-host-details');
+      
+      if (errorModal && errorBody) {
+        errorBody.textContent = msg;
+        if (errorDetails) {
+          const proto = profile.protocol ? profile.protocol.toUpperCase() : 'SFTP';
+          errorDetails.textContent = `${proto}://` + (profile.host || '127.0.0.1') + (profile.port ? `:${profile.port}` : '');
         }
+        errorModal.classList.add('active');
+        errorModal.setAttribute('aria-hidden', 'false');
+        
+        const dismiss = () => {
+          errorModal.classList.remove('active');
+          errorModal.setAttribute('aria-hidden', 'true');
+        };
+        
+        const btnOk = document.getElementById('btn-conn-error-ok');
+        const btnClose = document.getElementById('btn-conn-error-close');
+        if (btnOk) btnOk.onclick = dismiss;
+        if (btnClose) btnClose.onclick = dismiss;
+      } else {
+        alert(`Connection failed: ${msg}`);
       }
+      
+      throw err;
     }
   };
 
