@@ -1,13 +1,18 @@
-# DevsFTP — The SFTP & FTP Client for Windows
+# DevsFTP — Cross-Platform Build Configuration
 appId: com.devsftp.app
 productName: DevsFTP
+copyright: Copyright © 2026 DevsFTP.com
+
 directories:
   output: dist
+
 files:
   - "src/**/*"
+  - "assets/**/*"
   - "package.json"
+
 win:
-  forceCodeSigning: false
+  icon: assets/icon.ico
   signAndEditExecutable: false
   target:
     - target: nsis
@@ -16,7 +21,10 @@ win:
     - target: portable
       arch:
         - x64
-  icon: assets/icon.ico
+    - target: dir
+      arch:
+        - x64
+
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -26,3 +34,19 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: DevsFTP
+
+linux:
+  icon: assets/branding/icon_512.png
+  category: Network
+  synopsis: DevsFTP — High-Performance SFTP & FTP Client
+  description: An FTP/SFTP client that works with you, not against you.
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+    - target: tar.gz
+      arch:
+        - x64

@@ -9,9 +9,9 @@
     "start": "electron .",
     "dev": "electron .",
     "test": "node --test tests/**/*.test.js",
-    "package:win": "electron-packager . DevsFTP --platform=win32 --arch=x64 --out=dist --overwrite",
-    "build:win": "node scripts/build_clean_exe.js",
-    "dist:win": "node scripts/build_clean_exe.js"
+    "build:win": "node scripts/build_win.js",
+    "build:linux": "node scripts/build_linux.js",
+    "build:all": "node scripts/build_win.js && node scripts/build_linux.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
@@ -32,6 +32,15 @@
   "build": {
     "appId": "com.devsftp.app",
     "productName": "DevsFTP",
+    "copyright": "Copyright © 2026 DevsFTP.com",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
     "win": {
       "icon": "assets/icon.ico",
       "signAndEditExecutable": false,
@@ -51,13 +60,15 @@
       "createStartMenuShortcut": true,
       "shortcutName": "DevsFTP"
     },
-    "files": [
-      "src/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "directories": {
-      "output": "dist"
+    "linux": {
+      "icon": "assets/branding/icon_512.png",
+      "category": "Network",
+      "synopsis": "DevsFTP — SFTP & FTP Client for Linux",
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ]
     }
   }
 }
