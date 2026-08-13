@@ -182,6 +182,9 @@ window.ConnectionDialog = {
     if (!this.connModal) return;
     this.connModal.classList.add('active');
     this.renderConnectionProfileList();
+    // Apply current accent so Connect button hover is correct from the moment the dialog opens
+    const initialColor = this.activeAccentColor || '#68a063';
+    if (window.DevsApp) window.DevsApp.applyWorkspaceIdentityAccent(initialColor);
   },
 
   closeConnectionDialog() {
@@ -717,20 +720,30 @@ window.ConnectionDialog = {
         return;
       }
 
+      // Determine whether to reuse the active idle session or create a new one
       let activeSession = window.SessionManager.getActiveSession();
+      let createdNewSession = false;
       if (!activeSession || activeSession.connectionState === 'connected') {
         activeSession = window.SessionManager.createSession(profile, false);
+        createdNewSession = true;
       } else {
         activeSession.profile = { ...profile };
         activeSession.profileId = profile.id;
         activeSession.accentColor = profile.accentColor || '#68a063';
         window.SessionManager.setActiveSession(activeSession.sessionId);
       }
+
       if (window.connectToProfileSession) {
         try {
           await window.connectToProfileSession(profile, activeSession.sessionId);
         } catch (err) {
-          console.error('Failed to initiate connection session:', err);
+          // Connection failed — roll back the tab if we created a new one
+          if (createdNewSession) {
+            window.SessionManager.closeSession(activeSession.sessionId);
+          } else {
+            // Revert the reused session back to disconnected state
+            window.SessionManager.updateSessionConnectionState(activeSession.sessionId, false);
+          }
           if (window.LogViewer) {
             window.LogViewer.addEntry('error', `Failed to start connection to ${profile.name || profile.host}: ${err.message || err}`);
           }
