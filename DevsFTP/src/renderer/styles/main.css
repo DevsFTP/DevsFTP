@@ -1638,7 +1638,7 @@ input[type="number"] {
 
 /* Dual-Pane Drag & Drop Transfer Dropzone Highlight */
 .dropzone-active {
-  background-color: rgba(16, 185, 129, 0.05) !important;
+  background-color: rgba(104, 160, 99, 0.05) !important;
   position: relative;
 }
 
@@ -1661,7 +1661,7 @@ input[type="number"] {
 
 /* Directory Comparison Visual Diff Styling */
 .diff-row-local-only {
-  background-color: rgba(16, 185, 129, 0.12) !important;
+  background-color: rgba(104, 160, 99, 0.12) !important;
 }
 .diff-row-remote-only {
   background-color: rgba(14, 165, 233, 0.12) !important;
@@ -1673,7 +1673,7 @@ input[type="number"] {
   background-color: rgba(96, 165, 250, 0.15) !important;
 }
 .diff-row-mismatch {
-  background-color: rgba(16, 185, 129, 0.15) !important;
+  background-color: rgba(104, 160, 99, 0.15) !important;
 }
 
 .diff-badge {
@@ -1689,9 +1689,9 @@ input[type="number"] {
 }
 
 .badge-local-only {
-  background-color: rgba(16, 185, 129, 0.2);
+  background-color: rgba(104, 160, 99, 0.2);
   color: #34D399;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1px solid rgba(104, 160, 99, 0.4);
 }
 
 .badge-remote-only {
@@ -1701,7 +1701,7 @@ input[type="number"] {
 }
 
 .badge-local-newer {
-  background-color: rgba(16, 185, 129, 0.25);
+  background-color: rgba(104, 160, 99, 0.25);
   color: #6EE7B7;
   border: 1px solid #68a063;
 }
@@ -1713,9 +1713,9 @@ input[type="number"] {
 }
 
 .badge-size-mismatch {
-  background-color: rgba(16, 185, 129, 0.2);
+  background-color: rgba(104, 160, 99, 0.2);
   color: #FBBF24;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  border: 1px solid rgba(104, 160, 99, 0.4);
 }
 
 /* Transfer Queue Table Action Buttons */
