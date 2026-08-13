@@ -1,51 +1,21 @@
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
+# Monorepo Build & Dependency Rules
+**/node_modules/
+**/dist/
+**/build/
+**/out/
+**/devsftp-debug.log
+**/package-lock.json
 
-# Build & Packaging Outputs
-dist/
-DevsWWW/
-BACK UP/
-build/
-out/
-Do not touch/
-www/
-*.exe
-*.app
-*.dmg
-*.deb
-*.snap
-
-# Runtime Data & Debug Logs
-devsftp-debug.log
-.devs_userData/
+# Logs & Temporary Files
 *.log
+.devs_userData/
+DevsWWW/
 
 # OS Generated Files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 [Dd]esktop.ini
 
-# IDE & Editor Files
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.swp
-
-# Environment & Master Key Overrides
+# Environment Files
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local

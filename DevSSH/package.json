@@ -1,0 +1,20 @@
+{
+  "name": "devssh",
+  "version": "1.0.0",
+  "description": "DevSSH — Standalone High-Performance SSH Terminal for Windows & Linux",
+  "main": "src/main/main.js",
+  "author": "DevsFTP Development Team",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "electron": "^34.5.8"
+  }
+}
