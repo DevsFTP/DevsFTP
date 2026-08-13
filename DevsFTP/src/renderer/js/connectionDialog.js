@@ -737,13 +737,6 @@ window.ConnectionDialog = {
         try {
           await window.connectToProfileSession(profile, activeSession.sessionId);
         } catch (err) {
-          // Connection failed — roll back the tab if we created a new one
-          if (createdNewSession) {
-            window.SessionManager.closeSession(activeSession.sessionId);
-          } else {
-            // Revert the reused session back to disconnected state
-            window.SessionManager.updateSessionConnectionState(activeSession.sessionId, false);
-          }
           if (window.LogViewer) {
             window.LogViewer.addEntry('error', `Failed to start connection to ${profile.name || profile.host}: ${err.message || err}`);
           }

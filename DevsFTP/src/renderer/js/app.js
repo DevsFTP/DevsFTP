@@ -1278,6 +1278,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const dismiss = () => {
           errorModal.classList.remove('active');
           errorModal.setAttribute('aria-hidden', 'true');
+          // Close the failed session tab now that user acknowledged the error
+          if (window.SessionManager && targetSessionId) {
+            window.SessionManager.closeSession(targetSessionId);
+          }
         };
         
         const btnOk = document.getElementById('btn-conn-error-ok');
