@@ -1262,7 +1262,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const msg = err && err.message ? err.message : String(err);
       if (window.LogViewer) window.LogViewer.addEntry('error', `Connection error: ${msg}`);
       if (!isAutoRestore) {
-        alert(`Connection failed: ${msg}`);
+        const errorModal = document.getElementById('connection-error-modal');
+        const errorBody = document.getElementById('conn-error-modal-body');
+        const errorDetails = document.getElementById('conn-error-host-details');
+        
+        if (errorModal && errorBody) {
+          errorBody.textContent = msg;
+          if (errorDetails) {
+            const proto = profile.protocol ? profile.protocol.toUpperCase() : 'SFTP';
+            errorDetails.textContent = `${proto}://` + (profile.host || '127.0.0.1') + (profile.port ? `:${profile.port}` : '');
+          }
+          errorModal.classList.add('active');
+          errorModal.setAttribute('aria-hidden', 'false');
+          
+          const dismiss = () => {
+            errorModal.classList.remove('active');
+            errorModal.setAttribute('aria-hidden', 'true');
+          };
+          
+          const btnOk = document.getElementById('btn-conn-error-ok');
+          const btnClose = document.getElementById('btn-conn-error-close');
+          if (btnOk) btnOk.onclick = dismiss;
+          if (btnClose) btnClose.onclick = dismiss;
+        } else {
+          alert(`Connection failed: ${msg}`);
+        }
       }
     }
   };
