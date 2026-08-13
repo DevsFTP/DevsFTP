@@ -8,7 +8,7 @@ window.ConnectionDialog = {
   modal: null,
   connModal: null,
   activeProfileId: null,
-  activeAccentColor: '#10B981',
+  activeAccentColor: '#68a063',
   selectedConnectionProfile: null,
 
   getApi() {
@@ -218,7 +218,7 @@ window.ConnectionDialog = {
       profiles.forEach(p => {
         const item = document.createElement('div');
         item.className = `profile-card-item ${p.id === this.activeProfileId ? 'selected' : ''}`;
-        const hex = p.accentColor || '#10B981';
+        const hex = p.accentColor || '#68a063';
         const proto = (p.protocol || 'sftp').toUpperCase();
 
         item.innerHTML = `
@@ -292,7 +292,7 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = profile.proxyUsername || '';
     if (pPassEl) pPassEl.value = profile.proxyPassword || '';
 
-    this.setIdentityColor(profile.accentColor || '#10B981');
+    this.setIdentityColor(profile.accentColor || '#68a063');
 
     this.updateFormLabels(profile.protocol || 'sftp', profile.authType || 'password');
 
@@ -338,7 +338,7 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = '';
     if (pPassEl) pPassEl.value = '';
 
-    this.setIdentityColor('#10B981');
+    this.setIdentityColor('#68a063');
 
     this.updateFormLabels('sftp', 'password');
 
@@ -479,7 +479,7 @@ window.ConnectionDialog = {
       webdavPath: webdavPathVal,
       s3Bucket: s3BucketVal,
       s3Region: s3RegionVal,
-      accentColor: this.activeAccentColor || '#10B981',
+      accentColor: this.activeAccentColor || '#68a063',
       remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
       localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
       proxyType: pTypeEl ? pTypeEl.value : 'none',
@@ -569,7 +569,7 @@ window.ConnectionDialog = {
         badgeEl.textContent = 'ERROR';
       } else {
         badgeEl.style.background = 'rgba(16, 185, 129, 0.15)';
-        badgeEl.style.border = '1px solid #10B981';
+        badgeEl.style.border = '1px solid #68a063';
         badgeEl.style.color = '#6EE7B7';
         badgeEl.textContent = 'SUCCESS';
       }
@@ -658,7 +658,7 @@ window.ConnectionDialog = {
         password: finalPassword,
         privateKeyPath: document.getElementById('prof-keypath').value,
         webdavPath: webdavPathVal,
-        accentColor: this.activeAccentColor || '#10B981',
+        accentColor: this.activeAccentColor || '#68a063',
         remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
         localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
         proxyType: pTypeEl ? pTypeEl.value : 'none',
@@ -714,7 +714,7 @@ window.ConnectionDialog = {
       } else {
         activeSession.profile = { ...profile };
         activeSession.profileId = profile.id;
-        activeSession.accentColor = profile.accentColor || '#10B981';
+        activeSession.accentColor = profile.accentColor || '#68a063';
         window.SessionManager.setActiveSession(activeSession.sessionId);
       }
       if (window.connectToProfileSession) {

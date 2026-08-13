@@ -644,7 +644,7 @@ window.TransferQueue = {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
               <span class="progress-percent" style="font-size: 10px; color: hsl(var(--text-muted));">${item.percentage}%</span>
-              ${item.resumeOffset ? `<span style="font-size: 9px; color: var(--accent-primary-hex, #10B981); font-family: var(--font-mono);">Resumed ${this.formatBytes(item.resumeOffset)}</span>` : ''}
+              ${item.resumeOffset ? `<span style="font-size: 9px; color: var(--accent-primary-hex, #68a063); font-family: var(--font-mono);">Resumed ${this.formatBytes(item.resumeOffset)}</span>` : ''}
             </div>
           </td>
           <td class="speed-cell" style="font-family: var(--font-mono); font-size: 11px;">${item.speed}</td>

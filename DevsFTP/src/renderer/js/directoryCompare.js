@@ -205,7 +205,7 @@ window.DirectoryCompare = {
     const textEl = document.getElementById('dir-compare-text');
     if (textEl) {
       if (this.summary.diffCount === 0) {
-        textEl.innerHTML = `<strong style="color: #10B981;">✓ Identical Directories!</strong> No file size or timestamp differences detected.`;
+        textEl.innerHTML = `<strong style="color: #68a063;">✓ Identical Directories!</strong> No file size or timestamp differences detected.`;
       } else {
         textEl.innerHTML = `<strong style="color: #F59E0B;">🔍 ${this.summary.diffCount} Difference(s) Found:</strong> ` +
           `<span style="color: #34D399; margin-left: 6px;">Local Only/Newer: ${this.summary.localOnlyCount + this.summary.localNewerCount}</span> | ` +
@@ -322,7 +322,7 @@ window.DirectoryCompare = {
         </div>
         <div class="detail-item" style="padding: 10px 12px; text-align: center;">
           <span class="detail-label">Identical</span>
-          <span class="detail-value" style="font-size: 16px; font-weight: 700; color: #10B981;">${identicalCount}</span>
+          <span class="detail-value" style="font-size: 16px; font-weight: 700; color: #68a063;">${identicalCount}</span>
         </div>
       `;
     }

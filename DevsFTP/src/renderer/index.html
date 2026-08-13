@@ -54,7 +54,7 @@
           <div class="dropdown-action" id="menu-help-about">ℹ️ About DevsFTP</div>
         </div>
       </div>
-      <button id="btn-top-update-available" class="btn" style="display: none; margin-left: auto; padding: 3px 10px; font-size: 11px; font-weight: 700; background: var(--accent-primary-hex, #10B981); color: #052E16; border-radius: 4px; border: none; cursor: pointer; transition: transform 0.15s ease;" title="New DevsFTP release available! Click to view update details.">🚀 Update Available</button>
+      <button id="btn-top-update-available" class="btn" style="display: none; margin-left: auto; padding: 3px 10px; font-size: 11px; font-weight: 700; background: var(--accent-primary-hex, #68a063); color: #052E16; border-radius: 4px; border: none; cursor: pointer; transition: transform 0.15s ease;" title="New DevsFTP release available! Click to view update details.">🚀 Update Available</button>
     </nav>
 
     <!-- Top Header Navigation & Quick Connection Toolbar -->
@@ -337,7 +337,7 @@
         <!-- Live Editor Sync Debug Panel -->
         <div class="drawer-panel" id="tab-editor-debug">
           <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
-            <span style="font-size: 11px; font-weight: 700; color: #10B981;">🐞 Remote Editor & Live Save Diagnostic Console</span>
+            <span style="font-size: 11px; font-weight: 700; color: #68a063;">🐞 Remote Editor & Live Save Diagnostic Console</span>
             <div style="display: flex; gap: 6px;">
               <button id="btn-copy-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">📋 Copy Debug Log</button>
               <button id="btn-clear-editor-debug" class="btn" style="padding: 2px 8px; font-size: 10px;">Clear Debug Log</button>
@@ -445,7 +445,7 @@
 
           <div class="detail-item" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 14px;">
             <span class="detail-label">Calculated Octal Mode</span>
-            <span class="detail-value" id="chmod-octal-val" style="color: var(--accent-primary-hex, #10B981); font-size: 15px; font-family: var(--font-mono);">0755</span>
+            <span class="detail-value" id="chmod-octal-val" style="color: var(--accent-primary-hex, #68a063); font-size: 15px; font-family: var(--font-mono);">0755</span>
           </div>
         </div>
 
@@ -512,7 +512,7 @@
 
           <div class="detail-item" style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 14px;">
             <span class="detail-label">Calculated Octal Mode</span>
-            <span class="detail-value" id="chmod-edit-octal-val" style="color: var(--accent-primary-hex, #10B981); font-size: 15px; font-family: var(--font-mono);">0755</span>
+            <span class="detail-value" id="chmod-edit-octal-val" style="color: var(--accent-primary-hex, #68a063); font-size: 15px; font-family: var(--font-mono);">0755</span>
           </div>
         </div>
 
@@ -536,7 +536,7 @@
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Attempted Target</span>
-          <span class="detail-value" id="error-modal-target" style="font-size: 12px; word-break: break-all; color: var(--accent-primary-hex, #10B981); font-family: var(--font-mono); font-weight: 600;">C:\file.ext</span>
+          <span class="detail-value" id="error-modal-target" style="font-size: 12px; word-break: break-all; color: var(--accent-primary-hex, #68a063); font-family: var(--font-mono); font-weight: 600;">C:\file.ext</span>
         </div>
 
         <div class="detail-item" style="padding: 10px 14px;">
@@ -571,7 +571,7 @@
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Profile</span>
-          <span class="detail-value" id="delete-modal-profile-name" style="font-size: 13px; color: var(--accent-primary-hex, #10B981); font-weight: 700;">Profile Name</span>
+          <span class="detail-value" id="delete-modal-profile-name" style="font-size: 13px; color: var(--accent-primary-hex, #68a063); font-weight: 700;">Profile Name</span>
         </div>
 
         <div class="detail-item" style="padding: 10px 14px;">
@@ -629,7 +629,7 @@
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Path</span>
-          <span class="detail-value" id="confirm-delete-modal-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: var(--accent-primary-hex, #10B981);">/path/to/item</span>
+          <span class="detail-value" id="confirm-delete-modal-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: var(--accent-primary-hex, #68a063);">/path/to/item</span>
         </div>
 
         <div class="detail-item" style="padding: 10px 14px;">
@@ -814,7 +814,7 @@
         <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 12px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
           <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Job Name:</span> <strong id="del-job-val-name" style="color: hsl(var(--text-primary));">Scheduled Job</strong></div>
           <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Target Profile:</span> <span id="del-job-val-profile" style="font-family: var(--font-mono);">Profile</span></div>
-          <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Frequency:</span> <span id="del-job-val-freq" style="color: var(--accent-primary-hex, #10B981); font-weight: 600;">Startup</span></div>
+          <div style="display: flex; justify-content: space-between;"><span style="color: hsl(var(--text-muted));">Frequency:</span> <span id="del-job-val-freq" style="color: var(--accent-primary-hex, #68a063); font-weight: 600;">Startup</span></div>
         </div>
 
         <div class="modal-footer">
@@ -903,7 +903,7 @@
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Tunnel Rule</span>
-          <span class="detail-value" id="delete-tunnel-modal-name" style="font-size: 13px; color: var(--accent-primary-hex, #10B981); font-weight: 700;">Rule Name</span>
+          <span class="detail-value" id="delete-tunnel-modal-name" style="font-size: 13px; color: var(--accent-primary-hex, #68a063); font-weight: 700;">Rule Name</span>
         </div>
 
         <div class="detail-item" style="padding: 10px 14px;">
@@ -1130,7 +1130,7 @@
             <div class="form-group">
               <label class="form-label">Workspace Identity Accent Color</label>
               <div class="swatch-palette" id="swatch-palette">
-                <button type="button" class="swatch-btn active" data-color="#10B981" title="Brand Emerald (Default)" style="background-color: #10B981;"></button>
+                <button type="button" class="swatch-btn active" data-color="#68a063" title="Brand Green (Default)" style="background-color: #68a063;"></button>
                 <button type="button" class="swatch-btn" data-color="#4e8b49" title="Forest Green" style="background-color: #4e8b49;"></button>
                 <button type="button" class="swatch-btn" data-color="#ff8a2a" title="Orange" style="background-color: #ff8a2a;"></button>
                 <button type="button" class="swatch-btn" data-color="#f26a21" title="Deep Orange" style="background-color: #f26a21;"></button>
@@ -1154,7 +1154,7 @@
 
             <!-- Proxy & Bastion Host Settings (Standard Visible Section) -->
             <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 12px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
-              <span style="font-size: 11px; font-weight: 700; color: var(--accent-primary-hex, #10B981); text-transform: uppercase; letter-spacing: 0.5px;">🛡️ Proxy & Bastion Host Settings (Optional)</span>
+              <span style="font-size: 11px; font-weight: 700; color: var(--accent-primary-hex, #68a063); text-transform: uppercase; letter-spacing: 0.5px;">🛡️ Proxy & Bastion Host Settings (Optional)</span>
 
               <div class="form-row-grid-2">
                 <div class="form-group" style="min-width: 0;">
@@ -1379,7 +1379,7 @@
 
               <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
                 <button id="btn-clear-saved-sessions" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Saved Sessions Storage</button>
-                <span id="clear-sessions-msg" style="font-size: 11px; color: #10B981; display: none; font-weight: 600;">✓ Saved session storage cleared!</span>
+                <span id="clear-sessions-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Saved session storage cleared!</span>
               </div>
             </div>
 
@@ -1654,7 +1654,7 @@
 
               <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
                 <button id="btn-tools-cache-clear" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
-                <span id="clear-cache-msg" style="font-size: 11px; color: #10B981; display: none; font-weight: 600;">✓ Local file cache cleared!</span>
+                <span id="clear-cache-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Local file cache cleared!</span>
               </div>
             </div>
 
@@ -1691,7 +1691,7 @@
               </div>
               <div>
                 <h2 style="font-size: 22px; font-weight: 700; margin-top: 4px;">DevsFTP</h2>
-                <p style="font-size: 13px; color: var(--accent-primary-hex, #10B981); font-weight: 600; margin-top: 2px;">v1.0.0 (Production Release)</p>
+                <p style="font-size: 13px; color: var(--accent-primary-hex, #68a063); font-weight: 600; margin-top: 2px;">v1.0.0 (Production Release)</p>
               </div>
 
               <p style="font-size: 12px; color: hsl(var(--text-secondary)); max-width: 440px; margin: 0 auto; line-height: 1.5;">
@@ -1795,7 +1795,7 @@
         </div>
 
         <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="btn-update-modal-download" class="btn btn-primary" style="padding: 8px 20px; font-size: 12px; font-weight: 700; background: #10B981; color: #052E16; border: none;">🌐 Download Update from DevsFTP.com</button>
+          <button id="btn-update-modal-download" class="btn btn-primary" style="padding: 8px 20px; font-size: 12px; font-weight: 700; background: #68a063; color: #052E16; border: none;">🌐 Download Update from DevsFTP.com</button>
           <button id="btn-update-modal-dismiss" class="btn" style="padding: 8px 16px; font-size: 12px;">Dismiss</button>
         </div>
       </div>
@@ -1910,7 +1910,7 @@
             <div id="conflict-src-mtime" style="color: hsl(var(--text-muted));">Modified: -</div>
           </div>
           <div>
-            <div style="font-weight: 700; color: #10B981; margin-bottom: 4px;">Existing Destination File</div>
+            <div style="font-weight: 700; color: #68a063; margin-bottom: 4px;">Existing Destination File</div>
             <div id="conflict-dst-name" style="font-weight: 600; color: hsl(var(--text-primary));">file.txt</div>
             <div id="conflict-dst-size" style="color: hsl(var(--text-muted));">Size: 0 B</div>
             <div id="conflict-dst-mtime" style="color: hsl(var(--text-muted));">Modified: -</div>

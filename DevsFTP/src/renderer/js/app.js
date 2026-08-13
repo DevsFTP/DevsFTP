@@ -172,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cachedUpdateData = res;
         if (topUpdateBtn) topUpdateBtn.style.display = 'inline-block';
         if (statusEl) {
-          statusEl.style.color = '#10B981';
+          statusEl.style.color = '#68a063';
           statusEl.innerHTML = `🎉 Update available: DevsFTP v${res.latestVersion}! <a href="#" class="link-download-update-action" style="color: #38BDF8; text-decoration: underline;">View Update Details</a>`;
           const link = statusEl.querySelector('.link-download-update-action');
           if (link) link.onclick = (e) => { e.preventDefault(); window.UpdateModal.open(res); };
@@ -787,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('devsftp_pref_theme', next);
     } catch (e) {}
 
-    const activeAccent = html.style.getPropertyValue('--accent-primary-hex') || '#10B981';
+    const activeAccent = html.style.getPropertyValue('--accent-primary-hex') || '#68a063';
     if (window.SSHTerminal) {
       window.SSHTerminal.setTheme(next, activeAccent);
     }

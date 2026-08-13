@@ -33,7 +33,7 @@ window.SSHTerminal = {
       theme: {
         background: '#111315',
         foreground: '#E6E6E6',
-        cursor: '#10B981',
+        cursor: '#68a063',
         selectionBackground: 'rgba(255, 255, 255, 0.2)'
       }
     });
@@ -116,7 +116,7 @@ window.SSHTerminal = {
     const isLight = themeMode === 'light';
     const bg = isLight ? '#ffffff' : '#111315';
     const fg = isLight ? '#0f172a' : '#E6E6E6';
-    const cursor = accentHex || '#10B981';
+    const cursor = accentHex || '#68a063';
     const selection = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.2)';
 
     this.term.options.theme = {

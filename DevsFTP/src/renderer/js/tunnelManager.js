@@ -155,7 +155,7 @@ window.TunnelManager = {
         const profileName = r.profileConfig ? r.profileConfig.name || r.profileConfig.host : 'SSH Host';
 
         const statusBadge = t.status === 'active' 
-          ? '<span style="background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid #10B981; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;">● ACTIVE</span>'
+          ? '<span style="background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid #68a063; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;">● ACTIVE</span>'
           : '<span style="background: rgba(239,68,68,0.15); color: #FCA5A5; border: 1px solid #EF4444; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700;">STOPPED</span>';
 
         const startStopBtn = t.status === 'active'

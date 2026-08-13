@@ -82,12 +82,12 @@
 }
 
 .devsftp-logo-svg .logo-node-accent {
-  stroke: var(--active-profile-color, var(--accent-primary-hex, #68A063));
+  stroke: var(--active-profile-color, var(--accent-primary-hex, #68a063));
   transition: stroke 0.25s ease;
 }
 
 .devsftp-logo-svg .logo-node-accent-fill {
-  fill: var(--active-profile-color, var(--accent-primary-hex, #68A063));
+  fill: var(--active-profile-color, var(--accent-primary-hex, #68a063));
   transition: fill 0.25s ease;
 }
 
@@ -118,7 +118,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary-hex, #10B981);
+  background: var(--accent-primary-hex, #68a063);
   border-radius: 0;
 }
 
@@ -178,7 +178,7 @@ body {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background-color: var(--accent-primary-hex, #10B981);
+  background-color: var(--accent-primary-hex, #68a063);
   flex-shrink: 0;
 }
 
@@ -282,7 +282,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .dropdown-action:hover {
   background-color: hsl(var(--bg-hover));
-  color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
 }
 
 .dropdown-divider {
@@ -345,7 +345,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .session-tab.active {
   background-color: hsl(var(--bg-primary));
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
   color: hsl(var(--text-primary));
   font-weight: 600;
 }
@@ -430,7 +430,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .brand-logo:hover {
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
 }
 
 .brand-title {
@@ -542,8 +542,8 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .theme-toggle-btn:hover {
   background-color: hsl(var(--bg-hover));
-  border-color: var(--accent-primary-hex, #10B981);
-  color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
+  color: var(--accent-primary-hex, #68a063);
 }
 
 /* Dual File Manager Workspace */
@@ -600,7 +600,7 @@ select option:hover, select option:focus, select option:active, select option:ch
   font-weight: 700;
   background-color: hsl(var(--bg-surface));
   border: 1px solid hsl(var(--border-color));
-  color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
 }
 
 .breadcrumb-bar {
@@ -629,7 +629,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .path-input:focus {
   background-color: hsl(var(--bg-primary));
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
   outline: none;
 }
 
@@ -713,7 +713,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 .file-row.selected {
   background-color: hsl(var(--bg-selected)) !important;
   color: hsl(var(--text-primary)) !important;
-  border-left: 4px solid var(--accent-primary-hex, #10B981) !important;
+  border-left: 4px solid var(--accent-primary-hex, #68a063) !important;
 }
 
 .file-name-cell {
@@ -744,7 +744,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .splitter-bar:hover, .splitter-bar.dragging {
-  background-color: var(--accent-primary-hex, #10B981);
+  background-color: var(--accent-primary-hex, #68a063);
 }
 
 /* Bottom Drawer (Terminal / Queue / Logs) */
@@ -787,8 +787,8 @@ select option:hover, select option:focus, select option:active, select option:ch
 }
 
 .drawer-tab.active {
-  color: var(--accent-primary-hex, #10B981);
-  border-bottom-color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
+  border-bottom-color: var(--accent-primary-hex, #68a063);
   background-color: hsl(var(--bg-secondary));
 }
 
@@ -846,7 +846,7 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 .progress-bar-fill {
   height: 100%;
-  background: var(--accent-primary-hex, #10B981);
+  background: var(--accent-primary-hex, #68a063);
   width: 0%;
   transition: width 0.2s ease;
 }
@@ -1101,7 +1101,7 @@ input[type="number"] {
 
 .profile-card-item.selected {
   background-color: hsl(var(--bg-secondary));
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
 }
 
 .profile-card-info {
@@ -1224,8 +1224,8 @@ input[type="number"] {
 
 .pref-nav-btn.active {
   background-color: hsl(var(--bg-surface));
-  color: var(--accent-primary-hex, #10B981);
-  border-left: 3px solid var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
+  border-left: 3px solid var(--accent-primary-hex, #68a063);
 }
 
 /* Right Content Area */
@@ -1328,7 +1328,7 @@ input[type="number"] {
 }
 
 .form-control:focus {
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
 }
 
 .modal-body {
@@ -1391,7 +1391,7 @@ input[type="number"] {
   justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
   background-color: hsl(var(--accent-primary) / 0.14);
   border: 1px solid hsl(var(--accent-primary) / 0.24);
 }
@@ -1456,7 +1456,7 @@ input[type="number"] {
 
 .upload-save-checkbox input[type="checkbox"] {
   margin-top: 2px;
-  accent-color: var(--accent-primary-hex, #10B981);
+  accent-color: var(--accent-primary-hex, #68a063);
 }
 
 .upload-save-checkbox-copy {
@@ -1503,7 +1503,7 @@ input[type="number"] {
 
 .context-menu-item:hover {
   background-color: hsl(var(--bg-hover));
-  color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
 }
 
 /* New Item Creation Modal & CHMOD Styling */
@@ -1594,12 +1594,12 @@ input[type="number"] {
 }
 
 .chmod-checkbox-label input[type="checkbox"]:hover {
-  border-color: var(--accent-primary-hex, #10B981);
+  border-color: var(--accent-primary-hex, #68a063);
 }
 
 .chmod-checkbox-label input[type="checkbox"]:checked {
-  background-color: var(--accent-primary-hex, #10B981);
-  border-color: var(--accent-primary-hex, #10B981);
+  background-color: var(--accent-primary-hex, #68a063);
+  border-color: var(--accent-primary-hex, #68a063);
 }
 
 .chmod-checkbox-label input[type="checkbox"]:checked::before {
@@ -1627,7 +1627,7 @@ input[type="number"] {
 .chmod-octal-badge {
   background-color: hsl(var(--bg-surface));
   border: 1px solid hsl(var(--border-color));
-  color: var(--accent-primary-hex, #10B981);
+  color: var(--accent-primary-hex, #68a063);
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
@@ -1648,7 +1648,7 @@ input[type="number"] {
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: var(--accent-primary-hex, #10B981);
+  background-color: var(--accent-primary-hex, #68a063);
   color: #000000;
   font-size: 11px;
   font-weight: 700;
@@ -1703,7 +1703,7 @@ input[type="number"] {
 .badge-local-newer {
   background-color: rgba(16, 185, 129, 0.25);
   color: #6EE7B7;
-  border: 1px solid #10B981;
+  border: 1px solid #68a063;
 }
 
 .badge-remote-newer {
@@ -1733,7 +1733,7 @@ input[type="number"] {
 
 .btn-qaction:hover {
   background-color: hsl(var(--bg-hover)) !important;
-  border-color: var(--accent-primary-hex, #10B981) !important;
+  border-color: var(--accent-primary-hex, #68a063) !important;
 }
 
 .btn-qaction.btn-qdanger:hover {

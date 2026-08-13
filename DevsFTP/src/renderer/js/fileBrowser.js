@@ -1220,13 +1220,7 @@ window.FileBrowser = {
         <tr>
           <td colspan="4" style="text-align: center; padding: 80px 24px; color: hsl(var(--text-secondary));">
             <div style="margin-bottom: 16px;">
-              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--text-muted))" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; opacity: 0.85;">
-                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-                <line x1="6" y1="6" x2="6.01" y2="6" stroke-width="3"></line>
-                <line x1="6" y1="18" x2="6.01" y2="18" stroke-width="3"></line>
-                <line x1="2" y1="2" x2="22" y2="22" stroke="#EF4444" stroke-width="2.5"></line>
-              </svg>
+              <img src="../../assets/branding/disconnected.png" width="80" height="80" style="display: inline-block; opacity: 0.85; object-fit: contain;" alt="Disconnected">
             </div>
             <div style="font-size: 16px; font-weight: 700; color: hsl(var(--text-primary));">${this.escapeHTML(profileName)} Disconnected</div>
           </td>
