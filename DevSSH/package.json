@@ -7,7 +7,8 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "build": "electron-builder --win"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

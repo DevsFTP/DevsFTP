@@ -3,21 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DevSSH — Terminal</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background-color: #0F172A; color: #F8FAFC; font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-    .header { height: 42px; background: #1E293B; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
-    .title { font-size: 13px; font-weight: 700; color: #38BDF8; display: flex; align-items: center; gap: 8px; }
-    .terminal-container { flex: 1; padding: 16px; display: flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 14px; }
-  </style>
+  <title>DevSSH — Standalone High-Performance SSH Terminal</title>
+  <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
+  <link rel="stylesheet" href="css/style.css">
+  <script src="../../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
 </head>
 <body>
-  <div class="header">
-    <span class="title">⚡ DevSSH Console</span>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Dev<span>SSH</span>
+        </div>
+        <button class="icon-btn" id="btn-settings-vault" title="Master Password Vault Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab-btn active" id="tab-profiles">Profiles</button>
+        <button class="sidebar-tab-btn" id="tab-tunnels">Tunnels</button>
+      </div>
+
+      <div class="sidebar-content">
+        <!-- Profiles Section -->
+        <div class="panel-section active" id="section-profiles">
+          <div class="profiles-list" id="profiles-list-container">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Tunnels Section -->
+        <div class="panel-section" id="section-tunnels">
+          <div class="profiles-list" id="tunnels-list-container">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn primary" id="btn-new-profile">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Profile
+        </button>
+        <button class="btn" id="btn-import-config" title="Import ~/.ssh/config or key backup">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Import
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-area">
+      <!-- Session Tab Bar -->
+      <div class="tab-bar" id="session-tabs-container">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="tab-content-container" id="terminal-sessions-container">
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <h2>No Active SSH Sessions</h2>
+          <p>Select a saved profile from the sidebar to connect, or click "Add Profile" to configure a new host connection.</p>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="terminal-container">
-    <p>DevSSH Terminal Engine Initializing...</p>
+
+  <!-- Profile Configuration Drawer -->
+  <div class="drawer" id="profile-drawer">
+    <div class="drawer-header">
+      <h3 id="profile-drawer-title">Add Connection Profile</h3>
+      <button class="icon-btn" id="btn-close-profile-drawer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-content">
+      <form id="profile-form">
+        <input type="hidden" id="field-profile-id" value="">
+        <div class="form-group">
+          <label for="field-profile-name">Profile Name</label>
+          <input type="text" id="field-profile-name" required placeholder="Production Web Server">
+        </div>
+        <div class="form-group row">
+          <div class="form-field" style="flex: 3;">
+            <label for="field-profile-host">Host Name / IP</label>
+            <input type="text" id="field-profile-host" required placeholder="example.com">
+          </div>
+          <div class="form-field" style="flex: 1;">
+            <label for="field-profile-port">Port</label>
+            <input type="number" id="field-profile-port" required value="22" min="1" max="65535">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="field-profile-user">User Name</label>
+          <input type="text" id="field-profile-user" required placeholder="ubuntu">
+        </div>
+        <div class="form-group">
+          <label for="field-profile-auth-type">Authentication Method</label>
+          <select id="field-profile-auth-type">
+            <option value="password">Password Authentication</option>
+            <option value="key">SSH Private Key</option>
+          </select>
+        </div>
+        <div class="form-group" id="group-password">
+          <label for="field-profile-password">Password</label>
+          <input type="password" id="field-profile-password" placeholder="••••••••">
+        </div>
+        <div class="form-group" id="group-key" style="display: none;">
+          <label for="field-profile-key-path">Private Key File</label>
+          <div class="file-picker-input">
+            <input type="text" id="field-profile-key-path" placeholder="C:\Users\ubuntu\.ssh\id_rsa">
+            <button type="button" class="btn" id="btn-browse-key-file">Browse</button>
+          </div>
+        </div>
+        <div class="form-group" id="group-passphrase" style="display: none;">
+          <label for="field-profile-passphrase">Key Passphrase</label>
+          <input type="password" id="field-profile-passphrase" placeholder="Key Passphrase (optional)">
+        </div>
+        <div class="form-group">
+          <label>Profile Accent Identity Color</label>
+          <div class="accent-color-picker" id="swatch-container">
+            <div class="color-swatch active" style="background-color: #3B82F6;" data-color="#3B82F6"></div>
+            <div class="color-swatch" style="background-color: #10B981;" data-color="#10B981"></div>
+            <div class="color-swatch" style="background-color: #F59E0B;" data-color="#F59E0B"></div>
+            <div class="color-swatch" style="background-color: #EF4444;" data-color="#EF4444"></div>
+            <div class="color-swatch" style="background-color: #8B5CF6;" data-color="#8B5CF6"></div>
+            <div class="color-swatch" style="background-color: #EC4899;" data-color="#EC4899"></div>
+          </div>
+          <input type="hidden" id="field-profile-accent" value="#3B82F6">
+        </div>
+        <button type="submit" class="btn primary" style="width: 100%; margin-top: 16px;">Save Profile</button>
+      </form>
+    </div>
   </div>
+
+  <!-- Tunnel Configuration Drawer -->
+  <div class="drawer" id="tunnel-drawer">
+    <div class="drawer-header">
+      <h3>Add SSH Port Forwarding Tunnel</h3>
+      <button class="icon-btn" id="btn-close-tunnel-drawer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-content">
+      <form id="tunnel-form">
+        <div class="form-group">
+          <label for="field-tunnel-name">Tunnel Rule Name</label>
+          <input type="text" id="field-tunnel-name" required placeholder="PostgreSQL Local Port Forward">
+        </div>
+        <div class="form-group">
+          <label for="field-tunnel-profile-select">SSH Profile Gateway</label>
+          <select id="field-tunnel-profile-select" required>
+            <!-- Render profiles options dynamically -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="field-tunnel-type">Tunnel Type</label>
+          <select id="field-tunnel-type">
+            <option value="local">Local Port Forwarding (Local port -> Server -> Remote target)</option>
+            <option value="remote">Remote Port Forwarding (Server port -> Local target)</option>
+            <option value="dynamic">Dynamic SOCKS5 Proxy (Local socks port -> Server dynamic exit)</option>
+          </select>
+        </div>
+        <div class="form-group row">
+          <div class="form-field" id="field-group-local-host">
+            <label for="field-tunnel-local-host">Local Bind Interface</label>
+            <input type="text" id="field-tunnel-local-host" required value="127.0.0.1">
+          </div>
+          <div class="form-field">
+            <label for="field-tunnel-local-port" id="label-tunnel-local-port">Local Listen Port</label>
+            <input type="number" id="field-tunnel-local-port" required value="5432" min="1" max="65535">
+          </div>
+        </div>
+        <div class="form-group row" id="group-tunnel-remote">
+          <div class="form-field" style="flex: 3;">
+            <label for="field-tunnel-remote-host">Remote Target Host</label>
+            <input type="text" id="field-tunnel-remote-host" value="localhost" placeholder="127.0.0.1">
+          </div>
+          <div class="form-field" style="flex: 1;">
+            <label for="field-tunnel-remote-port">Remote Port</label>
+            <input type="number" id="field-tunnel-remote-port" value="5432" min="1" max="65535">
+          </div>
+        </div>
+        <button type="submit" class="btn primary" style="width: 100%; margin-top: 16px;">Start Tunnel</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Master Password Lock/Unlock Modal Overlay -->
+  <div class="overlay" id="overlay-vault-lock">
+    <div class="modal-box" id="vault-unlock-modal">
+      <div class="modal-title" id="vault-lock-title">Enter Master Password</div>
+      <p class="modal-desc" id="vault-lock-desc">Your credential store is locked with AES-256 vault security. Please enter your master password to unlock the workspace.</p>
+      <form id="vault-unlock-form">
+        <div class="form-group">
+          <input type="password" id="field-unlock-password" required placeholder="Master Password" autofocus>
+        </div>
+        <div id="vault-unlock-error" style="color: var(--status-danger); font-size: 12px; margin-bottom: 12px; display: none;">Incorrect Master Password. Please try again.</div>
+        <div class="modal-actions">
+          <button type="submit" class="btn primary">Unlock Vault</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Vault Settings Modal Overlay (Enable/Disable/Change) -->
+  <div class="overlay" id="overlay-vault-settings">
+    <div class="modal-box">
+      <div class="modal-title">Master Password Vault Settings</div>
+      <div id="vault-settings-desc-box">
+        <!-- Render state-specific explanation dynamically -->
+      </div>
+      <form id="vault-settings-form">
+        <div class="form-group" id="vault-form-current-pass" style="display: none;">
+          <label for="field-vault-current-pass">Current Master Password</label>
+          <input type="password" id="field-vault-current-pass" placeholder="••••••••">
+        </div>
+        <div class="form-group" id="vault-form-new-pass" style="display: none;">
+          <label for="field-vault-new-pass">New Master Password</label>
+          <input type="password" id="field-vault-new-pass" placeholder="••••••••">
+        </div>
+        <div class="form-group" id="vault-form-confirm-pass" style="display: none;">
+          <label for="field-vault-confirm-pass">Confirm New Password</label>
+          <input type="password" id="field-vault-confirm-pass" placeholder="••••••••">
+        </div>
+        <div id="vault-settings-error" style="color: var(--status-danger); font-size: 12px; margin-bottom: 12px; display: none;">Passwords do not match.</div>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="btn-close-vault-settings">Cancel</button>
+          <button type="submit" class="btn primary" id="btn-save-vault-settings">Save Settings</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Host Key Verification Modal Overlay -->
+  <div class="overlay" id="overlay-host-key">
+    <div class="modal-box">
+      <div class="modal-title" style="color: var(--status-warning);">SSH Host Key Verification</div>
+      <p class="modal-desc">The authenticity of host <span id="host-key-ip" style="font-family: var(--font-mono); font-weight: bold;"></span> can't be established.</p>
+      <div style="background: var(--bg-primary); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 11px; padding: 12px; border-radius: var(--radius-md); margin-bottom: 16px; word-break: break-all;">
+        <strong>SHA256 Fingerprint:</strong><br>
+        <span id="host-key-fingerprint"></span>
+      </div>
+      <p class="modal-desc">Are you sure you want to continue connecting?</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btn-host-key-cancel">Cancel Connection</button>
+        <button type="button" class="btn primary" id="btn-host-key-accept">Accept & Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Script Modules -->
+  <script src="js/vault.js"></script>
+  <script src="js/profiles.js"></script>
+  <script src="js/tunnels.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

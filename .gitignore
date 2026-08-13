@@ -9,6 +9,7 @@
 # Logs & Temporary Files
 *.log
 .devs_userData/
+.devssh_userData/
 DevsWWW/
 
 # OS Generated Files

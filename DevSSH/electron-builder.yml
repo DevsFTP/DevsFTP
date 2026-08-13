@@ -1,0 +1,15 @@
+# DevSSH — Standalone SSH Terminal
+appId: com.devssh.app
+productName: DevSSH
+directories:
+  output: dist
+files:
+  - "src/**/*"
+  - "package.json"
+win:
+  forceCodeSigning: false
+  signAndEditExecutable: false
+  target:
+    - target: portable
+      arch:
+        - x64
