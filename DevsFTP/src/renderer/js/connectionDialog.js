@@ -8,7 +8,7 @@ window.ConnectionDialog = {
   modal: null,
   connModal: null,
   activeProfileId: null,
-  activeAccentColor: '#68a063',
+  activeAccentColor: '#10B981',
   selectedConnectionProfile: null,
 
   getApi() {
@@ -218,7 +218,7 @@ window.ConnectionDialog = {
       profiles.forEach(p => {
         const item = document.createElement('div');
         item.className = `profile-card-item ${p.id === this.activeProfileId ? 'selected' : ''}`;
-        const hex = p.accentColor || '#68a063';
+        const hex = p.accentColor || '#10B981';
         const proto = (p.protocol || 'sftp').toUpperCase();
 
         item.innerHTML = `
@@ -292,7 +292,7 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = profile.proxyUsername || '';
     if (pPassEl) pPassEl.value = profile.proxyPassword || '';
 
-    this.setIdentityColor(profile.accentColor || '#68a063');
+    this.setIdentityColor(profile.accentColor || '#10B981');
 
     this.updateFormLabels(profile.protocol || 'sftp', profile.authType || 'password');
 
@@ -338,7 +338,7 @@ window.ConnectionDialog = {
     if (pUserEl) pUserEl.value = '';
     if (pPassEl) pPassEl.value = '';
 
-    this.setIdentityColor('#68a063');
+    this.setIdentityColor('#10B981');
 
     this.updateFormLabels('sftp', 'password');
 
@@ -658,7 +658,7 @@ window.ConnectionDialog = {
         password: finalPassword,
         privateKeyPath: document.getElementById('prof-keypath').value,
         webdavPath: webdavPathVal,
-        accentColor: this.activeAccentColor || '#68a063',
+        accentColor: this.activeAccentColor || '#10B981',
         remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
         localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
         proxyType: pTypeEl ? pTypeEl.value : 'none',
@@ -714,7 +714,7 @@ window.ConnectionDialog = {
       } else {
         activeSession.profile = { ...profile };
         activeSession.profileId = profile.id;
-        activeSession.accentColor = profile.accentColor || '#68a063';
+        activeSession.accentColor = profile.accentColor || '#10B981';
         window.SessionManager.setActiveSession(activeSession.sessionId);
       }
       if (window.connectToProfileSession) {
