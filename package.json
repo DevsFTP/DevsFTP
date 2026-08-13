@@ -34,7 +34,6 @@
     "productName": "DevsFTP",
     "win": {
       "icon": "assets/icon.ico",
-      "forceCodeSigning": false,
       "signAndEditExecutable": false,
       "target": [
         "nsis",
@@ -47,6 +46,7 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DevsFTP"

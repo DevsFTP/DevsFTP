@@ -13,10 +13,10 @@ if (fs.existsSync(distDir)) {
   fs.rmSync(distDir, { recursive: true, force: true });
 }
 
-console.log('2. Running electron-builder --win...');
-execSync('npx electron-builder --win', { cwd: rootDir, stdio: 'inherit' });
+console.log('2. Building win-unpacked dir target first via electron-builder...');
+execSync('npx electron-builder --win dir', { cwd: rootDir, stdio: 'inherit' });
 
-console.log('3. Injecting DevsFTP icon & Win32 PE version metadata resources via rcedit-x64...');
+console.log('3. Injecting DevsFTP icon & Win32 PE version metadata resources into DevsFTP.exe via rcedit...');
 if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath)) {
   const rceditCmd = `"${rceditPath}" "${exePath}" ` +
     `--set-icon "${icoPath}" ` +
@@ -34,11 +34,14 @@ if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath
   console.error('⚠️ Could not locate rcedit-x64.exe, DevsFTP.exe, or icon.ico');
 }
 
-console.log('4. Touching executable timestamp & refreshing Windows Shell cache...');
+console.log('4. Generating NSIS Installer and Portable binaries from pre-branded unpacked executable...');
+execSync('npx electron-builder --win nsis portable --prepackaged dist/win-unpacked', { cwd: rootDir, stdio: 'inherit' });
+
+console.log('5. Touching executable timestamp & refreshing Windows Shell cache...');
 try {
   const now = new Date();
   fs.utimesSync(exePath, now, now);
   execSync('ie4uinit.exe -show', { stdio: 'ignore' });
 } catch (e) {}
 
-console.log('✅ Clean Windows build complete at: ' + exePath);
+console.log('✅ Clean Branded Windows build complete at: ' + exePath);
