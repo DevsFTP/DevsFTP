@@ -424,8 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const bugFormView = document.getElementById('bug-report-form-view');
     const bugThankyouView = document.getElementById('bug-report-thankyou-view');
     const bugDescInput = document.getElementById('bug-report-description');
-    const bugEmailInput = document.getElementById('bug-report-email');
-    const bugIncludeLogsCb = document.getElementById('bug-report-include-logs');
     const btnBugSubmit = document.getElementById('btn-bug-report-submit');
 
     window.BugReportModal = {
@@ -435,8 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
           bugDescInput.value = '';
           bugDescInput.style.borderColor = '';
         }
-        if (bugEmailInput) bugEmailInput.value = '';
-        if (bugIncludeLogsCb) bugIncludeLogsCb.checked = true;
         if (bugFormView) bugFormView.style.display = 'block';
         if (bugThankyouView) bugThankyouView.style.display = 'none';
         if (btnBugSubmit) {
@@ -498,13 +494,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btnBugSubmit.disabled = true;
         btnBugSubmit.textContent = '⏳ Transmitting to devsftp.com/bugs.php...';
 
-        const email = bugEmailInput ? bugEmailInput.value.trim() : '';
-        const includeLogs = bugIncludeLogsCb ? bugIncludeLogsCb.checked : true;
-
         const api = window.devsFTP || window.pulseFTP;
         try {
           if (api && api.submitBugReport) {
-            await api.submitBugReport({ description: desc, email, includeLogs });
+            await api.submitBugReport({ description: desc, includeLogs: true });
           }
           if (bugFormView) bugFormView.style.display = 'none';
           if (bugThankyouView) bugThankyouView.style.display = 'block';
