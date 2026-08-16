@@ -1689,6 +1689,10 @@
                 <button id="btn-about-tab-check-updates" class="btn" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">🔄 Check for Updates...</button>
               </div>
 
+              <div style="margin-top: 10px;">
+                <button id="btn-reset-preferences" class="btn btn-danger" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">↺ Reset Preferences to Defaults</button>
+              </div>
+
               <div id="about-tab-update-status" style="font-size: 11px; font-weight: 600; display: none;"></div>
 
               <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 14px; line-height: 1.6; border-top: 1px solid hsl(var(--border-subtle)); padding-top: 14px; width: 100%; max-width: 440px;">
@@ -1699,6 +1703,27 @@
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Reset Preferences Confirmation Modal                                      -->
+  <!-- ========================================================================= -->
+  <div id="reset-prefs-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="width: 420px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <span class="modal-title">↺ Reset Preferences</span>
+        <button id="btn-reset-prefs-cancel-x" class="btn btn-sm modal-close-btn" title="Cancel">✕ Close</button>
+      </div>
+      <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <p style="font-size: 13px; color: hsl(var(--text-secondary)); line-height: 1.6; margin: 0;">
+          This will clear all preferences and reset them to their defaults. Your connection profiles, tunnels, and session tabs will not be affected.
+        </p>
+        <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 0; border: none; margin: 0;">
+          <button id="btn-reset-prefs-cancel" class="btn" style="padding: 8px 18px; font-size: 12px;">Cancel</button>
+          <button id="btn-reset-prefs-confirm" class="btn btn-danger" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">↺ Reset Preferences</button>
         </div>
       </div>
     </div>

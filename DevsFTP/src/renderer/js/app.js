@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const menuHelpDocs = document.getElementById('menu-help-docs');
     if (menuHelpDocs) {
-      menuHelpDocs.addEventListener('click', () => openWebsite('https://devsftp.com'));
+      menuHelpDocs.addEventListener('click', () => openWebsite('https://DevsFTP.com/docs/'));
     }
 
     const btnVisitWebsite = document.getElementById('btn-about-visit-website');
@@ -541,6 +541,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnCheckUpdates) btnCheckUpdates.addEventListener('click', () => doCheckForUpdates(updateMsg, true));
     if (btnCheckUpdatesTab) btnCheckUpdatesTab.addEventListener('click', () => doCheckForUpdates(updateMsgTab, true));
+
+    // Reset Preferences button
+    const btnResetPrefs = document.getElementById('btn-reset-preferences');
+    const resetPrefsModal = document.getElementById('reset-prefs-modal');
+    const btnResetPrefsConfirm = document.getElementById('btn-reset-prefs-confirm');
+    const btnResetPrefsCancel = document.getElementById('btn-reset-prefs-cancel');
+    const btnResetPrefsCancelX = document.getElementById('btn-reset-prefs-cancel-x');
+
+    const closeResetModal = () => {
+      if (resetPrefsModal) { resetPrefsModal.classList.remove('active'); resetPrefsModal.setAttribute('aria-hidden', 'true'); }
+    };
+
+    if (btnResetPrefs) btnResetPrefs.addEventListener('click', () => {
+      if (resetPrefsModal) { resetPrefsModal.classList.add('active'); resetPrefsModal.setAttribute('aria-hidden', 'false'); }
+    });
+    if (btnResetPrefsCancel) btnResetPrefsCancel.addEventListener('click', closeResetModal);
+    if (btnResetPrefsCancelX) btnResetPrefsCancelX.addEventListener('click', closeResetModal);
+    if (btnResetPrefsConfirm) btnResetPrefsConfirm.addEventListener('click', () => {
+      const prefKeys = [
+        'devsftp_pref_theme',
+        'devsftp_pref_restore_tabs',
+        'devsftp_pref_auto_check_updates',
+        'devsftp_pref_autoupdate',
+        'devsftp_pref_notify_transfers',
+        'devsftp_pref_notify_chime',
+        'devsftp_pref_term_font',
+        'devsftp_pref_term_fontsize',
+        'devsftp_pref_term_cursor_style',
+        'devsftp_pref_term_cursor_blink',
+        'devsftp_pref_term_scrollback',
+        'devsftp_workspace_panel_prefs',
+        'devsftp_live_edit_upload_prompt_disabled',
+        'devsftp_preferences_last_section'
+      ];
+      prefKeys.forEach(k => localStorage.removeItem(k));
+      closeResetModal();
+      window.location.reload();
+    });
 
     const prefAutoCheck = document.getElementById('pref-auto-check-updates');
     if (prefAutoCheck) {
