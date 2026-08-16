@@ -28,19 +28,10 @@
       <div class="menu-item-dropdown" id="menu-tools">
         <button class="menu-item-btn">Tools</button>
         <div class="menu-dropdown-content">
-          <div class="dropdown-action" id="menu-tools-cache">
-            <span>🧹 Clear Temp Cache...</span>
-            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+Del</span>
-          </div>
+          <div class="dropdown-action" id="menu-tools-cache">🧹 Clear Temp Cache...</div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-action" id="menu-tools-export">
-            <span>📤 Export Profiles (JSON)</span>
-            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+E</span>
-          </div>
-          <div class="dropdown-action" id="menu-tools-import">
-            <span>📥 Import Profiles (JSON)</span>
-            <span style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 20px;">Ctrl+Shift+I</span>
-          </div>
+          <div class="dropdown-action" id="menu-tools-export">📤 Export Profiles (JSON)</div>
+          <div class="dropdown-action" id="menu-tools-import">📥 Import Profiles (JSON)</div>
         </div>
       </div>
 
@@ -48,6 +39,7 @@
         <button class="menu-item-btn">Help</button>
         <div class="menu-dropdown-content">
           <div class="dropdown-action" id="menu-help-docs">📖 Documentation</div>
+          <div class="dropdown-action" id="menu-help-shortcuts">⌨️ Keyboard Shortcuts</div>
           <div class="dropdown-action" id="menu-help-issue">💬 Report Issue</div>
           <div class="dropdown-action" id="menu-help-update">🔄 Check for Updates...</div>
           <div class="dropdown-divider"></div>
@@ -1724,6 +1716,76 @@
         <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 0; border: none; margin: 0;">
           <button id="btn-reset-prefs-cancel" class="btn" style="padding: 8px 18px; font-size: 12px;">Cancel</button>
           <button id="btn-reset-prefs-confirm" class="btn btn-danger" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">↺ Reset Preferences</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Keyboard Shortcuts Modal                                                  -->
+  <!-- ========================================================================= -->
+  <div id="shortcuts-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <span class="modal-title">⌨️ Keyboard Shortcuts</span>
+        <button id="btn-shortcuts-close-x" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+      </div>
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 70vh; overflow-y: auto;">
+        
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: hsl(var(--text-muted)); letter-spacing: 0.05em; margin: 0 0 4px 0; font-weight: 700;">Application Tools</h4>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Clear Temp Cache</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Ctrl + Shift + Del</kbd>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Export Profiles (JSON)</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Ctrl + Shift + E</kbd>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Import Profiles (JSON)</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Ctrl + Shift + I</kbd>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: hsl(var(--text-muted)); letter-spacing: 0.05em; margin: 0 0 4px 0; font-weight: 700;">File Browser Navigation</h4>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Select All Files</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Ctrl + A</kbd>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Navigate Up / Down</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">↑ / ↓ Arrow</kbd>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Select Multiple Range</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Shift + ↑ / ↓</kbd>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Open Directory / File</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Enter</kbd>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <h4 style="font-size: 11px; text-transform: uppercase; color: hsl(var(--text-muted)); letter-spacing: 0.05em; margin: 0 0 4px 0; font-weight: 700;">Modals & Dialogs</h4>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 13px;">
+            <span style="color: hsl(var(--text-secondary));">Cancel / Close Dialog</span>
+            <kbd style="background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-primary));">Esc</kbd>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; padding: 10px 0 0 0; border: none; margin: 0;">
+          <button id="btn-shortcuts-close" class="btn" style="padding: 8px 18px; font-size: 12px;">Close</button>
         </div>
       </div>
     </div>

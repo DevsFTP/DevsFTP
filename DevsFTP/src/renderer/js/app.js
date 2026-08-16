@@ -291,12 +291,27 @@ document.addEventListener('DOMContentLoaded', () => {
       if (clearCacheModal && clearCacheModal.classList.contains('active')) {
         clearCacheModal.classList.remove('active');
       }
+      const shortcutsModal = document.getElementById('shortcuts-modal');
+      if (shortcutsModal && shortcutsModal.classList.contains('active')) {
+        shortcutsModal.classList.remove('active');
+        shortcutsModal.setAttribute('aria-hidden', 'true');
+      }
     }
     if (event.ctrlKey && event.shiftKey && (event.key === 'Delete' || event.key === 'Del')) {
       event.preventDefault();
       if (window.openClearCacheModal) {
         window.openClearCacheModal();
       }
+    }
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'e') {
+      event.preventDefault();
+      const menuToolsExport = document.getElementById('menu-tools-export');
+      if (menuToolsExport) menuToolsExport.click();
+    }
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      const menuToolsImport = document.getElementById('menu-tools-import');
+      if (menuToolsImport) menuToolsImport.click();
     }
   });
 
@@ -524,6 +539,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (menuHelpDocs) {
       menuHelpDocs.addEventListener('click', () => openWebsite('https://DevsFTP.com/docs/'));
     }
+
+    // Keyboard Shortcuts Modal wiring
+    const menuHelpShortcuts = document.getElementById('menu-help-shortcuts');
+    const shortcutsModal = document.getElementById('shortcuts-modal');
+    const btnShortcutsClose = document.getElementById('btn-shortcuts-close');
+    const btnShortcutsCloseX = document.getElementById('btn-shortcuts-close-x');
+
+    const closeShortcutsModal = () => {
+      if (shortcutsModal) {
+        shortcutsModal.classList.remove('active');
+        shortcutsModal.setAttribute('aria-hidden', 'true');
+      }
+    };
+
+    if (menuHelpShortcuts) {
+      menuHelpShortcuts.addEventListener('click', () => {
+        if (shortcutsModal) {
+          shortcutsModal.classList.add('active');
+          shortcutsModal.setAttribute('aria-hidden', 'false');
+        }
+      });
+    }
+    if (btnShortcutsClose) btnShortcutsClose.addEventListener('click', closeShortcutsModal);
+    if (btnShortcutsCloseX) btnShortcutsCloseX.addEventListener('click', closeShortcutsModal);
 
     const btnVisitWebsite = document.getElementById('btn-about-visit-website');
     const btnVisitWebsiteTab = document.getElementById('btn-about-tab-visit-website');
