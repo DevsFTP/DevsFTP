@@ -463,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnBugVisit) btnBugVisit.addEventListener('click', () => openWebsite('https://devsftp.com'));
 
     const btnBugWebLink = document.getElementById('btn-bug-report-web-link');
-    if (btnBugWebLink) btnBugWebLink.addEventListener('click', () => openWebsite('https://devsftp.com/bugs/'));
+    if (btnBugWebLink) btnBugWebLink.addEventListener('click', () => openWebsite('https://devsftp.com/issue-tracker/'));
 
     const btnBugExportLog = document.getElementById('btn-bug-report-export-log');
     if (btnBugExportLog) {
