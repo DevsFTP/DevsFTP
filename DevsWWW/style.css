@@ -1129,6 +1129,19 @@ pre {
 .docs-screenshot-wrapper img {
   width: 100%;
   height: auto;
+}
+
+.docs-screenshot-wrapper .screenshot-light {
+  display: none;
+}
+.docs-screenshot-wrapper .screenshot-dark {
+  display: block;
+}
+
+[data-theme="light"] .docs-screenshot-wrapper .screenshot-dark {
+  display: none;
+}
+[data-theme="light"] .docs-screenshot-wrapper .screenshot-light {
   display: block;
 }
 
