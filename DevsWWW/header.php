@@ -81,6 +81,7 @@
         <?php $active = isset($active_page) ? $active_page : ''; ?>
         <a href="<?= $root_rel ?>#features" class="<?php echo ($active === 'features') ? 'active' : ''; ?>">Features</a>
         <a href="<?= $root_rel ?>docs.php" class="<?php echo ($active === 'docs') ? 'active' : ''; ?>">Docs</a>
+        <a href="<?= $root_rel ?>privacy.php" class="<?php echo ($active === 'privacy') ? 'active' : ''; ?>">Privacy</a>
         <a href="<?= $root_rel ?>issue-tracker/" class="<?php echo ($active === 'issue-tracker') ? 'active' : ''; ?>">Issue Tracker</a>
       </nav>
 
