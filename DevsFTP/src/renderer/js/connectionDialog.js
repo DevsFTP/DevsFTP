@@ -403,7 +403,7 @@ window.ConnectionDialog = {
       if (groupKey) groupKey.style.display = 'none';
     } else {
       if (lblHost) lblHost.textContent = 'Host / IP Address';
-      if (txtHost) txtHost.placeholder = 'appvark.com or 192.168.1.100';
+      if (txtHost) txtHost.placeholder = 'devsftp.com or 192.168.1.100';
       if (groupPort) groupPort.style.display = '';
       if (groupBucket) groupBucket.style.display = 'none';
       if (rowHostPort) rowHostPort.style.gridTemplateColumns = '1fr 80px';
