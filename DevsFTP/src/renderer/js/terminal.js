@@ -98,8 +98,10 @@ window.SSHTerminal = {
     window.addEventListener('resize', () => this.resize());
     this.initialized = true;
 
-    this.term.writeln('\x1b[36mDevsFTP Embedded SSH Terminal ready.\x1b[0m');
-    this.term.writeln('Connect to an SFTP profile to initialize shell PTY session.\r\n');
+    this.term.writeln('\x1b[36m=================================================\x1b[0m');
+    this.term.writeln('\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m');
+    this.term.writeln('\x1b[36m                 v1.0.0                          \x1b[0m');
+    this.term.writeln('\x1b[36m=================================================\x1b[0m\r\n');
     this.focus();
   },
 
@@ -143,8 +145,12 @@ window.SSHTerminal = {
   switchSession(sessionId) {
     if (!this.term) return;
     this.term.clear();
-    if (!this.buffers) this.buffers = {};
-    const buffer = this.buffers[sessionId] || '\x1b[36mDevsFTP SSH Session Terminal\x1b[0m\r\n';
+    const buffer = this.buffers[sessionId] || 
+      '\x1b[36m=================================================\x1b[0m\r\n' +
+      '\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m\r\n' +
+      '\x1b[36m                 v1.0.0                          \x1b[0m\r\n' +
+      '\x1b[36m=================================================\x1b[0m\r\n\r\n' +
+      '\x1b[36mDevsFTP Active SSH Session Terminal\x1b[0m\r\n\r\n';
     this.term.write(buffer);
     this.resize();
   },
