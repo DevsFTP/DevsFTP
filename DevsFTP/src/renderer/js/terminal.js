@@ -145,6 +145,7 @@ window.SSHTerminal = {
   switchSession(sessionId) {
     if (!this.term) return;
     this.term.clear();
+    if (!this.buffers) this.buffers = {};
     const buffer = this.buffers[sessionId] || 
       '\x1b[36m=================================================\x1b[0m\r\n' +
       '\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m\r\n' +
