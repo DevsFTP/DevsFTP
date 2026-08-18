@@ -39,19 +39,22 @@ class SFTPAdapter {
           return reject(new Error('SFTP client disconnected'));
         }
         const normRemote = normalizePOSIXPath(remotePath);
-        this.sftp.fastGet(normRemote, localPath, {
-          step: (transferred, chunk, total) => {
-            if (onProgress) {
-              onProgress({
-                transferred,
-                total,
-                percentage: Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1)))
-              });
+        this.sftp.stat(normRemote, (statErr, stats) => {
+          const totalBytes = (stats && stats.size) ? stats.size : 1;
+          this.sftp.fastGet(normRemote, localPath, {
+            step: (transferred, chunk) => {
+              if (onProgress) {
+                onProgress({
+                  transferred,
+                  total: totalBytes,
+                  percentage: Math.min(100, parseFloat(((transferred / totalBytes) * 100).toFixed(1)))
+                });
+              }
             }
-          }
-        }, (err) => {
-          if (err) reject(err);
-          else resolve(true);
+          }, (err) => {
+            if (err) reject(err);
+            else resolve(true);
+          });
         });
       });
     }
@@ -143,19 +146,22 @@ class SFTPAdapter {
           return reject(new Error('SFTP client disconnected'));
         }
         const normRemote = normalizePOSIXPath(remotePath);
-        this.sftp.fastPut(localPath, normRemote, {
-          step: (transferred, chunk, total) => {
-            if (onProgress) {
-              onProgress({
-                transferred,
-                total,
-                percentage: Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1)))
-              });
+        fs.stat(localPath, (statErr, stats) => {
+          const totalBytes = (stats && stats.size) ? stats.size : 1;
+          this.sftp.fastPut(localPath, normRemote, {
+            step: (transferred, chunk) => {
+              if (onProgress) {
+                onProgress({
+                  transferred,
+                  total: totalBytes,
+                  percentage: Math.min(100, parseFloat(((transferred / totalBytes) * 100).toFixed(1)))
+                });
+              }
             }
-          }
-        }, (err) => {
-          if (err) reject(err);
-          else resolve(true);
+          }, (err) => {
+            if (err) reject(err);
+            else resolve(true);
+          });
         });
       });
     }
