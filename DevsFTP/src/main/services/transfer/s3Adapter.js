@@ -51,12 +51,30 @@ class S3Adapter {
 
   async downloadStream(remotePath, localPath, offset = 0, onProgress) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
-    return await this.service.downloadFile(remotePath, localPath, onProgress, offset);
+    const adapterProgress = (transferred, total) => {
+      if (onProgress) {
+        onProgress({
+          transferred,
+          total,
+          percentage: total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0
+        });
+      }
+    };
+    return await this.service.downloadFile(remotePath, localPath, adapterProgress, offset);
   }
 
   async uploadStream(localPath, remotePath, offset = 0, onProgress) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
-    return await this.service.uploadFile(localPath, remotePath, onProgress);
+    const adapterProgress = (transferred, total) => {
+      if (onProgress) {
+        onProgress({
+          transferred,
+          total,
+          percentage: total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0
+        });
+      }
+    };
+    return await this.service.uploadFile(localPath, remotePath, adapterProgress);
   }
 }
 

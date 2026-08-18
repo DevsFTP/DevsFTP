@@ -247,20 +247,25 @@ class S3Service {
     const totalBytes = fileStats.size;
 
     try {
-      const fileBuffer = fs.readFileSync(localPath);
-
-      if (onProgress) onProgress(0, totalBytes);
-
-      const command = new PutObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-        Body: fileBuffer,
-        ContentLength: totalBytes,
+      const readStream = fs.createReadStream(localPath);
+      const parallelUpload = new Upload({
+        client: this.client,
+        params: {
+          Bucket: this.bucket,
+          Key: key,
+          Body: readStream,
+        },
+        queueSize: 4, // Upload 4 chunks in parallel
+        partSize: 5 * 1024 * 1024, // 5MB chunks
       });
 
-      await this.client.send(command);
+      parallelUpload.on('httpUploadProgress', (progress) => {
+        if (onProgress && progress.loaded) {
+          onProgress(progress.loaded, totalBytes);
+        }
+      });
 
-      if (onProgress) onProgress(totalBytes, totalBytes);
+      await parallelUpload.done();
       return true;
     } catch (err) {
       throw new Error(`S3 upload failed: ${err.message}`);

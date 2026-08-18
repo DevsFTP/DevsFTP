@@ -33,6 +33,29 @@ class SFTPAdapter {
    * Streaming Download with Byte Offset Resume Support
    */
   downloadStream(remotePath, localPath, offset = 0, onProgress) {
+    if (offset === 0) {
+      return new Promise((resolve, reject) => {
+        if (!this.session || !this.session.connected || !this.sftp) {
+          return reject(new Error('SFTP client disconnected'));
+        }
+        const normRemote = normalizePOSIXPath(remotePath);
+        this.sftp.fastGet(normRemote, localPath, {
+          step: (transferred, chunk, total) => {
+            if (onProgress) {
+              onProgress({
+                transferred,
+                total,
+                percentage: Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1)))
+              });
+            }
+          }
+        }, (err) => {
+          if (err) reject(err);
+          else resolve(true);
+        });
+      });
+    }
+
     return new Promise((resolve, reject) => {
       if (!this.session || !this.session.connected || !this.sftp) {
         return reject(new Error('SFTP client disconnected'));
@@ -114,6 +137,29 @@ class SFTPAdapter {
    * Streaming Upload with Byte Offset Resume Support
    */
   uploadStream(localPath, remotePath, offset = 0, onProgress) {
+    if (offset === 0) {
+      return new Promise((resolve, reject) => {
+        if (!this.session || !this.session.connected || !this.sftp) {
+          return reject(new Error('SFTP client disconnected'));
+        }
+        const normRemote = normalizePOSIXPath(remotePath);
+        this.sftp.fastPut(localPath, normRemote, {
+          step: (transferred, chunk, total) => {
+            if (onProgress) {
+              onProgress({
+                transferred,
+                total,
+                percentage: Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1)))
+              });
+            }
+          }
+        }, (err) => {
+          if (err) reject(err);
+          else resolve(true);
+        });
+      });
+    }
+
     return new Promise((resolve, reject) => {
       if (!this.session || !this.session.connected || !this.sftp) {
         return reject(new Error('SFTP client disconnected'));
