@@ -1022,10 +1022,17 @@ window.FileBrowser = {
   },
 
   localUp() {
-    const parts = this.localPath.split('\\').filter(Boolean);
-    if (parts.length > 1) {
+    const isWindows = this.localPath.includes('\\') || !this.localPath.includes('/');
+    const separator = isWindows ? '\\' : '/';
+    const parts = this.localPath.split(separator).filter(Boolean);
+    if (parts.length > 0) {
       parts.pop();
-      this.refreshLocal(parts.join('\\') + '\\');
+      if (isWindows) {
+        this.refreshLocal(parts.join('\\') + '\\');
+      } else {
+        const parentPath = '/' + parts.join('/');
+        this.refreshLocal(parentPath === '' ? '/' : parentPath);
+      }
     }
   },
 
@@ -1591,12 +1598,14 @@ window.FileBrowser = {
             transferOptions.resumeOffset = conflictInfo.resumeOffset;
           }
           if (action === 'rename') {
-            const parts = localDest.split('\\');
+            const isWindows = localDest.includes('\\') || !localDest.includes('/');
+            const separator = isWindows ? '\\' : '/';
+            const parts = localDest.split(separator);
             const fname = parts.pop();
             const dotIdx = fname.lastIndexOf('.');
             const nameOnly = dotIdx > 0 ? fname.substring(0, dotIdx) : fname;
             const ext = dotIdx > 0 ? fname.substring(dotIdx) : '';
-            localDest = [...parts, `${nameOnly} (1)${ext}`].join('\\');
+            localDest = [...parts, `${nameOnly} (1)${ext}`].join(separator);
           }
           if (action === 'newer') {
             const srcTime = conflictInfo.remoteStat ? new Date(conflictInfo.remoteStat.modifyTime).getTime() : 0;
@@ -1665,7 +1674,7 @@ window.FileBrowser = {
     }
     if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) return;
     const api = this.getApi();
-    const fileName = localFilePath.split('\\').pop();
+    const fileName = localFilePath.replace(/\\/g, '/').split('/').pop();
     let remoteDest = customRemoteDest || `${this.remotePath}/${fileName}`;
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
 

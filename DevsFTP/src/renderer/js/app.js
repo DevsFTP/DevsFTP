@@ -1699,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return new Promise((resolve) => {
         activeConflictState.resolve = resolve;
 
-        const src = data.localStat || { name: (data.localPath || 'file').split('\\').pop(), size: 0, modifyTime: '-' };
+        const src = data.localStat || { name: (data.localPath || 'file').replace(/\\/g, '/').split('/').pop(), size: 0, modifyTime: '-' };
         const dst = data.remoteStat || { name: (data.remotePath || 'file').split('/').pop(), size: 0, modifyTime: '-' };
 
         if (conflictSrcName) conflictSrcName.textContent = src.name;
