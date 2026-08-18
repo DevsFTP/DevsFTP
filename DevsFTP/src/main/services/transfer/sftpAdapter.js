@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { normalizePOSIXPath } = require('../pathUtils');
+const { Transform } = require('stream');
 
 class SFTPAdapter {
   constructor(sftpSession) {
@@ -82,24 +83,29 @@ class SFTPAdapter {
           }
         };
 
-        readStream.on('data', (chunk) => {
-          bytesRead += chunk.length;
-          if (onProgress) {
-            onProgress({
-              transferred: bytesRead,
-              total: totalBytes,
-              percentage: Math.min(100, parseFloat(((bytesRead / totalBytes) * 100).toFixed(1)))
-            });
-          }
-        });
+        let bodyStream = readStream;
+        if (onProgress) {
+          const progressStream = new Transform({
+            transform(chunk, encoding, callback) {
+              bytesRead += chunk.length;
+              onProgress({
+                transferred: bytesRead,
+                total: totalBytes,
+                percentage: Math.min(100, parseFloat(((bytesRead / totalBytes) * 100).toFixed(1)))
+              });
+              callback(null, chunk);
+            }
+          });
+          bodyStream = readStream.pipe(progressStream);
+        }
 
-        readStream.on('error', (err) => cleanup(err));
+        bodyStream.on('error', (err) => cleanup(err));
         writeStream.on('error', (err) => cleanup(err));
 
         writeStream.on('finish', () => cleanup(null));
         writeStream.on('close', () => cleanup(null));
 
-        readStream.pipe(writeStream);
+        bodyStream.pipe(writeStream);
       });
     });
   }
@@ -143,24 +149,29 @@ class SFTPAdapter {
             }
           };
 
-          readStream.on('data', (chunk) => {
-            bytesSent += chunk.length;
-            if (onProgress) {
-              onProgress({
-                transferred: bytesSent,
-                total: totalBytes,
-                percentage: Math.min(100, parseFloat(((bytesSent / totalBytes) * 100).toFixed(1)))
-              });
-            }
-          });
+          let bodyStream = readStream;
+          if (onProgress) {
+            const progressStream = new Transform({
+              transform(chunk, encoding, callback) {
+                bytesSent += chunk.length;
+                onProgress({
+                  transferred: bytesSent,
+                  total: totalBytes,
+                  percentage: Math.min(100, parseFloat(((bytesSent / totalBytes) * 100).toFixed(1)))
+                });
+                callback(null, chunk);
+              }
+            });
+            bodyStream = readStream.pipe(progressStream);
+          }
 
-          readStream.on('error', (err) => cleanup(err));
+          bodyStream.on('error', (err) => cleanup(err));
           writeStream.on('error', (err) => cleanup(err));
 
           writeStream.on('finish', () => cleanup(null));
           writeStream.on('close', () => cleanup(null));
 
-          readStream.pipe(writeStream);
+          bodyStream.pipe(writeStream);
         };
 
         if (validOffset > 0) {
