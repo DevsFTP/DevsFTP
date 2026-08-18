@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "DevsFTP — An FTP/SFTP client that works with you, not against you.",
   "main": "src/main/main.js",
-  "author": "DevsFTP Development Team",
+  "author": "DevsFTP Support <support@devsftp.com>",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",
@@ -68,6 +68,16 @@
         "AppImage",
         "deb",
         "tar.gz"
+      ]
+    },
+    "deb": {
+      "packageCategory": "net",
+      "priority": "optional",
+      "maintainer": "DevsFTP Support <support@devsftp.com>",
+      "depends": [
+        "libfuse2t64 | libfuse2",
+        "libnotify4",
+        "libnss3"
       ]
     }
   }

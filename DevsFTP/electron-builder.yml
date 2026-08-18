@@ -50,3 +50,12 @@ linux:
     - target: tar.gz
       arch:
         - x64
+
+deb:
+  packageCategory: net
+  priority: optional
+  maintainer: DevsFTP Support <support@devsftp.com>
+  depends:
+    - libfuse2t64 | libfuse2
+    - libnotify4
+    - libnss3
