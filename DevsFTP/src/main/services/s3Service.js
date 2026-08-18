@@ -248,21 +248,30 @@ class S3Service {
 
     try {
       const readStream = fs.createReadStream(localPath);
+      let uploadedBytes = 0;
+
+      // Real-time transform stream to intercept progress byte-by-byte
+      const progressStream = new Transform({
+        transform(chunk, encoding, callback) {
+          uploadedBytes += chunk.length;
+          if (onProgress) {
+            onProgress(uploadedBytes, totalBytes);
+          }
+          callback(null, chunk);
+        }
+      });
+
+      const bodyStream = readStream.pipe(progressStream);
+
       const parallelUpload = new Upload({
         client: this.client,
         params: {
           Bucket: this.bucket,
           Key: key,
-          Body: readStream,
+          Body: bodyStream,
         },
         queueSize: 4, // Upload 4 chunks in parallel
         partSize: 5 * 1024 * 1024, // 5MB chunks
-      });
-
-      parallelUpload.on('httpUploadProgress', (progress) => {
-        if (onProgress && progress.loaded) {
-          onProgress(progress.loaded, totalBytes);
-        }
       });
 
       await parallelUpload.done();
