@@ -29,8 +29,9 @@ class S3Adapter {
     } catch (err) {
       // If head object fails, check if it exists as a virtual directory prefix
       try {
-        const list = await this.service.list(remotePath);
-        if (list && list.length > 0) {
+        const listRes = await this.service.list(remotePath);
+        const files = listRes ? (listRes.files || listRes) : [];
+        if (files && files.length > 0) {
           return { isDir: true, size: 0, modifyTime: new Date().toISOString() };
         }
       } catch (e) {}
@@ -44,7 +45,7 @@ class S3Adapter {
   }
 
   async list(remotePath) {
-    if (!this.service || !this.service.connected) return [];
+    if (!this.service || !this.service.connected) return { files: [] };
     return await this.service.list(remotePath);
   }
 

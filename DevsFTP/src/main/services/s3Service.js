@@ -18,6 +18,7 @@ const {
 } = require('@aws-sdk/client-s3');
 const fs = require('fs');
 const path = require('path');
+const { Transform } = require('stream');
 
 class S3Service {
   constructor() {
@@ -172,7 +173,7 @@ class S3Service {
         continuationToken = response.NextContinuationToken;
       } while (continuationToken);
 
-      return items;
+      return { currentPath: remotePath || '/', files: items };
     } catch (err) {
       throw new Error(`S3 list failed: ${err.message}`);
     }
@@ -246,19 +247,24 @@ class S3Service {
 
     try {
       const fileStream = fs.createReadStream(localPath);
-      let uploadedBytes = 0;
+      let bodyStream = fileStream;
 
       if (onProgress) {
-        fileStream.on('data', chunk => {
-          uploadedBytes += chunk.length;
-          onProgress(uploadedBytes, totalBytes);
+        let uploadedBytes = 0;
+        const progressStream = new Transform({
+          transform(chunk, encoding, callback) {
+            uploadedBytes += chunk.length;
+            onProgress(uploadedBytes, totalBytes);
+            callback(null, chunk);
+          }
         });
+        bodyStream = fileStream.pipe(progressStream);
       }
 
       const command = new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Body: fileStream,
+        Body: bodyStream,
         ContentLength: totalBytes,
       });
 
