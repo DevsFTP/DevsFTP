@@ -5,6 +5,11 @@
   "main": "src/main/main.js",
   "author": "DevsFTP Support <support@devsftp.com>",
   "license": "GPL-3.0-or-later",
+  "homepage": "https://devsftp.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevsFTP/DevsFTP.git"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
