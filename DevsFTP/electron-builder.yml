@@ -2,6 +2,7 @@
 appId: com.devsftp.app
 productName: DevsFTP
 copyright: Copyright © 2026 DevsFTP.com
+npmRebuild: false
 
 directories:
   output: dist

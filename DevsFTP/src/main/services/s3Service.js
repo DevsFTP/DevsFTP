@@ -16,6 +16,7 @@ const {
   DeleteObjectsCommand, 
   CopyObjectCommand 
 } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 const fs = require('fs');
 const path = require('path');
 const { Transform } = require('stream');
@@ -89,7 +90,7 @@ class S3Service {
   // Strip leading slash for S3 keys, but keep trailing slash for folders if present
   _pathToKey(remotePath) {
     if (!remotePath || remotePath === '/') return '';
-    let key = remotePath;
+    let key = remotePath.replace(/\\/g, '/').replace(/\/+/g, '/');
     if (key.startsWith('/')) key = key.slice(1);
     return key;
   }
@@ -246,29 +247,20 @@ class S3Service {
     const totalBytes = fileStats.size;
 
     try {
-      const fileStream = fs.createReadStream(localPath);
-      let bodyStream = fileStream;
+      const fileBuffer = fs.readFileSync(localPath);
 
-      if (onProgress) {
-        let uploadedBytes = 0;
-        const progressStream = new Transform({
-          transform(chunk, encoding, callback) {
-            uploadedBytes += chunk.length;
-            onProgress(uploadedBytes, totalBytes);
-            callback(null, chunk);
-          }
-        });
-        bodyStream = fileStream.pipe(progressStream);
-      }
+      if (onProgress) onProgress(0, totalBytes);
 
       const command = new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Body: bodyStream,
+        Body: fileBuffer,
         ContentLength: totalBytes,
       });
 
       await this.client.send(command);
+
+      if (onProgress) onProgress(totalBytes, totalBytes);
       return true;
     } catch (err) {
       throw new Error(`S3 upload failed: ${err.message}`);

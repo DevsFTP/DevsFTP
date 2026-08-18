@@ -1124,67 +1124,74 @@ registerLoggedHandle('connection:disconnect', async (_event, sessionId) => {
 
 // Remote File Operations
 registerLoggedHandle('remote:list', async (_event, remotePath, sessionId) => {
-  console.log('[DEBUG MAIN IPC] remote:list received:', { remotePath, sessionId });
+  const cleanPath = normalizePOSIXPath(remotePath);
+  console.log('[DEBUG MAIN IPC] remote:list received:', { remotePath: cleanPath, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) {
     console.warn('[DEBUG MAIN IPC] remote:list failed: No active session for sessionId:', sessionId);
     throw new Error('No active remote session for tab.');
   }
-  return await session.list(remotePath);
+  return await session.list(cleanPath);
 });
 
 registerLoggedHandle('remote:mkdir', async (_event, remotePath, sessionId, mode) => {
-  console.log('[DEBUG MAIN IPC] remote:mkdir received:', { remotePath, sessionId, mode });
+  const cleanPath = normalizePOSIXPath(remotePath);
+  console.log('[DEBUG MAIN IPC] remote:mkdir received:', { remotePath: cleanPath, sessionId, mode });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
-  await session.mkdir(remotePath, mode);
-  sendLog('info', `Created remote directory: ${remotePath} (mode: ${mode || 'default'})`);
+  await session.mkdir(cleanPath, mode);
+  sendLog('info', `Created remote directory: ${cleanPath} (mode: ${mode || 'default'})`);
   return true;
 });
 
 registerLoggedHandle('remote:delete', async (_event, remotePath, isDir, sessionId) => {
-  console.log('[DEBUG MAIN IPC] remote:delete received:', { remotePath, isDir, sessionId });
+  const cleanPath = normalizePOSIXPath(remotePath);
+  console.log('[DEBUG MAIN IPC] remote:delete received:', { remotePath: cleanPath, isDir, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
-  await session.delete(remotePath, isDir);
-  sendLog('info', `Deleted remote item: ${remotePath}`);
+  await session.delete(cleanPath, isDir);
+  sendLog('info', `Deleted remote item: ${cleanPath}`);
   return true;
 });
 
 registerLoggedHandle('remote:chmod', async (_event, remotePath, mode, sessionId) => {
-  console.log('[DEBUG MAIN IPC] remote:chmod received:', { remotePath, mode, sessionId });
+  const cleanPath = normalizePOSIXPath(remotePath);
+  console.log('[DEBUG MAIN IPC] remote:chmod received:', { remotePath: cleanPath, mode, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.chmod) {
-    await session.chmod(remotePath, mode);
-    sendLog('info', `Changed permissions on ${remotePath} to ${mode}`);
+    await session.chmod(cleanPath, mode);
+    sendLog('info', `Changed permissions on ${cleanPath} to ${mode}`);
     return true;
   }
   throw new Error('chmod is not supported on this protocol.');
 });
 
 registerLoggedHandle('remote:rename', async (_event, oldPath, newPath, sessionId) => {
-  console.log('[DEBUG MAIN IPC] remote:rename received:', { oldPath, newPath, sessionId });
+  const cleanOldPath = normalizePOSIXPath(oldPath);
+  const cleanNewPath = normalizePOSIXPath(newPath);
+  console.log('[DEBUG MAIN IPC] remote:rename received:', { oldPath: cleanOldPath, newPath: cleanNewPath, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
-  await session.rename(oldPath, newPath);
-  sendLog('info', `Renamed remote item ${oldPath} -> ${newPath}`);
+  await session.rename(cleanOldPath, cleanNewPath);
+  sendLog('info', `Renamed remote item ${cleanOldPath} -> ${cleanNewPath}`);
   return true;
 });
 
 registerLoggedHandle('remote:create-file', async (_event, remotePath, sessionId, mode) => {
-  console.log('[DEBUG MAIN IPC] remote:create-file received:', { remotePath, sessionId, mode });
+  const cleanPath = normalizePOSIXPath(remotePath);
+  console.log('[DEBUG MAIN IPC] remote:create-file received:', { remotePath: cleanPath, sessionId, mode });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.createFile) {
-    await session.createFile(remotePath, mode);
+    await session.createFile(cleanPath, mode);
   } else {
     const tempLocal = path.join(app.getPath('userData'), 'temp_empty.txt');
     fs.writeFileSync(tempLocal, '');
-    await session.uploadFile(tempLocal, remotePath, null);
+    await session.uploadFile(tempLocal, cleanPath, null);
     try { fs.unlinkSync(tempLocal); } catch (e) {}
   }
-  sendLog('info', `Created remote file: ${remotePath} (mode: ${mode || 'default'})`);
+  sendLog('info', `Created remote file: ${cleanPath} (mode: ${mode || 'default'})`);
   return true;
 });
 
@@ -1327,12 +1334,13 @@ registerLoggedHandle('transfer:download', async (_event, remotePath, localPath, 
   const profile = sessionItem ? sessionItem.config : activeConfig;
   const profileId = profile ? profile.id : 'temp';
   
-  sendLog('info', `Starting download via Transfer Engine: ${remotePath} -> ${localPath}`);
+  const cleanRemotePath = normalizePOSIXPath(remotePath);
+  sendLog('info', `Starting download via Transfer Engine: ${cleanRemotePath} -> ${localPath}`);
 
   const task = {
     id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     type: 'download',
-    source: remotePath,
+    source: cleanRemotePath,
     dest: localPath,
     profileId: profileId,
     sessionId: sessionId
@@ -1357,13 +1365,14 @@ registerLoggedHandle('transfer:upload', async (_event, localPath, remotePath, se
   const profile = sessionItem ? sessionItem.config : activeConfig;
   const profileId = profile ? profile.id : 'temp';
 
-  sendLog('info', `Starting upload via Transfer Engine: ${localPath} -> ${remotePath}`);
+  const cleanRemotePath = normalizePOSIXPath(remotePath);
+  sendLog('info', `Starting upload via Transfer Engine: ${localPath} -> ${cleanRemotePath}`);
 
   const task = {
     id: 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     type: 'upload',
     source: localPath,
-    dest: remotePath,
+    dest: cleanRemotePath,
     profileId: profileId,
     sessionId: sessionId
   };
@@ -1396,19 +1405,20 @@ registerLoggedHandle('transfer:save-queue', async (_event, queue) => {
 
 // Developer Remote Edit Workflow
 registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
-  writeDebugLog(`[TRACE MAIN remote:edit ENTERED] remotePath: ${remotePath} | sessionId: ${sessionId}`);
+  const cleanPath = normalizePOSIXPath(remotePath);
+  writeDebugLog(`[TRACE MAIN remote:edit ENTERED] remotePath: ${cleanPath} | sessionId: ${sessionId}`);
   writeDebugLog({
     scope: 'workflow',
     event: 'remote:edit requested',
     level: 'info',
     message: 'Remote edit request received',
-    details: { remotePath, sessionId }
+    details: { remotePath: cleanPath, sessionId }
   });
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('cache:debug-event', {
       stage: 'STAGE 1',
       msg: '[REMOTE EDIT ENTERED]',
-      details: { remotePath, sessionId }
+      details: { remotePath: cleanPath, sessionId }
     });
   }
   console.log('[CHECKPOINT 7] Main process ipcMain.handle("remote:edit") entered');
@@ -1422,44 +1432,44 @@ registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
   const profile = sessionItem ? sessionItem.config : activeConfig;
   const profileId = profile ? profile.id : 'temp';
 
-  const localCachePath = cacheWatcherService.getCachePath(profileId, remotePath);
+  const localCachePath = cacheWatcherService.getCachePath(profileId, cleanPath);
   console.log('[CHECKPOINT 12] Temporary cache file path:', localCachePath);
 
   // If the file is already being watched/edited, do not download it again! (Issue 2.6)
   if (cacheWatcherService && cacheWatcherService.watchers.has(localCachePath)) {
-    sendLog('info', `File ${path.basename(remotePath)} is already open for editing. Re-focusing.`);
+    sendLog('info', `File ${path.basename(cleanPath)} is already open for editing. Re-focusing.`);
     cacheWatcherService.launchEditor(localCachePath);
     return { localPath: localCachePath };
   }
 
-  console.log('[CHECKPOINT 10] Download started for editing:', { remotePath, localCachePath });
+  console.log('[CHECKPOINT 10] Download started for editing:', { remotePath: cleanPath, localCachePath });
   writeDebugLog({
     scope: 'workflow',
     event: 'remote file download',
     level: 'info',
     message: 'Downloading remote file for editing',
-    details: { remotePath, localCachePath, sessionId }
+    details: { remotePath: cleanPath, localCachePath, sessionId }
   });
-  sendLog('info', `Caching remote file for editing: ${remotePath}`);
-  await session.downloadFile(remotePath, localCachePath, null);
+  sendLog('info', `Caching remote file for editing: ${cleanPath}`);
+  await session.downloadFile(cleanPath, localCachePath, null);
   console.log('[CHECKPOINT 11] Download completed for editing:', localCachePath);
   writeDebugLog({
     scope: 'workflow',
     event: 'cache file created',
     level: 'info',
     message: 'Cached editor file created',
-    details: { remotePath, localCachePath, sessionId }
+    details: { remotePath: cleanPath, localCachePath, sessionId }
   });
   
   let remoteStats = {};
   if (session.stat) {
     try {
-      remoteStats = await session.stat(remotePath);
+      remoteStats = await session.stat(cleanPath);
     } catch (e) {}
   }
   
-  cacheWatcherService.openAndWatch(localCachePath, remotePath, profile || profileId, sessionId, remoteStats);
-  sendLog('info', `Opened ${path.basename(remotePath)} in default editor with live sync.`);
+  cacheWatcherService.openAndWatch(localCachePath, cleanPath, profile || profileId, sessionId, remoteStats);
+  sendLog('info', `Opened ${path.basename(cleanPath)} in default editor with live sync.`);
   return { localPath: localCachePath };
 });
 

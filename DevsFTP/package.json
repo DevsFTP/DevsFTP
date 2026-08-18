@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1107.0",
+    "@aws-sdk/lib-storage": "^3.1113.0",
     "@electron/asar": "^3.3.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
@@ -46,6 +47,7 @@
       "assets/**/*",
       "package.json"
     ],
+    "npmRebuild": false,
     "win": {
       "icon": "assets/icon.ico",
       "signAndEditExecutable": false,

@@ -14,9 +14,15 @@ if (fs.existsSync(distDir)) {
   fs.rmSync(distDir, { recursive: true, force: true });
 }
 
-console.log('2. Building win-unpacked dir target first via electron-builder...');
-execSync('npx electron-builder --win dir', { cwd: rootDir, stdio: 'inherit' });
+// Build all Windows targets in a single electron-builder invocation.
+// Using --prepackaged caused 7zip staging failures on Windows due to broken
+// hardlinks after rcedit replaces DevsFTP.exe. Building everything at once
+// avoids that issue entirely.
+console.log('2. Building all Windows targets (nsis, portable, dir) via electron-builder...');
+execSync('npx electron-builder --win nsis portable dir', { cwd: rootDir, stdio: 'inherit' });
 
+// rcedit brands dist/win-unpacked/DevsFTP.exe (the portable dev/run copy).
+// The NSIS/portable installers are already built above with their own bundled exe.
 console.log('3. Injecting DevsFTP icon & Win32 PE version metadata resources into DevsFTP.exe via rcedit...');
 if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath)) {
   const rceditCmd = `"${rceditPath}" "${exePath}" ` +
@@ -35,10 +41,7 @@ if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath
   console.error('⚠️ Could not locate rcedit-x64.exe, DevsFTP.exe, or icon.ico');
 }
 
-console.log('4. Generating NSIS Installer and Portable binaries from pre-branded unpacked executable...');
-execSync('npx electron-builder --win nsis portable --prepackaged dist/win-unpacked', { cwd: rootDir, stdio: 'inherit' });
-
-console.log('5. Touching executable timestamp & refreshing Windows Shell cache...');
+console.log('4. Touching executable timestamp & refreshing Windows Shell cache...');
 try {
   const now = new Date();
   fs.utimesSync(exePath, now, now);
