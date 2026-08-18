@@ -670,6 +670,8 @@ window.ConnectionDialog = {
         password: finalPassword,
         privateKeyPath: document.getElementById('prof-keypath').value,
         webdavPath: webdavPathVal,
+        s3Bucket: document.getElementById('prof-s3-bucket') ? document.getElementById('prof-s3-bucket').value.trim() : '',
+        s3Region: document.getElementById('prof-s3-region') ? document.getElementById('prof-s3-region').value.trim() : 'us-east-1',
         accentColor: this.activeAccentColor || '#68a063',
         remotePath: (this.selectedConnectionProfile && this.selectedConnectionProfile.remotePath) || '/',
         localPath: (this.selectedConnectionProfile && this.selectedConnectionProfile.localPath) || 'C:\\',
