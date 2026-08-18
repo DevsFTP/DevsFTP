@@ -298,11 +298,6 @@ window.FileBrowser = {
       });
     }
 
-    // Drag & Drop Setup
-    if (remoteContainer) {
-      remoteContainer.addEventListener('dragover', (e) => e.preventDefault());
-      remoteContainer.addEventListener('drop', (e) => this.handleRemoteDrop(e));
-    }
 
     // New Item Creation Modal Listeners
     const btnCancel = document.getElementById('btn-new-item-cancel');
@@ -410,6 +405,7 @@ window.FileBrowser = {
 
       localPane.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         localPane.classList.remove('dropzone-active');
         if (this.dragSourcePane === 'local') return;
 
@@ -446,6 +442,7 @@ window.FileBrowser = {
 
       remotePane.addEventListener('drop', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         remotePane.classList.remove('dropzone-active');
         if (this.dragSourcePane === 'remote') return;
 
