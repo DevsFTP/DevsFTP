@@ -1022,13 +1022,18 @@ window.FileBrowser = {
   },
 
   localUp() {
-    const isWindows = this.localPath.includes('\\') || !this.localPath.includes('/');
-    const separator = isWindows ? '\\' : '/';
-    const parts = this.localPath.split(separator).filter(Boolean);
+    const parts = this.localPath.split(/[\\/]/).filter(Boolean);
     if (parts.length > 0) {
+      const isWindows = /^[a-zA-Z]:/.test(parts[0]);
       parts.pop();
       if (isWindows) {
-        this.refreshLocal(parts.join('\\') + '\\');
+        if (parts.length === 0) {
+          this.refreshLocal(this.localPath);
+        } else if (parts.length === 1) {
+          this.refreshLocal(parts[0] + '\\');
+        } else {
+          this.refreshLocal(parts.join('\\'));
+        }
       } else {
         const parentPath = '/' + parts.join('/');
         this.refreshLocal(parentPath === '' ? '/' : parentPath);
