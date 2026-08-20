@@ -39,6 +39,7 @@
     "appId": "com.devsftp.app",
     "productName": "DevsFTP",
     "copyright": "Copyright © 2026 DevsFTP.com",
+    "electronVersion": "34.5.8",
     "directories": {
       "output": "dist"
     },
