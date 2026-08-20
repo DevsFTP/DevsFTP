@@ -86,9 +86,6 @@
         "libfuse2t64 | libfuse2",
         "libnotify4",
         "libnss3"
-      ],
-      "fpm": [
-        "--gpg-sign=8D28137A98E8E1C1"
       ]
     }
   }
