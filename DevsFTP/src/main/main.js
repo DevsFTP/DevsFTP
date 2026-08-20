@@ -1435,11 +1435,29 @@ registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
   const localCachePath = cacheWatcherService.getCachePath(profileId, cleanPath);
   console.log('[CHECKPOINT 12] Temporary cache file path:', localCachePath);
 
-  // If the file is already being watched/edited, do not download it again! (Issue 2.6)
-  if (cacheWatcherService && cacheWatcherService.watchers.has(localCachePath)) {
-    sendLog('info', `File ${path.basename(cleanPath)} is already open for editing. Re-focusing.`);
+  // 1. Fetch remote file stats first to check modification time
+  let remoteStats = {};
+  if (session.stat) {
+    try {
+      remoteStats = await session.stat(cleanPath);
+    } catch (e) {}
+  }
+
+  // 2. Read manifest to compare modification times
+  const manifest = cacheWatcherService.readManifest(localCachePath);
+  const remoteMtime = remoteStats.modifyTime || null;
+  const cachedMtime = manifest ? manifest.remoteMtime : null;
+
+  // 3. If file is watched and in sync, skip download and refocus
+  if (cacheWatcherService && cacheWatcherService.watchers.has(localCachePath) && cachedMtime === remoteMtime) {
+    sendLog('info', `File ${path.basename(cleanPath)} is already open for editing and in sync. Re-focusing.`);
     cacheWatcherService.launchEditor(localCachePath);
     return { localPath: localCachePath };
+  }
+
+  // 4. Otherwise, clean up old watcher and download fresh copy from remote server
+  if (cacheWatcherService && cacheWatcherService.watchers.has(localCachePath)) {
+    cacheWatcherService.stopWatching(localCachePath);
   }
 
   console.log('[CHECKPOINT 10] Download started for editing:', { remotePath: cleanPath, localCachePath });
@@ -1460,13 +1478,6 @@ registerLoggedHandle('remote:edit', async (_event, remotePath, sessionId) => {
     message: 'Cached editor file created',
     details: { remotePath: cleanPath, localCachePath, sessionId }
   });
-  
-  let remoteStats = {};
-  if (session.stat) {
-    try {
-      remoteStats = await session.stat(cleanPath);
-    } catch (e) {}
-  }
   
   cacheWatcherService.openAndWatch(localCachePath, cleanPath, profile || profileId, sessionId, remoteStats);
   sendLog('info', `Opened ${path.basename(cleanPath)} in default editor with live sync.`);
