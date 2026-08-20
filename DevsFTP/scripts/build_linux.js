@@ -4,7 +4,7 @@ const path = require('path');
 
 const rootDir = path.join(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
-const GPG_KEY = '8D28137A98E8E1C1';
+const GPG_KEY = '7DA36A4AD371D675';
 
 console.log('=== DevsFTP Linux Distribution Build Pipeline ===');
 console.log('1. Verifying Linux branding assets...');
