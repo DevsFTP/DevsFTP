@@ -25,6 +25,11 @@ window.FileBrowser = {
   localFiles: [],
   remoteFiles: [],
 
+  getLocalSeparator() {
+    const p = this.localPath || '';
+    return (p.includes('\\') || /^[a-zA-Z]:/.test(p)) ? '\\' : '/';
+  },
+
   selectedLocal: null,
   selectedRemote: null,
   selectedLocalFiles: [],
@@ -892,7 +897,8 @@ window.FileBrowser = {
           await api.remoteCreateFile(remoteFilePath, sessId, mode);
           this.refreshRemote(this.remotePath);
         } else {
-          const localFilePath = `${this.localPath}\\${name}`;
+          const sep = this.getLocalSeparator();
+          const localFilePath = this.localPath.endsWith(sep) ? `${this.localPath}${name}` : `${this.localPath}${sep}${name}`;
           await api.localCreateFile(localFilePath);
           this.refreshLocal(this.localPath);
         }
@@ -903,7 +909,8 @@ window.FileBrowser = {
           await api.remoteMkdir(remoteDirPath, sessId, mode);
           this.refreshRemote(this.remotePath);
         } else {
-          const localDirPath = `${this.localPath}\\${name}`;
+          const sep = this.getLocalSeparator();
+          const localDirPath = this.localPath.endsWith(sep) ? `${this.localPath}${name}` : `${this.localPath}${sep}${name}`;
           await api.localMkdir(localDirPath);
           this.refreshLocal(this.localPath);
         }
@@ -1579,8 +1586,9 @@ window.FileBrowser = {
       if (this.selectedLocal && this.selectedLocal.isDir && this.selectedLocal.path) {
         targetDir = this.selectedLocal.path;
       }
-      const baseLocal = targetDir.endsWith('\\') ? targetDir.slice(0, -1) : targetDir;
-      localDest = `${baseLocal}\\${fileName}`;
+      const sep = this.getLocalSeparator();
+      const baseLocal = targetDir.endsWith(sep) ? targetDir.slice(0, -sep.length) : targetDir;
+      localDest = `${baseLocal}${sep}${fileName}`;
     }
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
 
