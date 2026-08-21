@@ -22,5 +22,5 @@ Thumbs.db
 .env.local
 
 # Large release binaries (> 100MB)
-releases/linux/DevsFTP-1.0.0.AppImage
-releases/linux/devsftp-1.0.0.tar.gz
+releases/DevsFTP-1.0.0.AppImage
+releases/devsftp-1.0.0.tar.gz
