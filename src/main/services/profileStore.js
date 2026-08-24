@@ -7,6 +7,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+const TARGET_ITERATIONS = 800000;
+const DEFAULT_LEGACY_ITERATIONS = 100000;
+
 let app = null;
 try {
   app = require('electron').app;
@@ -72,9 +75,9 @@ class ProfileStore {
     return key;
   }
 
-  _deriveKey(password, saltHex) {
+  _deriveKey(password, saltHex, iterations = TARGET_ITERATIONS) {
     const salt = Buffer.from(saltHex, 'hex');
-    return crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
+    return crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256');
   }
 
   _encryptWithKey(text, key) {
@@ -184,13 +187,20 @@ class ProfileStore {
     }
 
     try {
-      const key = this._deriveKey(password, this.masterConfig.salt);
+      const iterations = this.masterConfig.iterations || DEFAULT_LEGACY_ITERATIONS;
+      const key = this._deriveKey(password, this.masterConfig.salt, iterations);
       const verifierResult = this._decryptWithKey(this.masterConfig.verifier, key);
 
       if (verifierResult === 'DEVFTP_MASTER_VERIFIER') {
         this.encryptionKey = key;
         this.isUnlocked = true;
         this.profiles = this._load();
+
+        // Silent migration if iterations count is outdated
+        if (!this.masterConfig.iterations || this.masterConfig.iterations < TARGET_ITERATIONS) {
+          this._migrateVaultIterations(password);
+        }
+
         return true;
       }
     } catch (e) {
@@ -205,7 +215,7 @@ class ProfileStore {
     if (!password) throw new Error('Password cannot be empty');
 
     const salt = crypto.randomBytes(16).toString('hex');
-    const newKey = this._deriveKey(password, salt);
+    const newKey = this._deriveKey(password, salt, TARGET_ITERATIONS);
     const verifier = this._encryptWithKey('DEVFTP_MASTER_VERIFIER', newKey);
 
     // Re-encrypt profiles from old key to new master key
@@ -216,13 +226,37 @@ class ProfileStore {
     this.masterConfig = {
       enabled: true,
       salt,
-      verifier
+      verifier,
+      iterations: TARGET_ITERATIONS
     };
 
     this._saveMasterConfig();
     this.isUnlocked = true;
     this.save();
     return true;
+  }
+
+  _migrateVaultIterations(password) {
+    try {
+      const newSalt = crypto.randomBytes(16).toString('hex');
+      const newKey = this._deriveKey(password, newSalt, TARGET_ITERATIONS);
+      const newVerifier = this._encryptWithKey('DEVFTP_MASTER_VERIFIER', newKey);
+
+      // Re-encrypt profiles with the upgraded key
+      this.encryptionKey = newKey;
+      if (!this.masterConfig) {
+        this.masterConfig = {};
+      }
+      this.masterConfig.salt = newSalt;
+      this.masterConfig.verifier = newVerifier;
+      this.masterConfig.iterations = TARGET_ITERATIONS;
+
+      this._saveMasterConfig();
+      this.save();
+      console.log(`[SECURITY] Vault successfully migrated to ${TARGET_ITERATIONS} iterations.`);
+    } catch (err) {
+      console.error('[SECURITY] Silent vault iteration migration failed:', err);
+    }
   }
 
   disableMasterPassword(currentPassword) {

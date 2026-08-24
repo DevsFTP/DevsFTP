@@ -38,7 +38,19 @@ class SFTPService {
           this.sftp = sftp;
           this.connected = true;
           if (onLog) onLog('info', 'SFTP Session active and ready.');
-          resolve(true);
+          
+          this.sftp.realpath('.', (realErr, absPath) => {
+            let remoteOS = 'linux';
+            if (!realErr && absPath) {
+              const clean = absPath.replace(/\\/g, '/');
+              if (/^[a-zA-Z]:/i.test(clean) || /^\/[a-zA-Z]:/i.test(clean)) {
+                remoteOS = 'windows';
+              }
+            }
+            this.remoteOS = remoteOS;
+            if (onLog) onLog('info', `Detected remote server OS: ${remoteOS.toUpperCase()}`);
+            resolve(true);
+          });
         });
       });
 
@@ -138,7 +150,10 @@ class SFTPService {
           try {
             bastionOpts.privateKey = fs.readFileSync(config.privateKeyPath);
             if (config.passphrase || config.proxyPassword) bastionOpts.passphrase = config.passphrase || config.proxyPassword;
-          } catch (e) {}
+          } catch (e) {
+            // Reject immediately with a clear message (Fix A1)
+            return reject(new Error(`Failed to read SSH private key for bastion host: ${e.message}`));
+          }
         } else if (config.proxyPassword || config.password) {
           bastionOpts.password = config.proxyPassword || config.password;
         }
@@ -228,11 +243,15 @@ class SFTPService {
       this.sftp.readdir(normalizedPath, async (err, list) => {
         if (err) return reject(err);
 
-        const itemsPromises = list.map(item => {
+        // Build entries — symlinks need a follow-up stat to resolve target type (D3)
+        const regularEntries = [];
+        const symlinkEntries = [];
+
+        for (const item of list) {
           const isDir = (item.attrs.mode & 0o040000) === 0o040000 || item.longname.startsWith('d');
           const isLink = (item.attrs.mode & 0o120000) === 0o120000 || item.longname.startsWith('l');
           const type = isDir ? 'd' : (isLink ? 'l' : '-');
-          
+
           const entry = {
             name: item.filename,
             path: normalizePOSIXPath(`${normalizedPath}/${item.filename}`),
@@ -244,25 +263,33 @@ class SFTPService {
             mode: item.attrs.mode
           };
 
-          // Resolve symbolic link target types (Issue 10.3)
           if (isLink) {
-            return new Promise((resResolve) => {
+            symlinkEntries.push(entry);
+          } else {
+            regularEntries.push(entry);
+          }
+        }
+
+        // Resolve symlink target types with throttled concurrency (max 10) (Fix D3)
+        const SYMLINK_CONCURRENCY = 10;
+        const resolvedLinks = [];
+        for (let i = 0; i < symlinkEntries.length; i += SYMLINK_CONCURRENCY) {
+          const batch = symlinkEntries.slice(i, i + SYMLINK_CONCURRENCY);
+          const batchResults = await Promise.all(batch.map(entry =>
+            new Promise((resResolve) => {
               this.sftp.stat(entry.path, (statErr, stats) => {
                 if (!statErr && stats) {
                   entry.isDir = (stats.mode & 0o040000) === 0o040000;
-                  if (entry.isDir) {
-                    entry.type = 'd';
-                  }
+                  if (entry.isDir) entry.type = 'd';
                 }
                 resResolve(entry);
               });
-            });
-          }
+            })
+          ));
+          resolvedLinks.push(...batchResults);
+        }
 
-          return Promise.resolve(entry);
-        });
-
-        const items = await Promise.all(itemsPromises);
+        const items = [...regularEntries, ...resolvedLinks];
 
         // Sort directories first, then files alphabetically
         items.sort((a, b) => {
@@ -312,23 +339,32 @@ class SFTPService {
     if (!this.connected || !this.sftp) throw new Error('SFTP client is not connected.');
     const normRemote = normalizePOSIXPath(remoteDirPath);
 
-    if (!fs.existsSync(localDestPath)) {
-      fs.mkdirSync(localDestPath, { recursive: true });
+    // Use async fs to avoid blocking the event loop (Fix A4/D2)
+    try { await fs.promises.access(localDestPath); } catch {
+      await fs.promises.mkdir(localDestPath, { recursive: true });
     }
 
     const res = await this.list(normRemote);
     const items = (res && res.files) ? res.files : [];
+    // Collect per-file errors and continue — don't abort on a single failure (Fix A3)
+    const errors = [];
     for (const item of items) {
       const remoteItemPath = `${normRemote === '/' ? '' : normRemote}/${item.name}`;
       const localItemPath = path.join(localDestPath, item.name);
-
-      if (item.isDir) {
-        await this.downloadDir(remoteItemPath, localItemPath, onProgress);
-      } else {
-        await this.downloadFile(remoteItemPath, localItemPath, onProgress);
+      try {
+        if (item.isDir) {
+          await this.downloadDir(remoteItemPath, localItemPath, onProgress);
+        } else {
+          await this.downloadFile(remoteItemPath, localItemPath, onProgress);
+        }
+      } catch (itemErr) {
+        errors.push({ path: remoteItemPath, error: itemErr.message });
       }
     }
-    return true;
+    if (errors.length > 0) {
+      return { success: true, partial: true, errors };
+    }
+    return { success: true, partial: false, errors: [] };
   }
 
   uploadFile(localPath, remotePath, onProgress) {
@@ -371,19 +407,28 @@ class SFTPService {
       await this.mkdir(normRemote);
     } catch (e) {}
 
-    const items = fs.readdirSync(localDirPath, { withFileTypes: true });
+    // Use async readdir to avoid blocking the event loop (Fix A2/D1)
+    const items = await fs.promises.readdir(localDirPath, { withFileTypes: true });
 
+    // Collect per-file errors and continue — don't abort on a single failure (Fix A3)
+    const errors = [];
     for (const item of items) {
       const localItemPath = path.join(localDirPath, item.name);
       const remoteItemPath = `${normRemote === '/' ? '' : normRemote}/${item.name}`;
-
-      if (item.isDirectory()) {
-        await this.uploadDir(localItemPath, remoteItemPath, onProgress);
-      } else {
-        await this.uploadFile(localItemPath, remoteItemPath, onProgress);
+      try {
+        if (item.isDirectory()) {
+          await this.uploadDir(localItemPath, remoteItemPath, onProgress);
+        } else {
+          await this.uploadFile(localItemPath, remoteItemPath, onProgress);
+        }
+      } catch (itemErr) {
+        errors.push({ path: localItemPath, error: itemErr.message });
       }
     }
-    return true;
+    if (errors.length > 0) {
+      return { success: true, partial: true, errors };
+    }
+    return { success: true, partial: false, errors: [] };
   }
 
   createFile(remotePath, mode = null) {
@@ -497,6 +542,167 @@ class SFTPService {
       this.sftp.rename(normalizePOSIXPath(oldPath), normalizePOSIXPath(newPath), (err) => {
         if (err) return reject(err);
         resolve(true);
+      });
+    });
+  }
+
+  copy(srcPath, destPath) {
+    return new Promise((resolve, reject) => {
+      if (!this.connected || !this.sftp) return reject(new Error('SFTP not connected'));
+      
+      const cleanSrc = normalizePOSIXPath(srcPath);
+      const cleanDest = normalizePOSIXPath(destPath);
+
+      // Attempt fast server-side SSH cp -r first
+      if (this.sshClient) {
+        let settled = false;
+
+        // Escape single quotes inside paths then wrap in single quotes (Fix B3)
+        // Single-quoted shell args are immune to $(), backticks, and other injections
+        const escapedSrc = cleanSrc.replace(/'/g, "'\\''");
+        const escapedDest = cleanDest.replace(/'/g, "'\\''");
+
+        // Timeout after 3 seconds: fallback to streaming if command hangs
+        const execTimeout = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+          }
+        }, 3000);
+
+        this.sshClient.exec(`cp -r '${escapedSrc}' '${escapedDest}'`, (err, stream) => {
+          if (err) {
+            clearTimeout(execTimeout);
+            if (!settled) {
+              settled = true;
+              this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+            }
+            return;
+          }
+          
+          // Drain stdout to prevent buffering hangs
+          stream.on('data', () => {});
+          
+          // Drain stderr
+          if (stream.stderr) {
+            stream.stderr.on('data', () => {});
+            stream.stderr.on('error', () => {});
+          }
+
+          stream.on('error', () => {
+            clearTimeout(execTimeout);
+            if (!settled) {
+              settled = true;
+              this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+            }
+          });
+
+          stream.on('close', (code) => {
+            clearTimeout(execTimeout);
+            if (!settled) {
+              settled = true;
+              if (code === 0) {
+                resolve(true);
+              } else {
+                this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+              }
+            }
+          });
+        });
+      } else {
+        this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+      }
+    });
+  }
+
+  _copyViaStream(src, dest) {
+    return new Promise((resolve, reject) => {
+      this.sftp.stat(src, (err, stats) => {
+        if (err) return reject(err);
+        
+        try {
+          const isDir = stats && (typeof stats.isDirectory === 'function' ? stats.isDirectory() : ((stats.mode & 0o170000) === 0o040000));
+          if (isDir) {
+            this._copyDirViaStream(src, dest).then(resolve).catch(reject);
+          } else {
+            this._copyFileViaStream(src, dest).then(resolve).catch(reject);
+          }
+        } catch (statErr) {
+          reject(statErr);
+        }
+      });
+    });
+  }
+
+  _copyFileViaStream(src, dest) {
+    return new Promise((resolve, reject) => {
+      const readStream = this.sftp.createReadStream(src);
+      const writeStream = this.sftp.createWriteStream(dest);
+
+      readStream.on('error', (err) => reject(err));
+      writeStream.on('error', (err) => reject(err));
+      writeStream.on('close', () => resolve(true));
+
+      readStream.pipe(writeStream);
+    });
+  }
+
+  async _copyDirViaStream(src, dest) {
+    await new Promise((resolve, reject) => {
+      this.sftp.mkdir(dest, (err) => {
+        if (err && err.code !== 4) return reject(err); 
+        resolve(true);
+      });
+    });
+
+    const items = await new Promise((resolve, reject) => {
+      this.sftp.readdir(src, (err, list) => {
+        if (err) return reject(err);
+        resolve(list);
+      });
+    });
+
+    for (const item of items) {
+      const itemSrc = `${src}/${item.filename}`;
+      const itemDest = `${dest}/${item.filename}`;
+      await this._copyViaStream(itemSrc, itemDest);
+    }
+    return true;
+  }
+
+  execCommand(cmdString) {
+    return new Promise((resolve, reject) => {
+      if (!this.connected || !this.sshClient) {
+        return reject(new Error('SSH/SFTP session is not connected or does not support shell command execution.'));
+      }
+      
+      this.sshClient.exec(cmdString, (err, stream) => {
+        if (err) return reject(err);
+        
+        let stdout = '';
+        let stderr = '';
+        
+        stream.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        if (stream.stderr) {
+          stream.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+        }
+        
+        stream.on('close', (code) => {
+          resolve({
+            code,
+            stdout,
+            stderr
+          });
+        });
+
+        stream.on('error', (streamErr) => {
+          reject(streamErr);
+        });
       });
     });
   }

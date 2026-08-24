@@ -1,20 +1,19 @@
-# DevsFTP Organization Workspace
+# DevsFTP — The SFTP & FTP Client for Windows & Linux
 
-This repository houses the applications maintained by DevsFTP:
+DevsFTP is a secure, offline-first multi-protocol file transfer and remote editor workspace.
 
-```
-https://github.com/DevsFTP/DevsFTP/
-└── DevsFTP/         # Main SFTP, FTP & Cloud Client Application
-```
+## Setup & Run
 
-## Projects
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-### 🚀 [DevsFTP](./DevsFTP)
-The main multi-protocol file transfer and remote editor workspace for Windows & Linux.
-- **Directory**: [`./DevsFTP`](./DevsFTP)
-- **Run**: `cd DevsFTP && npm run dev`
-- **Build Windows**: `cd DevsFTP && npm run build:win`
-- **Build Linux**: `cd DevsFTP && npm run build:linux`
+2. Run in development mode:
+   ```bash
+   npm run dev
+   ```
 
----
-Copyright © 2026 DevsFTP.com. All rights reserved.
+3. Build distributions:
+   * Windows: `npm run build:win`
+   * Linux: `npm run build:linux`

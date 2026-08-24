@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [1.0.1] - 2026-08-22
+
+### Changed
+- **Vault Cryptography Upgrade**: Upgraded PBKDF2 Master Key derivation count to **800,000 iterations** using SHA-256 with dynamic config storage. Legacy 100,000 iteration vaults migrate transparently on first successful unlock.
+
 ## [1.0.0] - 2026-08-01
 
 ### Added

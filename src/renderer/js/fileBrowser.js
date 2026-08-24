@@ -42,6 +42,10 @@ window.FileBrowser = {
   contextItems: [],
   contextPane: null,
   dragSourcePane: null,
+  localSortKey: 'name',
+  localSortOrder: 'asc',
+  remoteSortKey: 'name',
+  remoteSortOrder: 'asc',
 
   getApi() {
     return window.devsFTP || window.pulseFTP;
@@ -50,6 +54,7 @@ window.FileBrowser = {
   async init() {
     this.calculatedDirSizes = new Map();
     this.setupListeners();
+    this.updateSortHeaders();
     this.loadDrives();
     const api = this.getApi();
     let initialPath = 'C:\\';
@@ -125,48 +130,68 @@ window.FileBrowser = {
     
     // Setup Context Menu Action Listeners
     document.getElementById('ctx-open').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-open click fired');
       this.handleContextAction('open');
     });
     document.getElementById('ctx-edit').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-edit click fired');
       this.handleContextAction('edit');
     });
     document.getElementById('ctx-download').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-download click fired');
       this.handleContextAction('download');
     });
     document.getElementById('ctx-upload').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-upload click fired');
       this.handleContextAction('upload');
     });
     document.getElementById('ctx-copy-path').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-copy-path click fired');
       this.handleContextAction('copy-path');
     });
     document.getElementById('ctx-calculate-size').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-calculate-size click fired');
       this.handleContextAction('calculate-size');
     });
     document.getElementById('ctx-chmod').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-chmod click fired');
       this.handleContextAction('chmod');
     });
     document.getElementById('ctx-new-file').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-new-file click fired');
       this.handleContextAction('new-file');
     });
     document.getElementById('ctx-mkdir').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-mkdir click fired');
       this.handleContextAction('mkdir');
     });
     document.getElementById('ctx-rename').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-rename click fired');
       this.handleContextAction('rename');
     });
+    document.getElementById('ctx-move').addEventListener('click', (e) => {
+      this.handleContextAction('move');
+    });
+    document.getElementById('ctx-copy-to').addEventListener('click', (e) => {
+      this.handleContextAction('copy-to');
+    });
+    document.getElementById('ctx-duplicate').addEventListener('click', (e) => {
+      this.handleContextAction('duplicate');
+    });
     document.getElementById('ctx-delete').addEventListener('click', (e) => {
-      console.log('[DEBUG MENU] #ctx-delete click fired');
       this.handleContextAction('delete');
+    });
+
+    // SSH Commands Submenu Listeners
+    document.getElementById('ssh-cmd-compress').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('ssh-compress');
+    });
+    document.getElementById('ssh-cmd-extract').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('ssh-extract');
+    });
+    document.getElementById('ssh-cmd-grep').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('ssh-grep');
+    });
+    document.getElementById('ssh-cmd-find').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('ssh-find');
+    });
+    document.getElementById('ssh-cmd-du').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('ssh-du');
     });
 
     // Drive selector
@@ -372,6 +397,45 @@ window.FileBrowser = {
       });
     }
 
+    // Batch Rename Modal Event Listeners
+    const btnBatchRenameClose = document.getElementById('btn-batch-rename-close-icon');
+    const btnBatchRenameCancel = document.getElementById('btn-batch-rename-cancel');
+    const btnBatchRenameSubmit = document.getElementById('btn-batch-rename-submit');
+    const batchRenameMode = document.getElementById('batch-rename-mode');
+
+    if (btnBatchRenameClose) btnBatchRenameClose.addEventListener('click', () => this.closeBatchRenameModal());
+    if (btnBatchRenameCancel) btnBatchRenameCancel.addEventListener('click', () => this.closeBatchRenameModal());
+    if (btnBatchRenameSubmit) btnBatchRenameSubmit.addEventListener('click', () => this.submitBatchRename());
+    if (batchRenameMode) {
+      batchRenameMode.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        document.querySelectorAll('.batch-rename-group').forEach(el => el.style.display = 'none');
+        if (mode === 'prefix-suffix') {
+          document.getElementById('batch-rename-prefix-suffix-group').style.display = 'block';
+        } else if (mode === 'find-replace') {
+          document.getElementById('batch-rename-find-replace-group').style.display = 'block';
+        } else if (mode === 'sequential') {
+          document.getElementById('batch-rename-sequential-group').style.display = 'block';
+        }
+      });
+    }
+
+    // Move/Copy Modal Event Listeners
+    const btnMoveClose = document.getElementById('btn-move-modal-close');
+    const btnMoveCancel = document.getElementById('btn-move-cancel');
+    const btnMoveSubmit = document.getElementById('btn-move-submit');
+    const movePathInput = document.getElementById('move-item-path-input');
+
+    if (btnMoveClose) btnMoveClose.addEventListener('click', () => this.closeMoveModal());
+    if (btnMoveCancel) btnMoveCancel.addEventListener('click', () => this.closeMoveModal());
+    if (btnMoveSubmit) btnMoveSubmit.addEventListener('click', () => this.submitMoveOrCopy());
+    if (movePathInput) {
+      movePathInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.submitMoveOrCopy();
+        if (e.key === 'Escape') this.closeMoveModal();
+      });
+    }
+
     // Delete Confirmation Modal Event Listeners
     const btnDelClose = document.getElementById('btn-confirm-delete-close');
     const btnDelCancel = document.getElementById('btn-confirm-delete-cancel');
@@ -381,8 +445,67 @@ window.FileBrowser = {
     if (btnDelCancel) btnDelCancel.addEventListener('click', () => this.closeDeleteConfirmModal());
     if (btnDelSubmit) btnDelSubmit.addEventListener('click', () => this.submitDelete());
 
+    // SSH Prompt Modal Event Listeners
+    const btnSshClose = document.getElementById('btn-ssh-prompt-close');
+    const btnSshCancel = document.getElementById('btn-ssh-prompt-cancel');
+    const btnSshSubmit = document.getElementById('btn-ssh-prompt-submit');
+    const sshPromptInput = document.getElementById('ssh-prompt-input');
+
+    if (btnSshClose) btnSshClose.addEventListener('click', () => this.closeSshPromptModal());
+    if (btnSshCancel) btnSshCancel.addEventListener('click', () => this.closeSshPromptModal());
+    if (btnSshSubmit) btnSshSubmit.addEventListener('click', () => this.submitSshPrompt());
+    if (sshPromptInput) {
+      sshPromptInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') this.submitSshPrompt();
+        if (e.key === 'Escape') this.closeSshPromptModal();
+      });
+    }
+
+    // Sortable Headers Event Listeners
+    document.querySelectorAll('.sortable-header').forEach(th => {
+      th.addEventListener('click', () => {
+        const pane = th.getAttribute('data-pane');
+        const key = th.getAttribute('data-sort-key');
+        
+        if (pane === 'local') {
+          if (this.localSortKey === key) {
+            this.localSortOrder = this.localSortOrder === 'asc' ? 'desc' : 'asc';
+          } else {
+            this.localSortKey = key;
+            this.localSortOrder = 'asc';
+          }
+          this.renderLocalTable(this.localFiles);
+        } else {
+          if (this.remoteSortKey === key) {
+            this.remoteSortOrder = this.remoteSortOrder === 'asc' ? 'desc' : 'asc';
+          } else {
+            this.remoteSortKey = key;
+            this.remoteSortOrder = 'asc';
+          }
+          this.renderRemoteTable(this.remoteFiles);
+        }
+        this.updateSortHeaders();
+      });
+    });
+
     // Drag & Drop Dual-Pane Listeners
     this.setupDragAndDrop();
+
+    // Search Drawer Panel Listeners
+    const btnCloseSearch = document.getElementById('btn-close-search-tab');
+    const btnClearSearch = document.getElementById('btn-clear-search');
+    if (btnCloseSearch) {
+      btnCloseSearch.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.clearSearchResults();
+        this.hideSearchTab();
+      });
+    }
+    if (btnClearSearch) {
+      btnClearSearch.addEventListener('click', () => {
+        this.clearSearchResults();
+      });
+    }
   },
 
   setupDragAndDrop() {
@@ -418,8 +541,14 @@ window.FileBrowser = {
           const raw = e.dataTransfer.getData('application/json');
           if (raw) {
             const data = JSON.parse(raw);
-            if (data && data.sourcePane === 'remote' && data.path) {
-              this.downloadFile(data.path);
+            if (data && data.sourcePane === 'remote') {
+              if (data.items && data.items.length > 0) {
+                data.items.forEach(item => {
+                  if (item.path) this.downloadFile(item.path);
+                });
+              } else if (data.path) {
+                this.downloadFile(data.path);
+              }
             }
           }
         } catch (err) {}
@@ -466,8 +595,14 @@ window.FileBrowser = {
           const raw = e.dataTransfer.getData('application/json');
           if (raw) {
             const data = JSON.parse(raw);
-            if (data && data.sourcePane === 'local' && data.path) {
-              this.uploadFile(data.path);
+            if (data && data.sourcePane === 'local') {
+              if (data.items && data.items.length > 0) {
+                data.items.forEach(item => {
+                  if (item.path) this.uploadFile(item.path);
+                });
+              } else if (data.path) {
+                this.uploadFile(data.path);
+              }
             }
           }
         } catch (err) {}
@@ -507,10 +642,13 @@ window.FileBrowser = {
     this.restorePaneFocus();
   },
 
-  openChmodModal(item) {
-    if (!item) return;
+  openChmodModal(items) {
+    // Accepts a single item or array of items (batch chmod support)
+    const itemsArr = Array.isArray(items) ? items : [items];
+    if (!itemsArr.length) return;
     this.hideContextMenu();
-    this.chmodTargetItem = item;
+    this.chmodTargetItems = itemsArr;
+    this.chmodTargetItem = itemsArr[0]; // keep for single-item backward compat
     this.chmodTargetPane = 'remote';
 
     const modal = document.getElementById('chmod-modal');
@@ -520,11 +658,36 @@ window.FileBrowser = {
 
     if (!modal) return;
 
-    if (title) title.textContent = `🔐 Permissions (CHMOD) - ${item.name}`;
-    if (pathVal) pathVal.textContent = item.path;
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
 
-    const initialOctal = this.parsePermissionsToOctal(item.permissions || (item.isDir ? 'rwxr-xr-x' : 'rw-r--r--'));
-    
+    if (itemsArr.length === 1) {
+      if (title) title.textContent = `🔐 Permissions (CHMOD) - ${itemsArr[0].name}`;
+      if (pathVal) {
+        pathVal.innerHTML = `<span style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(itemsArr[0].path)}</span>`;
+      }
+    } else {
+      if (title) title.textContent = `🔐 Permissions (CHMOD) - ${itemsArr.length} items`;
+      if (pathVal) {
+        const listHtml = `
+          <div class="chmod-target-list" style="max-height: 90px; overflow-y: auto; border: 1px solid hsl(var(--border-subtle)); padding: 6px 10px; border-radius: 4px; background-color: rgba(0,0,0,0.15); margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+            ${itemsArr.map(i => `
+              <div style="font-family: var(--font-mono); font-size: 11px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <input type="checkbox" class="chmod-target-checkbox" data-path="${escapeHtml(i.path)}" checked style="margin: 0; cursor: pointer;">
+                <span>${i.isDir ? '📁' : '📄'}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(i.name)}">${escapeHtml(i.name)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        pathVal.innerHTML = listHtml;
+      }
+    }
+
+    // Seed checkboxes from first item's current permissions
+    const initialOctal = this.parsePermissionsToOctal(itemsArr[0].permissions || (itemsArr[0].isDir ? 'rwxr-xr-x' : 'rw-r--r--'));
     if (presetSelect) presetSelect.value = initialOctal;
     this.applyEditChmodPreset(initialOctal);
 
@@ -533,6 +696,67 @@ window.FileBrowser = {
 
   closeChmodModal() {
     const modal = document.getElementById('chmod-modal');
+    if (modal) modal.classList.remove('active');
+    this.restorePaneFocus();
+  },
+
+  openBatchRenameModal(items, pane) {
+    const itemsArr = Array.isArray(items) ? items : [items];
+    if (!itemsArr.length) return;
+    this.hideContextMenu();
+    this.batchRenameTargetItems = itemsArr;
+    this.batchRenameTargetPane = pane || 'remote';
+
+    const modal = document.getElementById('batch-rename-modal');
+    const listContainer = document.getElementById('batch-rename-modal-target-list');
+    if (!modal) return;
+
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
+    // Render checkbox-based scrollable list of target files
+    if (listContainer) {
+      listContainer.innerHTML = `
+        <div class="batch-rename-target-list" style="max-height: 90px; overflow-y: auto; border: 1px solid hsl(var(--border-subtle)); padding: 6px 10px; border-radius: 4px; background-color: rgba(0,0,0,0.15); margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+          ${itemsArr.map(i => `
+            <div style="font-family: var(--font-mono); font-size: 11px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+              <input type="checkbox" class="batch-rename-target-checkbox" data-path="${escapeHtml(i.path)}" data-name="${escapeHtml(i.name)}" checked style="margin: 0; cursor: pointer;">
+              <span>${i.isDir ? '📁' : '📄'}</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(i.name)}">${escapeHtml(i.name)}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Reset input fields
+    const prefixInput = document.getElementById('batch-rename-prefix');
+    const suffixInput = document.getElementById('batch-rename-suffix');
+    const findInput = document.getElementById('batch-rename-find');
+    const replaceInput = document.getElementById('batch-rename-replace');
+    const baseInput = document.getElementById('batch-rename-base');
+    const startInput = document.getElementById('batch-rename-start');
+    const modeSelect = document.getElementById('batch-rename-mode');
+
+    if (prefixInput) prefixInput.value = '';
+    if (suffixInput) suffixInput.value = '';
+    if (findInput) findInput.value = '';
+    if (replaceInput) replaceInput.value = '';
+    if (baseInput) baseInput.value = '';
+    if (startInput) startInput.value = '1';
+    if (modeSelect) {
+      modeSelect.value = 'prefix-suffix';
+      // Trigger change to update group visibility
+      modeSelect.dispatchEvent(new Event('change'));
+    }
+
+    modal.classList.add('active');
+  },
+
+  closeBatchRenameModal() {
+    const modal = document.getElementById('batch-rename-modal');
     if (modal) modal.classList.remove('active');
     this.restorePaneFocus();
   },
@@ -577,6 +801,216 @@ window.FileBrowser = {
     if (modal) modal.classList.remove('active');
     this.renameTargetItem = null;
     this.restorePaneFocus();
+  },
+
+  openMoveModal(item, mode, pane) {
+    if (!item) return;
+    this.hideContextMenu();
+    this.moveTargetItem = item;
+    this.moveTargetMode = mode; // 'move' or 'copy'
+    this.moveTargetPane = pane || 'remote';
+
+    const modal = document.getElementById('move-modal');
+    const title = document.getElementById('move-modal-title');
+    const pathVal = document.getElementById('move-modal-target-path');
+    const pathInput = document.getElementById('move-item-path-input');
+    const label = document.getElementById('move-item-path-label');
+    const submitBtn = document.getElementById('btn-move-submit');
+
+    if (!modal) return;
+
+    const icon = item.isDir ? '📁' : '📄';
+    const typeLabel = item.isDir ? 'Directory' : 'File';
+    
+    if (mode === 'move') {
+      if (title) title.textContent = `📦 Move ${typeLabel}`;
+      if (label) label.textContent = 'New Destination Path';
+      if (submitBtn) {
+        submitBtn.innerHTML = '📦 Move Item';
+        submitBtn.className = 'btn btn-primary';
+      }
+    } else {
+      if (title) title.textContent = `📋 Copy ${typeLabel} To...`;
+      if (label) label.textContent = 'Copy Destination Path';
+      if (submitBtn) {
+        submitBtn.innerHTML = '⚡ Copy Item';
+        submitBtn.className = 'btn btn-primary';
+      }
+    }
+
+    if (pathVal) pathVal.textContent = item.path;
+    if (pathInput) {
+      pathInput.value = item.path;
+      pathInput.style.borderColor = '';
+    }
+
+    modal.classList.add('active');
+    setTimeout(() => {
+      if (pathInput) {
+        pathInput.focus();
+        pathInput.select();
+      }
+    }, 100);
+  },
+
+  closeMoveModal() {
+    const modal = document.getElementById('move-modal');
+    if (modal) modal.classList.remove('active');
+    this.moveTargetItem = null;
+    this.restorePaneFocus();
+  },
+
+  showSshPromptModal(title, label, placeholder, defaultValue, onSubmit) {
+    const modal = document.getElementById('ssh-prompt-modal');
+    const titleEl = document.getElementById('ssh-prompt-modal-title');
+    const labelEl = document.getElementById('ssh-prompt-label');
+    const inputEl = document.getElementById('ssh-prompt-input');
+
+    if (titleEl) titleEl.textContent = title;
+    if (labelEl) labelEl.textContent = label;
+    if (inputEl) {
+      inputEl.placeholder = placeholder;
+      inputEl.value = defaultValue || '';
+    }
+
+    this.sshPromptSubmitCallback = onSubmit;
+    if (modal) modal.classList.add('active');
+
+    setTimeout(() => {
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    }, 100);
+  },
+
+  closeSshPromptModal() {
+    const modal = document.getElementById('ssh-prompt-modal');
+    if (modal) modal.classList.remove('active');
+    const inputEl = document.getElementById('ssh-prompt-input');
+    if (inputEl) inputEl.value = '';
+    this.sshPromptSubmitCallback = null;
+    this.restorePaneFocus();
+  },
+
+  submitSshPrompt() {
+    const inputEl = document.getElementById('ssh-prompt-input');
+    const value = inputEl ? inputEl.value.trim() : '';
+    if (typeof this.sshPromptSubmitCallback === 'function') {
+      this.sshPromptSubmitCallback(value);
+    }
+    this.closeSshPromptModal();
+  },
+
+  async submitMoveOrCopy() {
+    if (!this.moveTargetItem) return;
+    const pathInput = document.getElementById('move-item-path-input');
+    const newPath = pathInput ? pathInput.value.trim() : '';
+
+    if (!newPath) {
+      if (pathInput) {
+        pathInput.style.borderColor = 'hsl(var(--status-danger))';
+        pathInput.focus();
+      }
+      return;
+    }
+
+    if (pathInput) pathInput.style.borderColor = '';
+    const item = this.moveTargetItem;
+    const mode = this.moveTargetMode || 'move';
+    const pane = this.moveTargetPane || 'remote';
+    const api = this.getApi();
+    const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
+
+    if (newPath === item.path) {
+      this.closeMoveModal();
+      return;
+    }
+
+    this.closeMoveModal();
+
+    try {
+      if (mode === 'move') {
+        if (pane === 'remote') {
+          await api.remoteRename(item.path, newPath, sessId);
+          this.refreshRemote(this.remotePath);
+        } else if (pane === 'local') {
+          await api.localRename(item.path, newPath);
+          this.refreshLocal(this.localPath);
+        }
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('info', `📦 Moved item: ${item.name} -> ${newPath}`);
+        }
+      } else {
+        if (pane === 'remote') {
+          if (api.remoteCopy) {
+            await api.remoteCopy(item.path, newPath, sessId);
+            this.refreshRemote(this.remotePath);
+          } else {
+            throw new Error('Remote copy is not supported.');
+          }
+        } else if (pane === 'local') {
+          if (api.localCopy) {
+            await api.localCopy(item.path, newPath);
+            this.refreshLocal(this.localPath);
+          } else {
+            throw new Error('Local copy is not supported.');
+          }
+        }
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('info', `📋 Copied item: ${item.name} -> ${newPath}`);
+        }
+      }
+    } catch (err) {
+      const cleanMsg = err && err.message ? err.message : String(err);
+      alert(`Failed to ${mode} ${item.name}: ${cleanMsg}`);
+      if (pane === 'remote') this.refreshRemote(this.remotePath);
+      else this.refreshLocal(this.localPath);
+    }
+  },
+
+  async duplicateItem(item, pane) {
+    if (!item) return;
+    const api = this.getApi();
+    const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
+    
+    let newPath = '';
+    if (pane === 'remote') {
+      const parts = item.path.split('/');
+      const fname = parts.pop();
+      const dotIdx = fname.lastIndexOf('.');
+      const nameOnly = dotIdx > 0 ? fname.substring(0, dotIdx) : fname;
+      const ext = dotIdx > 0 ? fname.substring(dotIdx) : '';
+      newPath = [...parts, `${nameOnly}_copy${ext}`].join('/');
+    } else {
+      const sep = this.getLocalSeparator();
+      const parts = item.path.split(sep);
+      const fname = parts.pop();
+      const dotIdx = fname.lastIndexOf('.');
+      const nameOnly = dotIdx > 0 ? fname.substring(0, dotIdx) : fname;
+      const ext = dotIdx > 0 ? fname.substring(dotIdx) : '';
+      newPath = [...parts, `${nameOnly}_copy${ext}`].join(sep);
+    }
+
+    try {
+      if (pane === 'remote') {
+        if (api.remoteCopy) {
+          await api.remoteCopy(item.path, newPath, sessId);
+          this.refreshRemote(this.remotePath);
+        }
+      } else {
+        if (api.localCopy) {
+          await api.localCopy(item.path, newPath);
+          this.refreshLocal(this.localPath);
+        }
+      }
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('info', `👯 Duplicated item: ${item.name} -> ${newPath}`);
+      }
+    } catch (err) {
+      const cleanMsg = err && err.message ? err.message : String(err);
+      alert(`Failed to duplicate ${item.name}: ${cleanMsg}`);
+    }
   },
 
   async submitRename() {
@@ -624,6 +1058,100 @@ window.FileBrowser = {
     } catch (err) {
       const cleanMsg = err && err.message ? err.message : String(err);
       alert(`Failed to rename ${item.name}: ${cleanMsg}`);
+    }
+  },
+
+  async submitBatchRename() {
+    if (!this.batchRenameTargetItems || !this.batchRenameTargetItems.length) return;
+    
+    // Filter by checked checkboxes in the UI target list
+    const checkboxes = document.querySelectorAll('.batch-rename-target-checkbox');
+    const checkedItems = [];
+    checkboxes.forEach((cb, index) => {
+      if (cb.checked) {
+        checkedItems.push(this.batchRenameTargetItems[index]);
+      }
+    });
+
+    if (!checkedItems.length) {
+      alert('Please check at least one item to rename.');
+      return;
+    }
+
+    const mode = document.getElementById('batch-rename-mode').value;
+    const pane = this.batchRenameTargetPane || 'remote';
+    const api = this.getApi();
+    const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
+
+    this.closeBatchRenameModal();
+
+    const isRemote = pane === 'remote';
+    const separator = isRemote ? '/' : '\\';
+    const errors = [];
+    let seqIndex = 0;
+
+    for (const item of checkedItems) {
+      const filename = item.name;
+      const lastIndex = item.path.lastIndexOf(separator);
+      const parentDir = lastIndex <= 0 ? '' : item.path.substring(0, lastIndex);
+
+      // Split filename and extension
+      const dotIndex = filename.lastIndexOf('.');
+      let baseName = filename;
+      let ext = '';
+      if (dotIndex > 0 && !item.isDir) {
+        baseName = filename.substring(0, dotIndex);
+        ext = filename.substring(dotIndex);
+      }
+
+      let newName = filename;
+
+      if (mode === 'prefix-suffix') {
+        const prefix = document.getElementById('batch-rename-prefix').value;
+        const suffix = document.getElementById('batch-rename-suffix').value;
+        newName = `${prefix}${baseName}${suffix}${ext}`;
+      } else if (mode === 'find-replace') {
+        const findVal = document.getElementById('batch-rename-find').value;
+        const replaceVal = document.getElementById('batch-rename-replace').value;
+        if (findVal) {
+          newName = filename.split(findVal).join(replaceVal);
+        }
+      } else if (mode === 'sequential') {
+        const basePattern = document.getElementById('batch-rename-base').value || 'file_';
+        const startNum = parseInt(document.getElementById('batch-rename-start').value || '1', 10);
+        const padding = parseInt(document.getElementById('batch-rename-padding').value || '3', 10);
+        const currentNum = startNum + seqIndex;
+        const paddedNum = String(currentNum).padStart(padding, '0');
+        newName = `${basePattern}${paddedNum}${ext}`;
+        seqIndex++;
+      }
+
+      // Skip renaming if the name hasn't changed
+      if (newName === filename) continue;
+
+      const newPath = parentDir ? `${parentDir}${separator}${newName}` : newName;
+
+      try {
+        if (isRemote) {
+          await api.remoteRename(item.path, newPath, sessId);
+        } else {
+          if (api.localRename) {
+            await api.localRename(item.path, newPath);
+          }
+        }
+      } catch (err) {
+        errors.push(`${filename}: ${err.message || err}`);
+      }
+    }
+
+    if (isRemote) {
+      this.refreshRemote(this.remotePath);
+    } else {
+      this.refreshLocal(this.localPath);
+    }
+
+    if (errors.length > 0) {
+      alert(`Batch rename completed with errors:\n${errors.join('\n')}`);
     }
   },
 
@@ -770,22 +1298,49 @@ window.FileBrowser = {
   },
 
   async submitChmodPermissions() {
-    if (!this.chmodTargetItem) return;
+    if (!this.chmodTargetItems || !this.chmodTargetItems.length) return;
     const octalDisplay = document.getElementById('chmod-edit-octal-val');
     const octalStr = octalDisplay ? octalDisplay.textContent.trim() : '0755';
     const mode = parseInt(octalStr, 8);
     const api = this.getApi();
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
 
+    if (isNaN(mode)) return;
+
+    // Filter by checked checkboxes in the UI target list (Fix: selective batch chmod)
+    const checkboxes = document.querySelectorAll('.chmod-target-checkbox');
+    const checkedPaths = new Set();
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        checkedPaths.add(cb.getAttribute('data-path'));
+      }
+    });
+
+    const itemsToChmod = checkboxes.length > 0
+      ? this.chmodTargetItems.filter(item => checkedPaths.has(item.path))
+      : this.chmodTargetItems;
+
+    if (!itemsToChmod.length) {
+      alert('Please check at least one item to change permissions.');
+      return;
+    }
+
     this.closeChmodModal();
 
-    try {
-      if (!isNaN(mode)) {
-        await api.remoteChmod(this.chmodTargetItem.path, mode, sessId);
-        this.refreshRemote(this.remotePath);
+    // Apply chmod to checked items
+    const errors = [];
+    for (const item of itemsToChmod) {
+      try {
+        await api.remoteChmod(item.path, mode, sessId);
+      } catch (err) {
+        errors.push(`${item.name}: ${err.message || err}`);
       }
-    } catch (err) {
-      alert(`Failed to change permissions: ${err.message || err}`);
+    }
+
+    this.refreshRemote(this.remotePath);
+
+    if (errors.length > 0) {
+      alert(`Permissions applied with errors:\n${errors.join('\n')}`);
     }
   },
 
@@ -1112,28 +1667,19 @@ window.FileBrowser = {
       return;
     }
 
-    files.forEach((f) => {
-      const diffInfo = window.DirectoryCompare ? window.DirectoryCompare.getDiffInfo(f.name) : null;
-      if (window.DirectoryCompare && window.DirectoryCompare.active && window.DirectoryCompare.filterMode === 'diff_only') {
-        if (!diffInfo) return;
-      }
-
+    const sortedFiles = this.sortFiles(files || [], this.localSortKey, this.localSortOrder);
+    sortedFiles.forEach((f) => {
       const tr = document.createElement('tr');
       const isSelected = this.selectedLocalFiles.some(item => item.path === f.path);
-      tr.className = `file-row ${f.isDir ? 'is-dir' : ''} ${diffInfo ? diffInfo.rowClass : ''} ${isSelected ? 'selected' : ''}`;
+      tr.className = `file-row ${f.isDir ? 'is-dir' : ''} ${isSelected ? 'selected' : ''}`;
       tr.setAttribute('data-path', f.path);
       tr.draggable = true;
       const icon = f.isDir ? '📁' : '📄';
-
-      const badgeHtml = (diffInfo && (diffInfo.side === 'local' || diffInfo.side === 'both')) 
-        ? `<span class="diff-badge ${diffInfo.badgeClass}">${diffInfo.badge}</span>` 
-        : '';
 
       tr.innerHTML = `
         <td class="file-name-cell">
           <span class="file-icon">${icon}</span>
           <span>${f.name}</span>
-          ${badgeHtml}
         </td>
         <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td>${new Date(f.modifyTime).toLocaleDateString()}</td>
@@ -1259,28 +1805,19 @@ window.FileBrowser = {
       return;
     }
 
-    files.forEach((f) => {
-      const diffInfo = window.DirectoryCompare ? window.DirectoryCompare.getDiffInfo(f.name) : null;
-      if (window.DirectoryCompare && window.DirectoryCompare.active && window.DirectoryCompare.filterMode === 'diff_only') {
-        if (!diffInfo) return;
-      }
-
+    const sortedFiles = this.sortFiles(files || [], this.remoteSortKey, this.remoteSortOrder);
+    sortedFiles.forEach((f) => {
       const tr = document.createElement('tr');
       const isSelected = this.selectedRemoteFiles.some(item => item.path === f.path);
-      tr.className = `file-row ${f.isDir ? 'is-dir' : ''} ${diffInfo ? diffInfo.rowClass : ''} ${isSelected ? 'selected' : ''}`;
+      tr.className = `file-row ${f.isDir ? 'is-dir' : ''} ${isSelected ? 'selected' : ''}`;
       tr.setAttribute('data-path', f.path);
       tr.draggable = true;
       const icon = f.isDir ? '📁' : '📄';
-
-      const badgeHtml = (diffInfo && (diffInfo.side === 'remote' || diffInfo.side === 'both')) 
-        ? `<span class="diff-badge ${diffInfo.badgeClass}">${diffInfo.badge}</span>` 
-        : '';
 
       tr.innerHTML = `
         <td class="file-name-cell">
           <span class="file-icon">${icon}</span>
           <span>${f.name}</span>
-          ${badgeHtml}
         </td>
         <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td class="permissions-cell">${f.permissions || 'rwxr-xr-x'}</td>
@@ -1373,20 +1910,31 @@ window.FileBrowser = {
   },
 
   filterLocal(term) {
-    const lower = term.toLowerCase();
-    const filtered = this.localFiles.filter(f => f.name.toLowerCase().includes(lower));
-    this.renderLocalTable(filtered);
+    // Debounce to avoid rebuilding the full DOM table on every keystroke (Fix D5)
+    if (this._filterLocalTimer) clearTimeout(this._filterLocalTimer);
+    this._filterLocalTimer = setTimeout(() => {
+      const lower = term.toLowerCase();
+      const filtered = this.localFiles.filter(f => f.name.toLowerCase().includes(lower));
+      this.renderLocalTable(filtered);
+    }, 150);
   },
 
   filterRemote(term) {
-    const lower = term.toLowerCase();
-    const filtered = this.remoteFiles.filter(f => f.name.toLowerCase().includes(lower));
-    this.renderRemoteTable(filtered);
+    // Debounce to avoid rebuilding the full DOM table on every keystroke (Fix D5)
+    if (this._filterRemoteTimer) clearTimeout(this._filterRemoteTimer);
+    this._filterRemoteTimer = setTimeout(() => {
+      const lower = term.toLowerCase();
+      const filtered = this.remoteFiles.filter(f => f.name.toLowerCase().includes(lower));
+      this.renderRemoteTable(filtered);
+    }, 150);
   },
 
   showContextMenu(x, y, items, pane) {
     const menu = document.getElementById('context-menu');
     this.contextPane = pane;
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const isSftp = activeSess && activeSess.profile && activeSess.profile.protocol === 'sftp';
 
     const selectedList = Array.isArray(items) ? items : (items ? [items] : []);
     this.contextItems = selectedList;
@@ -1398,11 +1946,48 @@ window.FileBrowser = {
     const ctxUpload = document.getElementById('ctx-upload');
     const ctxChmod = document.getElementById('ctx-chmod');
     const ctxRename = document.getElementById('ctx-rename');
+    const ctxMove = document.getElementById('ctx-move');
+    const ctxCopyTo = document.getElementById('ctx-copy-to');
+    const ctxDuplicate = document.getElementById('ctx-duplicate');
     const ctxDelete = document.getElementById('ctx-delete');
     const ctxCopyPath = document.getElementById('ctx-copy-path');
     const ctxCalculateSize = document.getElementById('ctx-calculate-size');
     const ctxNewFile = document.getElementById('ctx-new-file');
     const ctxMkdir = document.getElementById('ctx-mkdir');
+    const ctxSshTools = document.getElementById('ctx-ssh-tools');
+    const sshCmdCompress = document.getElementById('ssh-cmd-compress');
+    const sshCmdExtract = document.getElementById('ssh-cmd-extract');
+    const sshCmdGrep = document.getElementById('ssh-cmd-grep');
+    const sshCmdFind = document.getElementById('ssh-cmd-find');
+    const sshCmdDu = document.getElementById('ssh-cmd-du');
+    const api = window.devsFTP || window.pulseFTP;
+    const isLocalWindows = api ? api.isWindows : false;
+    const remoteOS = activeSess && activeSess.remoteOS ? activeSess.remoteOS : 'linux';
+    const isWin = pane === 'local' ? isLocalWindows : (remoteOS === 'windows');
+    const showTools = (pane === 'remote' && isSftp) || (pane === 'local');
+
+    if (ctxSshTools) {
+      const labelSpan = ctxSshTools.querySelector('span:first-child');
+      if (labelSpan) {
+        labelSpan.textContent = pane === 'local' ? '⚡ Local Commands' : '⚡ Remote Commands';
+      }
+    }
+
+    if (sshCmdCompress) {
+      sshCmdCompress.textContent = isWin ? '📦 Compress (.zip)' : '📦 Compress (.tar.gz)';
+    }
+    if (sshCmdExtract) {
+      sshCmdExtract.textContent = isWin ? '📂 Extract (.zip)' : '📂 Extract (.tar.gz)';
+    }
+    if (sshCmdGrep) {
+      sshCmdGrep.style.display = isWin ? 'none' : 'flex';
+    }
+    if (sshCmdFind) {
+      sshCmdFind.style.display = isWin ? 'none' : 'flex';
+    }
+    if (sshCmdDu) {
+      sshCmdDu.style.display = isWin ? 'none' : 'flex';
+    }
 
     if (selectedList.length === 0) {
       if (ctxOpen) ctxOpen.style.display = 'none';
@@ -1411,9 +1996,13 @@ window.FileBrowser = {
       if (ctxUpload) ctxUpload.style.display = 'none';
       if (ctxChmod) ctxChmod.style.display = 'none';
       if (ctxRename) ctxRename.style.display = 'none';
+      if (ctxMove) ctxMove.style.display = 'none';
+      if (ctxCopyTo) ctxCopyTo.style.display = 'none';
+      if (ctxDuplicate) ctxDuplicate.style.display = 'none';
       if (ctxDelete) ctxDelete.style.display = 'none';
       if (ctxCopyPath) ctxCopyPath.style.display = 'none';
       if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
+      if (ctxSshTools) ctxSshTools.style.display = 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else if (selectedList.length === 1) {
@@ -1431,8 +2020,27 @@ window.FileBrowser = {
         const label = ctxUpload.querySelector('span:last-child');
         if (label) label.textContent = 'Upload';
       }
-      if (ctxChmod) ctxChmod.style.display = pane === 'remote' ? 'flex' : 'none';
-      if (ctxRename) ctxRename.style.display = 'flex';
+      if (ctxChmod) {
+        ctxChmod.style.display = pane === 'remote' ? 'flex' : 'none';
+        const label = ctxChmod.querySelector('span:last-child');
+        if (label) {
+          label.textContent = 'Permissions (chmod)';
+        } else {
+          ctxChmod.textContent = '🔐 Permissions (chmod)';
+        }
+      }
+      if (ctxRename) {
+        ctxRename.style.display = 'flex';
+        const label = ctxRename.querySelector('span:last-child');
+        if (label) {
+          label.textContent = 'Rename';
+        } else {
+          ctxRename.textContent = '✏️ Rename';
+        }
+      }
+      if (ctxMove) ctxMove.style.display = 'flex';
+      if (ctxCopyTo) ctxCopyTo.style.display = 'flex';
+      if (ctxDuplicate) ctxDuplicate.style.display = 'flex';
       if (ctxDelete) {
         ctxDelete.style.display = 'flex';
         const label = ctxDelete.querySelector('span:last-child');
@@ -1446,6 +2054,7 @@ window.FileBrowser = {
       if (ctxCalculateSize) {
         ctxCalculateSize.style.display = isDir ? 'flex' : 'none';
       }
+      if (ctxSshTools) ctxSshTools.style.display = showTools ? 'flex' : 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else {
@@ -1462,8 +2071,27 @@ window.FileBrowser = {
         const label = ctxUpload.querySelector('span:last-child');
         if (label) label.textContent = `Upload (${count} items)`;
       }
-      if (ctxChmod) ctxChmod.style.display = 'none';
-      if (ctxRename) ctxRename.style.display = 'none';
+      if (ctxChmod) {
+        ctxChmod.style.display = pane === 'remote' ? 'flex' : 'none';
+        const label = ctxChmod.querySelector('span:last-child');
+        if (label) {
+          label.textContent = `Permissions (${count} items)`;
+        } else {
+          ctxChmod.textContent = `🔐 Permissions (${count} items)`;
+        }
+      }
+      if (ctxRename) {
+        ctxRename.style.display = 'flex';
+        const label = ctxRename.querySelector('span:last-child');
+        if (label) {
+          label.textContent = `Rename (${count} items)`;
+        } else {
+          ctxRename.textContent = `✏️ Rename (${count} items)`;
+        }
+      }
+      if (ctxMove) ctxMove.style.display = 'none';
+      if (ctxCopyTo) ctxCopyTo.style.display = 'none';
+      if (ctxDuplicate) ctxDuplicate.style.display = 'none';
       if (ctxDelete) {
         ctxDelete.style.display = 'flex';
         const label = ctxDelete.querySelector('span:last-child');
@@ -1475,9 +2103,24 @@ window.FileBrowser = {
         if (label) label.textContent = `Copy Paths (${count} items)`;
       }
       if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
+      if (ctxSshTools) ctxSshTools.style.display = showTools ? 'flex' : 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     }
+
+    // Helper to toggle parent group display based on children visibility
+    const updateGroupVisibility = (groupId, childIds) => {
+      const groupEl = document.getElementById(groupId);
+      if (!groupEl) return;
+      const anyVisible = childIds.some(id => {
+        const el = document.getElementById(id);
+        return el && el.style.display !== 'none';
+      });
+      groupEl.style.display = anyVisible ? 'flex' : 'none';
+    };
+
+    updateGroupVisibility('ctx-group-new', ['ctx-new-file', 'ctx-mkdir']);
+    updateGroupVisibility('ctx-group-organize', ['ctx-duplicate', 'ctx-copy-to', 'ctx-move']);
 
     menu.style.display = 'block';
 
@@ -1494,6 +2137,12 @@ window.FileBrowser = {
     }
     if (y + menuHeight > viewportHeight) {
       posY = Math.max(10, viewportHeight - menuHeight - 10);
+    }
+
+    if (posX + menuWidth + 170 > viewportWidth) {
+      menu.classList.add('submenu-left');
+    } else {
+      menu.classList.remove('submenu-left');
     }
 
     menu.style.left = `${posX}px`;
@@ -1544,12 +2193,22 @@ window.FileBrowser = {
       const pathsText = items.map(i => i.path).join('\n');
       navigator.clipboard.writeText(pathsText);
       if (window.LogViewer) window.LogViewer.addEntry('info', `Copied ${items.length} path(s) to clipboard.`);
-    } else if (action === 'chmod' && pane === 'remote' && items.length === 1) {
-      this.openChmodModal(items[0]);
+    } else if (action === 'chmod' && pane === 'remote') {
+      this.openChmodModal(items);
     } else if (action === 'delete') {
       this.openDeleteConfirmModal(items, pane);
-    } else if (action === 'rename' && items.length === 1) {
-      this.openRenameModal(items[0], pane);
+    } else if (action === 'rename') {
+      if (items.length === 1) {
+        this.openRenameModal(items[0], pane);
+      } else if (items.length > 1) {
+        this.openBatchRenameModal(items, pane);
+      }
+    } else if (action === 'move' && items.length === 1) {
+      this.openMoveModal(items[0], 'move', pane);
+    } else if (action === 'copy-to' && items.length === 1) {
+      this.openMoveModal(items[0], 'copy', pane);
+    } else if (action === 'duplicate' && items.length === 1) {
+      this.duplicateItem(items[0], pane);
     } else if (action === 'calculate-size' && items.length === 1) {
       const item = items[0];
       if (item.isDir) {
@@ -1565,6 +2224,227 @@ window.FileBrowser = {
           }
           api.calculateDirSize(item.path, isRemote, sessId);
         }
+      }
+    } else if (action.startsWith('ssh-')) {
+      const item = items[0];
+      const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
+      const api = this.getApi();
+      if (!api) return;
+
+      const isRemote = pane === 'remote';
+      if (isRemote) {
+        if (!api.remoteExecCommand) {
+          alert('Remote commands require an active SFTP session.');
+          return;
+        }
+      } else {
+        if (!api.localExecCommand) {
+          alert('Local shell commands are not supported on this platform.');
+          return;
+        }
+      }
+
+      // Convert SFTP path (e.g. /public) to relative SSH path (e.g. ./public)
+      const toSshPath = (p) => {
+        if (!p) return '.';
+        let clean = p.replace(/\\/g, '/');
+        if (clean === '/') return '.';
+        if (clean.startsWith('/')) {
+          return './' + clean.slice(1);
+        }
+        return './' + clean;
+      };
+
+      const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      const isLocalWindows = api.isWindows;
+      const remoteOS = activeSess && activeSess.remoteOS ? activeSess.remoteOS : 'linux';
+      const isWin = isRemote ? (remoteOS === 'windows') : isLocalWindows;
+
+      let parentDir = '';
+      let name = '';
+      let targetPath = '';
+
+      if (isRemote) {
+        const parts = item.path.split('/');
+        name = parts.pop() || 'archive';
+        const rawParent = parts.join('/') || '/';
+        parentDir = toSshPath(rawParent);
+        targetPath = toSshPath(item.path);
+      } else {
+        const sep = isWin ? '\\' : '/';
+        const parts = item.path.split(sep);
+        name = parts.pop() || 'archive';
+        parentDir = parts.join(sep) || (isWin ? 'C:\\' : '/');
+        targetPath = item.path;
+      }
+
+      const runCmd = async (command) => {
+        if (isRemote) {
+          return await api.remoteExecCommand(command, sessId);
+        } else {
+          return await api.localExecCommand(command);
+        }
+      };
+
+      const refreshView = () => {
+        if (isRemote) {
+          this.refreshRemote(this.remotePath);
+        } else {
+          this.refreshLocal(this.localPath);
+        }
+      };
+
+      if (action === 'ssh-du') {
+        const label = isRemote ? 'server' : 'local';
+        if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Running ${label} du (Disk Usage) on: ${item.path}...`);
+        try {
+          const res = await runCmd(`du -sh "${targetPath.replace(/"/g, '\\"')}"`);
+          if (res.code === 0) {
+            const out = res.stdout.trim() || res.stderr.trim();
+            if (window.LogViewer) window.LogViewer.addEntry('success', `💾 Disk Usage result: ${out}`);
+          } else {
+            if (window.LogViewer) window.LogViewer.addEntry('error', `du failed (code ${res.code}): ${res.stderr.trim()}`);
+          }
+        } catch (err) {
+          if (window.LogViewer) window.LogViewer.addEntry('error', `du error: ${err.message}`);
+        }
+      } else if (action === 'ssh-compress') {
+        if (isWin) {
+          const defaultName = `${name}.zip`;
+          this.showSshPromptModal(
+            '📦 Compress Folder/File',
+            'Output Archive Name (zip):',
+            'archive_name.zip',
+            defaultName,
+            async (archiveName) => {
+              if (!archiveName) return;
+              if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Creating zip archive: ${archiveName}...`);
+              try {
+                const res = await runCmd(`powershell.exe -Command "cd '${parentDir.replace(/'/g, "''")}' ; Compress-Archive -Path '${name.replace(/'/g, "''")}' -DestinationPath '${archiveName.replace(/'/g, "''")}' -Force"`);
+                if (res.code === 0) {
+                  if (window.LogViewer) window.LogViewer.addEntry('success', `✓ Successfully compressed ${name} to ${archiveName}`);
+                  refreshView();
+                } else {
+                  if (window.LogViewer) window.LogViewer.addEntry('error', `Compression failed (code ${res.code}): ${res.stderr.trim()}`);
+                }
+              } catch (err) {
+                if (window.LogViewer) window.LogViewer.addEntry('error', `Compression error: ${err.message}`);
+              }
+            }
+          );
+        } else {
+          const defaultName = `${name}.tar.gz`;
+          this.showSshPromptModal(
+            '📦 Compress Folder/File',
+            'Output Archive Name (tar.gz):',
+            'archive_name.tar.gz',
+            defaultName,
+            async (archiveName) => {
+              if (!archiveName) return;
+              if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Creating archive: ${archiveName}...`);
+              try {
+                const res = await runCmd(`cd "${parentDir.replace(/"/g, '\\"')}" && tar -czf "${archiveName.replace(/"/g, '\\"')}" "${name.replace(/"/g, '\\"')}"`);
+                if (res.code === 0) {
+                  if (window.LogViewer) window.LogViewer.addEntry('success', `✓ Successfully compressed ${name} to ${archiveName}`);
+                  refreshView();
+                } else {
+                  if (window.LogViewer) window.LogViewer.addEntry('error', `Compression failed (code ${res.code}): ${res.stderr.trim()}`);
+                }
+              } catch (err) {
+                if (window.LogViewer) window.LogViewer.addEntry('error', `Compression error: ${err.message}`);
+              }
+            }
+          );
+        }
+      } else if (action === 'ssh-extract') {
+        if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Extracting archive: ${item.path}...`);
+        try {
+          let cmd = '';
+          if (isWin) {
+            cmd = `powershell.exe -Command "cd '${parentDir.replace(/'/g, "''")}' ; Expand-Archive -Path '${name.replace(/'/g, "''")}' -DestinationPath '.' -Force"`;
+          } else {
+            cmd = `cd "${parentDir.replace(/"/g, '\\"')}" && tar -xzf "${name.replace(/"/g, '\\"')}"`;
+            if (name.endsWith('.zip')) {
+              cmd = `cd "${parentDir.replace(/"/g, '\\"')}" && unzip -o "${name.replace(/"/g, '\\"')}"`;
+            }
+          }
+          const res = await runCmd(cmd);
+          if (res.code === 0) {
+            if (window.LogViewer) window.LogViewer.addEntry('success', `✓ Archive extracted successfully in: ${parentDir}`);
+            refreshView();
+          } else {
+            if (window.LogViewer) window.LogViewer.addEntry('error', `Extraction failed (code ${res.code}): ${res.stderr.trim()}`);
+          }
+        } catch (err) {
+          if (window.LogViewer) window.LogViewer.addEntry('error', `Extraction error: ${err.message}`);
+        }
+      } else if (action === 'ssh-grep') {
+        this.showSshPromptModal(
+          '🔍 Search text recursively (grep)',
+          'Enter text query:',
+          'pattern',
+          '',
+          async (query) => {
+            if (!query) return;
+            if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Running grep search for "${query}" inside ${item.path}...`);
+            try {
+              const res = await runCmd(`grep -rn "${query.replace(/"/g, '\\"')}" "${targetPath.replace(/"/g, '\\"')}"`);
+              const lines = (res.stdout.trim() || res.stderr.trim()).split('\n').filter(Boolean);
+              const parsed = lines.map(lineStr => {
+                const match = lineStr.match(/^((?:[a-zA-Z]:)?[^:]+):(\d+):(.*)$/);
+                if (match) {
+                  return {
+                    path: match[1],
+                    line: match[2],
+                    text: match[3],
+                    isRemote: isRemote
+                  };
+                }
+                return {
+                  path: lineStr,
+                  line: '',
+                  text: '',
+                  isRemote: isRemote
+                };
+              });
+              if (window.LogViewer) {
+                window.LogViewer.addEntry('success', `✓ Grep search complete. Found ${parsed.length} match(es) for "${query}".`);
+              }
+              this.displaySearchResults(parsed, query, isRemote);
+            } catch (err) {
+              if (window.LogViewer) window.LogViewer.addEntry('error', `Grep error: ${err.message}`);
+            }
+          }
+        );
+      } else if (action === 'ssh-find') {
+        this.showSshPromptModal(
+          '🕵️ Find Files recursively',
+          'Enter filename pattern (e.g. *.php):',
+          '*.php',
+          '*',
+          async (pattern) => {
+            if (!pattern) return;
+            if (window.LogViewer) window.LogViewer.addEntry('info', `⚡ Running find for "${pattern}" inside ${item.path}...`);
+            try {
+              const res = await runCmd(`find "${targetPath.replace(/"/g, '\\"')}" -name "${pattern.replace(/"/g, '\\"')}"`);
+              const lines = (res.stdout.trim() || res.stderr.trim()).split('\n').filter(Boolean);
+              const parsed = lines.map(lineStr => {
+                return {
+                  path: lineStr,
+                  line: '',
+                  text: 'File matches search pattern',
+                  isRemote: isRemote
+                };
+              });
+              if (window.LogViewer) {
+                window.LogViewer.addEntry('success', `✓ Find complete. Found ${parsed.length} matching file(s) for "${pattern}".`);
+              }
+              this.displaySearchResults(parsed, pattern, isRemote);
+            } catch (err) {
+              if (window.LogViewer) window.LogViewer.addEntry('error', `Find error: ${err.message}`);
+            }
+          }
+        );
       }
     }
   },
@@ -1782,5 +2662,127 @@ window.FileBrowser = {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  },
+
+  sortFiles(files, key, order) {
+    const sorted = [...files];
+    sorted.sort((a, b) => {
+      // Directories always go first
+      if (a.isDir && !b.isDir) return -1;
+      if (!a.isDir && b.isDir) return 1;
+
+      let valA, valB;
+      if (key === 'name') {
+        valA = (a.name || '').toLowerCase();
+        valB = (b.name || '').toLowerCase();
+      } else if (key === 'size') {
+        valA = a.isDir ? -1 : (a.size || 0);
+        valB = b.isDir ? -1 : (b.size || 0);
+      } else if (key === 'modified') {
+        valA = a.modifyTime ? new Date(a.modifyTime).getTime() : 0;
+        valB = b.modifyTime ? new Date(b.modifyTime).getTime() : 0;
+      }
+
+      if (valA < valB) return order === 'asc' ? -1 : 1;
+      if (valA > valB) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  },
+
+  updateSortHeaders() {
+    document.querySelectorAll('.sortable-header').forEach(th => {
+      const pane = th.getAttribute('data-pane');
+      const sortKey = th.getAttribute('data-sort-key');
+      const arrow = th.querySelector('.sort-arrow');
+      if (!arrow) return;
+
+      const activeKey = pane === 'local' ? this.localSortKey : this.remoteSortKey;
+      const activeOrder = pane === 'local' ? this.localSortOrder : this.remoteSortOrder;
+
+      if (sortKey === activeKey) {
+        arrow.textContent = activeOrder === 'asc' ? ' ▴' : ' ▾';
+        th.classList.add('sorted-active');
+      } else {
+        arrow.textContent = '';
+        th.classList.remove('sorted-active');
+      }
+    });
+  },
+
+  clearSearchResults() {
+    const tbody = document.getElementById('search-results-tbody');
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: hsl(var(--text-muted)); padding: 20px; font-size: 11px;">Perform a "Search Text" or "Find Files" operation to display results.</td></tr>`;
+    }
+    const badge = document.getElementById('search-badge');
+    if (badge) badge.textContent = '0';
+    const summary = document.getElementById('search-results-summary');
+    if (summary) summary.textContent = 'No active search';
+  },
+
+  hideSearchTab() {
+    const tabBtn = document.getElementById('drawer-tab-search');
+    if (tabBtn) tabBtn.style.display = 'none';
+
+    const activeTab = document.querySelector('.drawer-tab.active');
+    if (activeTab && activeTab.getAttribute('data-tab') === 'tab-search') {
+      const logsTab = document.querySelector('.drawer-tab[data-tab="tab-logs"]');
+      if (logsTab) logsTab.click();
+    }
+  },
+
+  displaySearchResults(results, query, isRemote) {
+    const tabBtn = document.getElementById('drawer-tab-search');
+    if (tabBtn) tabBtn.style.display = 'flex';
+
+    const badge = document.getElementById('search-badge');
+    if (badge) badge.textContent = results.length;
+
+    const summary = document.getElementById('search-results-summary');
+    if (summary) {
+      summary.textContent = `Found ${results.length} match(es) for "${query}"`;
+    }
+
+    const tbody = document.getElementById('search-results-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    const renderLimit = 250;
+    const itemsToRender = results.slice(0, renderLimit);
+
+    if (itemsToRender.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: hsl(var(--text-muted)); padding: 20px; font-size: 11px;">No matches found.</td></tr>`;
+    } else {
+      itemsToRender.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.title = `Double click to open: ${item.path}`;
+
+        tr.innerHTML = `
+          <td style="text-align: left; padding: 6px 10px; width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.path}">${item.path}</td>
+          <td style="text-align: center; padding: 6px 10px; width: 80px;">${item.line || '-'}</td>
+          <td style="text-align: left; padding: 6px 10px; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.text || ''}">${item.text || ''}</td>
+        `;
+
+        tr.addEventListener('dblclick', async () => {
+          const api = this.getApi();
+          if (!api) return;
+
+          if (isRemote) {
+            if (window.LogViewer) window.LogViewer.addEntry('info', `📥 Opening remote file in default editor: ${item.path}`);
+            await api.editRemoteFile(item.path, window.SessionManager ? window.SessionManager.activeSessionId : null);
+          } else {
+            if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Opening local file in default editor: ${item.path}`);
+            await api.localOpen(item.path);
+          }
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Switch focus to search results tab
+    if (tabBtn) tabBtn.click();
   }
 };

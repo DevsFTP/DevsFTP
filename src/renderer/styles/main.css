@@ -1746,3 +1746,191 @@ input[type="number"] {
   z-index: 99999 !important;
 }
 
+/* Sortable Table Headers */
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sortable-header:hover {
+  background-color: hsl(var(--bg-hover));
+  color: hsl(var(--text-primary)) !important;
+}
+
+.sortable-header.sorted-active {
+  color: var(--accent-primary-hex, #68a063) !important;
+}
+
+.sort-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  vertical-align: middle;
+  width: 12px;
+}
+
+/* Context Submenu Hover Layout */
+.trigger-submenu {
+  position: relative;
+}
+
+.context-submenu {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  background-color: hsl(var(--bg-secondary));
+  border: 1px solid hsl(var(--border-color));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  min-width: 170px;
+  z-index: 10000;
+  padding: 4px 0;
+}
+
+.trigger-submenu:hover .context-submenu {
+  display: block;
+}
+
+/* Boundary Collision Fallback (opens leftwards when triggered) */
+.context-menu.submenu-left .context-submenu {
+  left: auto;
+  right: 100%;
+  margin-right: 2px;
+}
+
+/* Reset colors for child items inside submenus so they do not inherit active hover of parent */
+.context-submenu .context-menu-item {
+  color: hsl(var(--text-secondary)) !important;
+  background-color: transparent !important;
+}
+
+.context-submenu .context-menu-item:hover {
+  background-color: hsl(var(--bg-hover)) !important;
+  color: var(--accent-primary-hex, #68a063) !important;
+}
+
+/* Search Results Panel Styling */
+#tab-search {
+  display: none;
+  flex-direction: column;
+}
+
+#tab-search.active {
+  display: flex;
+}
+
+#search-results-tbody tr {
+  cursor: pointer;
+  border-bottom: 1px solid hsl(var(--border-subtle));
+  transition: background-color 0.1s ease;
+}
+
+#search-results-tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+#search-results-tbody td {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+#btn-close-search-tab:hover {
+  opacity: 1 !important;
+  color: hsl(var(--status-danger)) !important;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+/* Transfer Queue Drag & Drop / Selection styling */
+.queue-table tbody tr {
+  cursor: grab;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.queue-table tbody tr:active {
+  cursor: grabbing;
+}
+
+.queue-table tbody tr.selected-row {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.queue-table tbody tr.dragging {
+  opacity: 0.4;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.queue-table tbody tr.drag-over {
+  background-color: rgba(104, 160, 99, 0.1) !important;
+  outline: 1px dashed var(--accent-primary-hex, #68a063);
+}
+
+/* Compare Modal Table Custom Style Alignments */
+#dir-compare-modal .file-list-container {
+  background-color: hsl(var(--bg-primary)) !important;
+}
+
+#dir-compare-modal .file-table {
+  background-color: hsl(var(--bg-primary)) !important;
+}
+
+#dir-compare-modal .file-table tbody tr {
+  cursor: default !important;
+  background-color: transparent !important;
+}
+
+#dir-compare-modal .file-table tbody tr:hover {
+  background-color: hsl(var(--bg-hover)) !important;
+}
+
+#dir-compare-modal .file-table td {
+  border-bottom: 1px solid hsl(var(--border-subtle)) !important;
+}
+
+#dir-compare-modal .file-name-cell {
+  display: table-cell !important;
+  vertical-align: middle !important;
+  box-sizing: border-box;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
+.compare-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background-color: hsl(var(--bg-secondary));
+  border: 1px solid hsl(var(--border-subtle));
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.compare-select {
+  background-color: hsl(var(--bg-surface));
+  border: 1px solid hsl(var(--border-color));
+  color: hsl(var(--text-primary));
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+}
+
+.compare-empty-cell {
+  color: hsl(var(--text-muted));
+  opacity: 0.4;
+  font-family: var(--font-mono);
+  font-style: italic;
+}
+
+
+

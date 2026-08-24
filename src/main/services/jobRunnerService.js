@@ -11,11 +11,13 @@ const FTPService = require('./ftpService');
 const WebDAVService = require('./webdavService');
 
 class JobRunnerService {
-  constructor(ipcWindow, jobStore, profileStore, logFn) {
+  constructor(ipcWindow, jobStore, profileStore, logFn, knownHostsStore) {
     this.ipcWindow = ipcWindow;
     this.jobStore = jobStore;
     this.profileStore = profileStore;
     this.logFn = logFn || console.log;
+    // knownHostsStore allows scheduled jobs to verify SSH host keys (Fix B2)
+    this.knownHostsStore = knownHostsStore || null;
 
     this.timer = null;
     this.runningJobs = new Set();
@@ -62,6 +64,8 @@ class JobRunnerService {
       const baseTime = job.lastRun ? new Date(job.lastRun) : (job.createdAt ? new Date(job.createdAt) : now);
       let next = new Date(baseTime.getTime() + minutes * 60000);
       if (next <= now && !job.lastRun) {
+        // Job has never run — return a past timestamp so checkSchedules fires it immediately
+        // on the next tick rather than waiting a full interval before the first execution (Fix C10)
         return new Date(now.getTime() - 1000).toISOString();
       }
       return next.toISOString();
@@ -165,8 +169,19 @@ class JobRunnerService {
     const driver = new Driver();
 
     try {
+      // Build host key verifier using knownHostsStore if available (Fix B2)
+      // verifyHostKey returns { status: 'MATCH' | 'UNKNOWN' | 'CHANGED' }
+      // Only allow MATCH; UNKNOWN/CHANGED hosts are rejected to prevent MITM
+      const knownHosts = this.knownHostsStore;
+      const verifyHostKeyFn = knownHosts
+        ? ({ host, port, fingerprint }) => {
+            const result = knownHosts.verifyHostKey(host, port, fingerprint);
+            return Promise.resolve(result && result.status === 'MATCH');
+          }
+        : null;
+
       this.log('info', `[Job Engine] Connecting to target server ${profile.name} (${profile.host})...`);
-      await driver.connect(profile, (lvl, msg) => this.log(lvl, `[Job: ${job.name}] ${msg}`));
+      await driver.connect(profile, (lvl, msg) => this.log(lvl, `[Job: ${job.name}] ${msg}`), verifyHostKeyFn);
 
       if (job.jobType === 'download') {
         let isDir = false;

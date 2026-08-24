@@ -99,18 +99,6 @@
       <button id="btn-new-session-tab" class="btn-new-tab" title="Open New Session Tab">➕ New Tab</button>
     </div>
 
-    <!-- Directory Comparison Summary Bar -->
-    <div id="dir-compare-bar" class="dir-compare-bar" style="display: none; align-items: center; justify-content: space-between; padding: 6px 16px; background: hsl(var(--bg-secondary)); border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 11px;">
-      <div id="dir-compare-text" style="display: flex; align-items: center; gap: 8px;">
-        <!-- Comparison results rendered here -->
-      </div>
-      <div style="display: flex; gap: 6px; align-items: center;">
-        <span style="color: hsl(var(--text-muted)); font-weight: 600;">Filter:</span>
-        <button class="btn diff-filter-btn active" data-filter="all" onclick="window.DirectoryCompare.setFilter('all')" style="padding: 2px 8px; font-size: 10px;">Show All</button>
-        <button class="btn diff-filter-btn" data-filter="diff_only" onclick="window.DirectoryCompare.setFilter('diff_only')" style="padding: 2px 8px; font-size: 10px;">Show Differences Only</button>
-        <button class="btn btn-danger" onclick="window.DirectoryCompare.clear()" style="padding: 2px 8px; font-size: 10px;">✕ Close Diff</button>
-      </div>
-    </div>
 
     <!-- Main Workspace (Dual File Panes) -->
     <main class="workspace-main" id="workspace-main">
@@ -140,9 +128,9 @@
           <table class="file-table" id="local-file-table">
             <thead>
               <tr>
-                <th style="width: 50%;">Name</th>
-                <th style="width: 25%;">Size</th>
-                <th style="width: 25%;">Modified</th>
+                <th style="width: 50%;" class="sortable-header" data-sort-key="name" data-pane="local">Name <span class="sort-arrow"></span></th>
+                <th style="width: 25%;" class="sortable-header" data-sort-key="size" data-pane="local">Size <span class="sort-arrow"></span></th>
+                <th style="width: 25%;" class="sortable-header" data-sort-key="modified" data-pane="local">Modified <span class="sort-arrow"></span></th>
               </tr>
             </thead>
             <tbody id="local-file-tbody">
@@ -179,10 +167,10 @@
           <table class="file-table" id="remote-file-table">
             <thead>
               <tr>
-                <th style="width: 40%;">Name</th>
-                <th style="width: 20%;">Size</th>
+                <th style="width: 40%;" class="sortable-header" data-sort-key="name" data-pane="remote">Name <span class="sort-arrow"></span></th>
+                <th style="width: 20%;" class="sortable-header" data-sort-key="size" data-pane="remote">Size <span class="sort-arrow"></span></th>
                 <th style="width: 20%;">Permissions</th>
-                <th style="width: 20%;">Modified</th>
+                <th style="width: 20%;" class="sortable-header" data-sort-key="modified" data-pane="remote">Modified <span class="sort-arrow"></span></th>
               </tr>
             </thead>
             <tbody id="remote-file-tbody">
@@ -206,6 +194,10 @@
           <button class="drawer-tab" data-tab="tab-queue">📊 Transfers <span id="queue-badge" class="tag-badge">0</span></button>
           <button class="drawer-tab" data-tab="tab-schedules">⏰ Scheduled <span id="jobs-badge" class="tag-badge">0</span></button>
           <button class="drawer-tab" data-tab="tab-logs">📜 Logs</button>
+          <button class="drawer-tab" data-tab="tab-search" id="drawer-tab-search" style="display: none; align-items: center; gap: 4px;">
+            🔍 Search Results <span id="search-badge" class="tag-badge">0</span>
+            <span id="btn-close-search-tab" style="margin-left: 4px; font-weight: bold; cursor: pointer; opacity: 0.6; padding: 2px 4px;" title="Clear and Close Search Tab">✕</span>
+          </button>
         </div>
         <button id="btn-toggle-drawer" class="btn" style="padding: 2px 8px; font-size: 11px;">▼ Minimize</button>
       </div>
@@ -324,6 +316,31 @@
             <div class="log-entry info">[00:00:00] DevsFTP ready. Select a profile to initiate session.</div>
           </div>
         </div>
+
+        <!-- Search Results Panel -->
+        <div class="drawer-panel" id="tab-search">
+          <div style="padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid hsl(var(--border-subtle)); background: rgba(0,0,0,0.15);">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 11px; font-weight: 700; color: hsl(var(--text-secondary));">🔍 File & Text Search Results</span>
+              <span id="search-results-summary" style="font-size: 10px; color: hsl(var(--text-muted)); font-weight: 600; padding: 2px 6px; background: rgba(255,255,255,0.05); border-radius: 4px;">No active search</span>
+            </div>
+            <button id="btn-clear-search" class="btn" style="padding: 2px 8px; font-size: 10px;">Clear Results</button>
+          </div>
+          <div style="flex: 1; overflow-y: auto; padding: 0;">
+            <table class="queue-table" style="table-layout: fixed; width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr>
+                  <th style="width: 250px; text-align: left; padding: 6px 10px;">File Path</th>
+                  <th style="width: 80px; text-align: center; padding: 6px 10px;">Line</th>
+                  <th style="text-align: left; padding: 6px 10px;">Match Snippet / Content</th>
+                </tr>
+              </thead>
+              <tbody id="search-results-tbody">
+                <tr><td colspan="3" style="text-align: center; color: hsl(var(--text-muted)); padding: 20px; font-size: 11px;">Perform a "Search Text" or "Find Files" operation to display results.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -342,17 +359,56 @@
 
   <!-- Selection-Aware Context Menu -->
   <div id="context-menu" class="context-menu">
-    <div class="context-menu-item" id="ctx-new-file">📄 New File</div>
-    <div class="context-menu-item" id="ctx-mkdir">📁 New Directory</div>
+    <!-- Group: New -->
+    <div class="context-menu-item trigger-submenu" id="ctx-group-new">
+      <span>📁 New</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu">
+        <div class="context-menu-item" id="ctx-new-file">📄 New File</div>
+        <div class="context-menu-item" id="ctx-mkdir">📁 New Directory</div>
+      </div>
+    </div>
+
+    <!-- Direct Actions -->
     <div class="context-menu-item" id="ctx-open">📂 Open</div>
-    <div class="context-menu-item" id="ctx-edit">✏️ Edit in Default Editor</div>
-    <div class="context-menu-item" id="ctx-download">⬇ Download</div>
-    <div class="context-menu-item" id="ctx-upload">⬆ Upload</div>
-    <div class="context-menu-item" id="ctx-copy-path">📋 Copy Path</div>
-    <div class="context-menu-item" id="ctx-calculate-size">📊 Calculate Size</div>
-    <div class="context-menu-item" id="ctx-chmod">🔐 Permissions (chmod)</div>
+    <div class="context-menu-item" id="ctx-edit">📝 Edit in Default Editor</div>
+    <div class="context-menu-item" id="ctx-download">⬇️ Download</div>
+    <div class="context-menu-item" id="ctx-upload">⬆️ Upload</div>
     <div class="context-menu-item" id="ctx-rename">✏️ Rename</div>
     <div class="context-menu-item" id="ctx-delete" style="color: hsl(var(--status-danger));">🗑 Delete</div>
+
+    <div class="context-menu-separator" style="height: 1px; background-color: hsl(var(--border-subtle)); margin: 4px 0;"></div>
+
+    <!-- Utilities -->
+    <div class="context-menu-item" id="ctx-copy-path">📋 Copy Path</div>
+    <div class="context-menu-item" id="ctx-calculate-size">🧮 Calculate Size</div>
+    <div class="context-menu-item" id="ctx-chmod">🔑 Permissions (chmod)</div>
+
+    <div class="context-menu-separator" style="height: 1px; background-color: hsl(var(--border-subtle)); margin: 4px 0;"></div>
+
+    <!-- Group: Organize -->
+    <div class="context-menu-item trigger-submenu" id="ctx-group-organize">
+      <span>📦 Organize</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu">
+        <div class="context-menu-item" id="ctx-duplicate">👯 Duplicate</div>
+        <div class="context-menu-item" id="ctx-copy-to">📋 Copy To...</div>
+        <div class="context-menu-item" id="ctx-move">📦 Move File...</div>
+      </div>
+    </div>
+
+    <!-- Group: Remote commands -->
+    <div class="context-menu-item trigger-submenu" id="ctx-ssh-tools">
+      <span>⚡ Remote Commands</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu" id="ssh-tools-submenu">
+        <div class="context-menu-item" id="ssh-cmd-compress">📦 Compress (.tar.gz)</div>
+        <div class="context-menu-item" id="ssh-cmd-extract">📂 Extract Archive</div>
+        <div class="context-menu-item" id="ssh-cmd-grep">🔍 Search Text (grep)</div>
+        <div class="context-menu-item" id="ssh-cmd-find">🕵️ Find Files</div>
+        <div class="context-menu-item" id="ssh-cmd-du">💾 Folder Size (du)</div>
+      </div>
+    </div>
   </div>
 
   <!-- Queue Row Context Menu -->
@@ -446,7 +502,7 @@
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
           <span class="detail-label">Target Item</span>
-          <span class="detail-value" id="chmod-modal-target-path" style="font-size: 12px; word-break: break-all;">/path/to/item</span>
+          <div class="detail-value" id="chmod-modal-target-path" style="font-size: 12px; word-break: break-all; width: 100%;">/path/to/item</div>
         </div>
 
         <div class="form-group">
@@ -588,6 +644,115 @@
         <div class="modal-footer">
           <button id="btn-rename-cancel" class="btn" type="button" style="padding: 8px 16px;">Cancel</button>
           <button id="btn-rename-submit" class="btn btn-primary" type="button" style="padding: 8px 24px; font-weight: 600;">⚡ Rename Item</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Batch Rename Modal (#batch-rename-modal)                                 -->
+  <!-- ========================================================================= -->
+  <div id="batch-rename-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="batch-rename-modal-title">✏️ Batch Rename Items</span>
+        <button id="btn-batch-rename-close-icon" class="btn btn-sm modal-close-btn" type="button" title="Close">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px;">
+        <div class="detail-item" style="padding: 10px 14px; margin-bottom: 12px; display: flex; flex-direction: column; align-items: flex-start;">
+          <span class="detail-label" style="margin-bottom: 4px;">Target Files (Check to Rename)</span>
+          <div class="detail-value" id="batch-rename-modal-target-list" style="font-size: 12px; width: 100%;"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" for="batch-rename-mode">Rename Operation</label>
+          <select id="batch-rename-mode" class="form-control" style="width: 100%;">
+            <option value="prefix-suffix" selected>Add Prefix / Suffix</option>
+            <option value="find-replace">Find and Replace</option>
+            <option value="sequential">Sequential Numbering</option>
+          </select>
+        </div>
+
+        <!-- Mode Inputs: Prefix / Suffix -->
+        <div id="batch-rename-prefix-suffix-group" class="batch-rename-group">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="batch-rename-prefix">Prefix</label>
+            <input type="text" id="batch-rename-prefix" class="form-control" placeholder="e.g. backup_" style="width: 100%;">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="batch-rename-suffix">Suffix</label>
+            <input type="text" id="batch-rename-suffix" class="form-control" placeholder="e.g. _v1" style="width: 100%;">
+          </div>
+        </div>
+
+        <!-- Mode Inputs: Find and Replace -->
+        <div id="batch-rename-find-replace-group" class="batch-rename-group" style="display: none;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="batch-rename-find">Find Text</label>
+            <input type="text" id="batch-rename-find" class="form-control" placeholder="Text to find" style="width: 100%;">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="batch-rename-replace">Replace With</label>
+            <input type="text" id="batch-rename-replace" class="form-control" placeholder="Replacement text" style="width: 100%;">
+          </div>
+        </div>
+
+        <!-- Mode Inputs: Sequential Numbering -->
+        <div id="batch-rename-sequential-group" class="batch-rename-group" style="display: none;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" for="batch-rename-base">Base Name</label>
+            <input type="text" id="batch-rename-base" class="form-control" placeholder="e.g. image" style="width: 100%;">
+          </div>
+          <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label" for="batch-rename-start">Start Number</label>
+              <input type="number" id="batch-rename-start" class="form-control" value="1" min="0" style="width: 100%;">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label class="form-label" for="batch-rename-padding">Digits Padding</label>
+              <select id="batch-rename-padding" class="form-control" style="width: 100%;">
+                <option value="1">1 (e.g. 1)</option>
+                <option value="2">2 (e.g. 01)</option>
+                <option value="3" selected>3 (e.g. 001)</option>
+                <option value="4">4 (e.g. 0001)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid hsl(var(--border-subtle));">
+          <button id="btn-batch-rename-cancel" class="btn" type="button" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-batch-rename-submit" class="btn btn-primary" type="button" style="padding: 8px 24px; font-weight: 600;">⚡ Rename Items</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Move/Copy File/Folder Modal (#move-modal)                                -->
+  <!-- ========================================================================= -->
+  <div id="move-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="move-modal-title">📦 Move Item</span>
+        <button id="btn-move-modal-close" class="btn btn-sm" type="button">✕ Close</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Current Path</span>
+          <span class="detail-value" id="move-modal-target-path" style="font-size: 12px; word-break: break-all; font-family: var(--font-mono); color: hsl(var(--text-muted));">/path/to/item</span>
+        </div>
+
+        <div class="form-group" style="margin-top: 12px;">
+          <label class="form-label" id="move-item-path-label" for="move-item-path-input">New Destination Path</label>
+          <input type="text" id="move-item-path-input" class="form-control" placeholder="Enter new destination path" style="width: 100%;">
+        </div>
+
+        <div class="modal-footer">
+          <button id="btn-move-cancel" class="btn" type="button" style="padding: 8px 16px;">Cancel</button>
+          <button id="btn-move-submit" class="btn btn-primary" type="button" style="padding: 8px 24px; font-weight: 600;">📦 Move Item</button>
         </div>
       </div>
     </div>
@@ -923,26 +1088,37 @@
   <!-- Directory Comparison Analysis Modal (#dir-compare-modal)                  -->
   <!-- ========================================================================= -->
   <div id="dir-compare-modal" class="modal-overlay">
-    <div class="modal-card" style="width: 680px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+    <div class="modal-card" style="width: 920px; max-width: 95vw; height: 600px; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color)); display: flex; flex-direction: column;">
       <div class="pref-modal-header">
-        <span class="modal-title" id="dir-compare-modal-title">🔍 Directory Comparison Analysis</span>
+        <span class="modal-title" id="dir-compare-modal-title">🔍 Compare Directories</span>
         <button id="btn-dir-compare-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
-        <div id="dir-compare-modal-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
-          <!-- Summary cards populated dynamically -->
+      <div class="modal-body" style="height: calc(600px - 42px); display: flex; flex-direction: column; gap: 8px; padding: 12px; box-sizing: border-box; overflow: hidden;">
+        <div class="compare-toolbar">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-size: 11px; font-weight: 600; color: hsl(var(--text-muted));">Filter:</span>
+            <select id="dir-compare-filter-select" class="compare-select">
+              <option value="all">Show All Files</option>
+              <option value="diff_only" selected>Show Differences Only</option>
+              <option value="local_only">Show Local Only</option>
+              <option value="remote_only">Show Remote Only</option>
+              <option value="mismatches">Show Mismatches</option>
+            </select>
+          </div>
+          <div id="dir-compare-modal-summary" style="display: flex; gap: 12px; font-size: 11px;">
+            <!-- Summary details dynamically inserted -->
+          </div>
         </div>
 
-        <div style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; max-height: 420px; overflow-y: auto;">
-          <table class="queue-table" style="margin: 0;">
+        <div class="file-list-container" style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; background-color: hsl(var(--bg-surface)); flex: 1;">
+          <table class="file-table" style="margin: 0; table-layout: fixed; width: 100%;">
             <thead style="position: sticky; top: 0; background: hsl(var(--bg-secondary)); z-index: 2;">
               <tr>
-                <th style="width: 36px; text-align: center;"><input type="checkbox" id="dir-compare-select-all" checked title="Select / Deselect All"></th>
-                <th>File Name</th>
-                <th>Status / Category</th>
-                <th>Local Detail</th>
-                <th>Remote Detail</th>
+                <th style="width: 36px; text-align: center; vertical-align: middle;"><input type="checkbox" id="dir-compare-select-all" checked title="Select / Deselect All" style="margin: 0; cursor: pointer;"></th>
+                <th style="width: 39%;">Local File</th>
+                <th style="width: 22%; text-align: center; vertical-align: middle;">Sync / Status</th>
+                <th style="width: 39%;">Remote File</th>
               </tr>
             </thead>
             <tbody id="dir-compare-modal-tbody">
@@ -951,9 +1127,9 @@
           </table>
         </div>
 
-        <div class="modal-footer">
-          <button id="btn-dir-compare-modal-ok" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
-          <button id="btn-dir-compare-modal-sync" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Sync Selected Files</button>
+        <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid hsl(var(--border-subtle)); display: flex; justify-content: flex-end; gap: 8px;">
+          <button id="btn-dir-compare-modal-ok" class="btn" style="padding: 8px 16px;">✕ Close</button>
+          <button id="btn-dir-compare-modal-sync" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Sync Checked Files</button>
         </div>
       </div>
     </div>
@@ -1613,7 +1789,7 @@
 
               <div style="font-size: 10px; color: hsl(var(--text-muted)); border-top: 1px solid hsl(var(--border-subtle)); padding-top: 8px; margin-top: 4px; display: flex; gap: 12px;">
                 <span>🔒 Encryption: <strong>AES-256-GCM</strong></span>
-                <span>🔑 Derivation: <strong>PBKDF2 (100k rounds)</strong></span>
+                <span>🔑 Derivation: <strong>PBKDF2 (800k rounds)</strong></span>
               </div>
             </div>
 
@@ -2108,7 +2284,7 @@
       <div class="modal-body">
         <div id="master-config-mode-enable" style="display: flex; flex-direction: column; gap: 12px;">
           <p style="font-size: 11px; color: hsl(var(--text-muted)); line-height: 1.4; margin: 0;">
-            Creating a Master Password encrypts all server passwords and SSH keys with PBKDF2-SHA256 (100,000 rounds). You will be prompted to unlock DevsFTP whenever you open the application.
+            Creating a Master Password encrypts all server passwords and SSH keys with PBKDF2-SHA256 (800,000 rounds). You will be prompted to unlock DevsFTP whenever you open the application.
           </p>
           <div class="form-group">
             <label class="form-label" for="master-cfg-new-pass">New Master Password</label>
@@ -2180,6 +2356,28 @@
         <div class="modal-footer">
           <button id="btn-clear-cache-modal-cancel" class="btn">Cancel</button>
           <button id="btn-clear-cache-modal-submit" class="btn btn-primary">🧹 Purge Selected</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SSH Command Parameter Prompt Modal -->
+  <div id="ssh-prompt-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 460px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border-color)); background: hsl(var(--bg-tertiary));">
+        <span class="modal-title" id="ssh-prompt-modal-title" style="font-weight: 700; color: hsl(var(--text-primary));">⚡ SSH Command Parameter</span>
+        <button id="btn-ssh-prompt-close" class="btn btn-sm" type="button" style="background: none; border: none; color: hsl(var(--text-muted)); cursor: pointer;">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px;">
+        <div class="form-group">
+          <label class="form-label" id="ssh-prompt-label" for="ssh-prompt-input" style="display: block; margin-bottom: 6px; font-weight: 600; color: hsl(var(--text-secondary));">Input Value</label>
+          <input type="text" id="ssh-prompt-input" class="search-input" placeholder="Enter parameter..." style="width: 100%; box-sizing: border-box; padding: 8px;">
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+          <button id="btn-ssh-prompt-cancel" class="btn" type="button">Cancel</button>
+          <button id="btn-ssh-prompt-submit" class="btn btn-primary" type="button" style="font-weight: 600;">⚡ Execute</button>
         </div>
       </div>
     </div>

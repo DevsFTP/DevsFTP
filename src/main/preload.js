@@ -21,6 +21,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const devsFTPApi = {
+  isWindows: process.platform === 'win32',
+  appVersion: require('electron').app ? require('electron').app.getVersion() : '1.0.0',
   // Saved Profiles
   profiles: {
     getAll: () => ipcRenderer.invoke('profiles:get-all'),
@@ -49,6 +51,9 @@ const devsFTPApi = {
   remoteDelete: (remotePath, isDir, sessionId) => ipcRenderer.invoke('remote:delete', remotePath, isDir, sessionId),
   remoteChmod: (remotePath, mode, sessionId) => ipcRenderer.invoke('remote:chmod', remotePath, mode, sessionId),
   remoteRename: (oldPath, newPath, sessionId) => ipcRenderer.invoke('remote:rename', oldPath, newPath, sessionId),
+  remoteCopy: (srcPath, destPath, sessionId) => ipcRenderer.invoke('remote:copy', srcPath, destPath, sessionId),
+  remoteExecCommand: (command, sessionId) => ipcRenderer.invoke('remote:exec-command', command, sessionId),
+  remoteGetOS: (sessionId) => ipcRenderer.invoke('remote:get-os', sessionId),
 
   // Local Operations
   localList: (localPath) => ipcRenderer.invoke('local:list', localPath),
@@ -58,7 +63,9 @@ const devsFTPApi = {
   localCreateFile: (localPath) => ipcRenderer.invoke('local:create-file', localPath),
   localMkdir: (localPath) => ipcRenderer.invoke('local:mkdir', localPath),
   localRename: (oldPath, newPath) => ipcRenderer.invoke('local:rename', oldPath, newPath),
+  localCopy: (srcPath, destPath) => ipcRenderer.invoke('local:copy', srcPath, destPath),
   localDelete: (localPath, isDir) => ipcRenderer.invoke('local:delete', localPath, isDir),
+  localExecCommand: (command) => ipcRenderer.invoke('local:exec-command', command),
   selectLocalPath: () => ipcRenderer.invoke('dialog:select-local-path'),
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   checkForUpdates: () => ipcRenderer.invoke('system:check-updates'),

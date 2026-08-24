@@ -25,7 +25,7 @@ function appendDiagnosticLine(line) {
     const time = new Date().toLocaleTimeString();
     const normalized = String(line).endsWith('\n') ? String(line) : `${line}\n`;
     const formatted = `[${time}] ${normalized}`;
-    fs.appendFileSync(path.join(process.cwd(), 'devsftp-debug.log'), formatted);
+    // Only write to userData — process.cwd() can be a system dir in packaged builds (Fix B4)
     if (app) {
       fs.appendFileSync(path.join(app.getPath('userData'), 'devsftp-debug.log'), formatted);
     }
@@ -73,14 +73,15 @@ class CacheWatcherService {
 
   launchEditor(localPath) {
     if (!localPath) return;
-    const { exec } = require('child_process');
+    // Use execFile (not exec) to avoid shell injection from remote-derived paths (Fix B1)
+    const { execFile } = require('child_process');
     const ext = path.extname(localPath).toLowerCase();
     const webExts = ['.html', '.htm', '.xhtml', '.phtml', '.shtml', '.svg', '.xml'];
 
     if (webExts.includes(ext) && process.platform === 'win32') {
       const codeEditorPath = this.getSystemCodeEditorPath();
       if (codeEditorPath && fs.existsSync(codeEditorPath)) {
-        exec(`"${codeEditorPath}" "${localPath}"`, (err) => {
+        execFile(codeEditorPath, [localPath], (err) => {
           if (err && shell && shell.openPath) shell.openPath(localPath);
         });
         return;
@@ -249,22 +250,27 @@ class CacheWatcherService {
     logCacheDiagnostic('recoverWatchersOnStartup entered', { cacheDir: this.cacheDir, exists: fs.existsSync(this.cacheDir) });
     if (!fs.existsSync(this.cacheDir)) return;
 
-    const findManifests = (dir) => {
+    // Async recursive manifest finder with depth limit to prevent stack overflow (Fix A6 + D4)
+    const findManifests = async (dir, depth = 0) => {
+      const MAX_DEPTH = 5;
+      if (depth > MAX_DEPTH) return [];
       let results = [];
-      const list = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of list) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          results = results.concat(findManifests(fullPath));
-        } else if (entry.isFile() && entry.name.endsWith('.meta.json')) {
-          results.push(fullPath);
+      try {
+        const list = await fs.promises.readdir(dir, { withFileTypes: true });
+        for (const entry of list) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            const sub = await findManifests(fullPath, depth + 1);
+            results = results.concat(sub);
+          } else if (entry.isFile() && entry.name.endsWith('.meta.json')) {
+            results.push(fullPath);
+          }
         }
-      }
+      } catch (e) {} // silently skip unreadable dirs
       return results;
     };
 
-    try {
-      const manifests = findManifests(this.cacheDir);
+    findManifests(this.cacheDir).then(manifests => {
       logCacheDiagnostic('recoverWatchersOnStartup manifests found', { count: manifests.length, manifests });
       const modifiedBatch = [];
 
@@ -308,17 +314,20 @@ class CacheWatcherService {
 
       if (modifiedBatch.length > 0) {
         logCacheDiagnostic('startup modified files detected -> sending IPC cache:batch-files-saved', { count: modifiedBatch.length, modifiedBatch });
-        if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
-          this.ipcWindow.webContents.send('cache:batch-files-saved', modifiedBatch);
-        }
+        // Delay IPC by 500ms to ensure the renderer has registered its handlers (Fix C7)
+        setTimeout(() => {
+          if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
+            this.ipcWindow.webContents.send('cache:batch-files-saved', modifiedBatch);
+          }
+        }, 500);
       }
 
       // Perform automatic stale cache cleanup (purges un-watched cache older than 7 days)
       this.cleanupStaleCache(7);
-    } catch (err) {
+    }).catch(err => {
       console.error('Error recovering cache watchers on startup:', err);
       logCacheDiagnostic('recoverWatchersOnStartup error', { error: err.message, stack: err.stack }, 'error');
-    }
+    });
   }
 
   cleanupStaleCache(maxAgeDays = 7) {

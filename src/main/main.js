@@ -476,7 +476,7 @@ function createWindow() {
   knownHostsStore = new KnownHostsStore();
   transferEngine = new TransferEngine(mainWindow, sendLog);
   scheduledJobStore = new ScheduledJobStore();
-  jobRunnerService = new JobRunnerService(mainWindow, scheduledJobStore, profileStore, sendLog);
+  jobRunnerService = new JobRunnerService(mainWindow, scheduledJobStore, profileStore, sendLog, knownHostsStore);
   cacheWatcherService = new CacheWatcherService(mainWindow);
   if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
   sshTerminalService = new SSHTerminalService(mainWindow);
@@ -1041,7 +1041,7 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
         cacheWatcherService.updateWatcherSessionId(config.id, sessId, Array.from(activeSessions.keys()));
       }
       sendLog('info', `SFTP Session established cleanly for tab [${sessId}] to ${config.host}:${config.port || 22}`);
-      return { success: true, protocol: 'sftp', sessionId: sessId };
+      return { success: true, protocol: 'sftp', sessionId: sessId, remoteOS: session.remoteOS || 'linux' };
     } catch (err) {
       sendLog('error', `SFTP Connection failed for tab [${sessId}]: ${err.message}`);
       throw err;
@@ -1178,6 +1178,53 @@ registerLoggedHandle('remote:rename', async (_event, oldPath, newPath, sessionId
   return true;
 });
 
+registerLoggedHandle('remote:copy', async (_event, srcPath, destPath, sessionId) => {
+  const cleanSrc = normalizePOSIXPath(srcPath);
+  const cleanDest = normalizePOSIXPath(destPath);
+  console.log('[DEBUG MAIN IPC] remote:copy received:', { srcPath: cleanSrc, destPath: cleanDest, sessionId });
+  const session = getActiveSessionInstance(sessionId);
+  if (!session || !session.connected) throw new Error('Not connected');
+  if (session.copy) {
+    await session.copy(cleanSrc, cleanDest);
+    sendLog('info', `Copied remote item ${cleanSrc} -> ${cleanDest}`);
+    return true;
+  }
+  throw new Error('Copy is not supported on this protocol.');
+});
+
+registerLoggedHandle('remote:exec-command', async (_event, cmdString, sessionId) => {
+  sendLog('info', `[DEBUG MAIN IPC] remote:exec-command received: cmd="${cmdString}"`);
+  const session = getActiveSessionInstance(sessionId);
+  if (!session || !session.connected) throw new Error('Not connected');
+  if (session.execCommand) {
+    const res = await session.execCommand(cmdString);
+    sendLog('info', `[DEBUG MAIN IPC] remote:exec-command result: code=${res.code} stdout="${res.stdout.trim()}" stderr="${res.stderr.trim()}"`);
+    return res;
+  }
+  throw new Error('Command execution is not supported on this protocol.');
+});
+
+registerLoggedHandle('remote:get-os', async (_event, sessionId) => {
+  const session = getActiveSessionInstance(sessionId);
+  return session ? (session.remoteOS || 'linux') : 'linux';
+});
+
+registerLoggedHandle('local:exec-command', async (_event, cmdString) => {
+  const { exec } = require('child_process');
+  sendLog('info', `[DEBUG MAIN IPC] local:exec-command received: cmd="${cmdString}"`);
+  return new Promise((resolve) => {
+    exec(cmdString, (error, stdout, stderr) => {
+      const code = error ? (error.code || 1) : 0;
+      sendLog('info', `[DEBUG MAIN IPC] local:exec-command result: code=${code}`);
+      resolve({
+        code,
+        stdout: stdout || '',
+        stderr: stderr || (error ? error.message : '')
+      });
+    });
+  });
+});
+
 registerLoggedHandle('remote:create-file', async (_event, remotePath, sessionId, mode) => {
   const cleanPath = normalizePOSIXPath(remotePath);
   console.log('[DEBUG MAIN IPC] remote:create-file received:', { remotePath: cleanPath, sessionId, mode });
@@ -1223,6 +1270,23 @@ registerLoggedHandle('local:rename', async (_event, oldPath, newPath) => {
   fs.renameSync(oldPath, newPath);
   sendLog('info', `Renamed local item ${oldPath} -> ${newPath}`);
   return true;
+});
+
+registerLoggedHandle('local:copy', async (_event, srcPath, destPath) => {
+  if (isProtectedSystemPath(srcPath) || isProtectedSystemPath(destPath)) {
+    throw new Error(`Permission denied: System-protected path operations are not permitted.`);
+  }
+  if (fs.existsSync(srcPath)) {
+    const stat = fs.statSync(srcPath);
+    if (stat.isDirectory()) {
+      fs.cpSync(srcPath, destPath, { recursive: true });
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+    sendLog('info', `Copied local item ${srcPath} -> ${destPath}`);
+    return true;
+  }
+  throw new Error('Source file does not exist');
 });
 
 registerLoggedHandle('local:delete', async (_event, localPath) => {

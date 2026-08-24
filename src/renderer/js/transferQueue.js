@@ -16,6 +16,7 @@ window.TransferQueue = {
   lastSingleFile: null,
   cancelledIds: new Set(),
   batchCancelled: false,
+  selectedId: null,
 
   async init() {
     this.tbody = document.getElementById('queue-tbody');
@@ -353,6 +354,30 @@ window.TransferQueue = {
     }
   },
 
+  async reorderQueue(draggedId, targetId) {
+    const draggedIdx = this.queue.findIndex(q => q.id === draggedId);
+    const targetIdx = this.queue.findIndex(q => q.id === targetId);
+    if (draggedIdx !== -1 && targetIdx !== -1) {
+      const item = this.queue.splice(draggedIdx, 1)[0];
+      this.queue.splice(targetIdx, 0, item);
+      this.render();
+      await this.syncQueue();
+    }
+  },
+
+  renderSelectedState() {
+    if (!this.tbody) return;
+    const rows = this.tbody.querySelectorAll('tr');
+    rows.forEach(row => {
+      const id = row.getAttribute('data-id');
+      if (id === this.selectedId) {
+        row.classList.add('selected-row');
+      } else {
+        row.classList.remove('selected-row');
+      }
+    });
+  },
+
   pauseAll() {
     const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
     const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
@@ -633,6 +658,10 @@ window.TransferQueue = {
         tr = document.createElement('tr');
         tr.setAttribute('data-id', item.id);
         tr.setAttribute('data-status', item.status);
+        tr.setAttribute('draggable', 'true');
+        if (item.id === this.selectedId) {
+          tr.classList.add('selected-row');
+        }
 
         tr.innerHTML = `
           <td style="font-weight: 600;">${arrow} ${item.type.toUpperCase()}</td>
@@ -656,9 +685,54 @@ window.TransferQueue = {
           </td>
         `;
 
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-qaction')) return;
+          this.selectedId = item.id;
+          this.renderSelectedState();
+        });
+
         tr.addEventListener('contextmenu', (e) => {
           e.preventDefault();
+          this.selectedId = item.id;
+          this.renderSelectedState();
           this.showContextMenu(e.clientX, e.clientY, item);
+        });
+
+        // Drag & Drop
+        tr.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', item.id);
+          tr.classList.add('dragging');
+          this.selectedId = item.id;
+          this.renderSelectedState();
+        });
+
+        tr.addEventListener('dragend', (e) => {
+          tr.classList.remove('dragging');
+          if (this.tbody) {
+            const rows = this.tbody.querySelectorAll('tr');
+            rows.forEach(r => r.classList.remove('drag-over'));
+          }
+        });
+
+        tr.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          tr.classList.add('drag-over');
+        });
+
+        tr.addEventListener('dragleave', (e) => {
+          tr.classList.remove('drag-over');
+        });
+
+        tr.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          tr.classList.remove('drag-over');
+          const draggedId = e.dataTransfer.getData('text/plain');
+          const targetId = tr.getAttribute('data-id');
+          if (draggedId && targetId && draggedId !== targetId) {
+            await this.reorderQueue(draggedId, targetId);
+          }
         });
 
         this.tbody.appendChild(tr);
@@ -681,6 +755,13 @@ window.TransferQueue = {
           tr.setAttribute('data-status', item.status);
           const actionsCell = tr.querySelector('.actions-cell');
           if (actionsCell) actionsCell.innerHTML = this.generateActionButtons(item);
+        }
+
+        // Selection style update
+        if (item.id === this.selectedId) {
+          tr.classList.add('selected-row');
+        } else {
+          tr.classList.remove('selected-row');
         }
       }
     });

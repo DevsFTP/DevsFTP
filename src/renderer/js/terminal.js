@@ -9,6 +9,8 @@ window.SSHTerminal = {
   fitAddon: null,
   container: null,
   initialized: false,
+  buffers: {},
+  _resizeHandler: null, // stored ref for cleanup (Fix A8)
 
   init() {
     this.container = document.getElementById('terminal-container');
@@ -83,7 +85,6 @@ window.SSHTerminal = {
         const { sessionId, data } = payload || {};
         if (!sessionId) return;
 
-        if (!this.buffers) this.buffers = {};
         if (!this.buffers[sessionId]) this.buffers[sessionId] = '';
         this.buffers[sessionId] += data;
 
@@ -94,13 +95,16 @@ window.SSHTerminal = {
       });
     }
 
-    // Auto resize listener
-    window.addEventListener('resize', () => this.resize());
+    // Store resize listener reference so it can be removed on cleanup (Fix A8)
+    this._resizeHandler = () => this.resize();
+    window.addEventListener('resize', this._resizeHandler);
     this.initialized = true;
 
+    // Read app version dynamically from preload API (Fix C8)
+    const appVersion = (api && api.appVersion) ? api.appVersion : '1.0.0';
     this.term.writeln('\x1b[36m=================================================\x1b[0m');
     this.term.writeln('\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m');
-    this.term.writeln('\x1b[36m                 v1.0.0                          \x1b[0m');
+    this.term.writeln(`\x1b[36m                 v${appVersion}                          \x1b[0m`);
     this.term.writeln('\x1b[36m=================================================\x1b[0m\r\n');
     this.focus();
   },
@@ -145,15 +149,38 @@ window.SSHTerminal = {
   switchSession(sessionId) {
     if (!this.term) return;
     this.term.clear();
-    if (!this.buffers) this.buffers = {};
-    const buffer = this.buffers[sessionId] || 
+    const api = window.devsFTP || window.pulseFTP;
+    const appVersion = (api && api.appVersion) ? api.appVersion : '1.0.0';
+    const buffer = this.buffers[sessionId] ||
       '\x1b[36m=================================================\x1b[0m\r\n' +
       '\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m\r\n' +
-      '\x1b[36m                 v1.0.0                          \x1b[0m\r\n' +
+      `\x1b[36m                 v${appVersion}                          \x1b[0m\r\n` +
       '\x1b[36m=================================================\x1b[0m\r\n\r\n' +
       '\x1b[36mDevsFTP Active SSH Session Terminal\x1b[0m\r\n\r\n';
     this.term.write(buffer);
     this.resize();
+  },
+
+  // Remove the stale buffer for a disconnected session (Fix A9)
+  clearSession(sessionId) {
+    if (sessionId && this.buffers[sessionId] !== undefined) {
+      delete this.buffers[sessionId];
+    }
+  },
+
+  // Full cleanup: remove resize listener and dispose terminal (Fix A8)
+  destroy() {
+    if (this._resizeHandler) {
+      window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
+    }
+    if (this.term) {
+      try { this.term.dispose(); } catch (e) {}
+      this.term = null;
+    }
+    this.fitAddon = null;
+    this.initialized = false;
+    this.buffers = {};
   },
 
   clear() {
@@ -173,3 +200,4 @@ window.SSHTerminal = {
     this.resize();
   }
 };
+

@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const menuHelpDocs = document.getElementById('menu-help-docs');
     if (menuHelpDocs) {
-      menuHelpDocs.addEventListener('click', () => openWebsite('https://DevsFTP.com/docs/'));
+      menuHelpDocs.addEventListener('click', () => openWebsite('https://devsftp.com/documents/'));
     }
 
     // Keyboard Shortcuts Modal wiring
@@ -1049,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Top Menu Actions
   const menuFileNew = document.getElementById('menu-file-new');
-  if (menuFileNew) menuFileNew.addEventListener('click', () => window.ConnectionDialog.openPreferences('profiles'));
+  if (menuFileNew) menuFileNew.addEventListener('click', () => window.ConnectionDialog.openConnectionDialog());
 
   const menuFileDisc = document.getElementById('menu-file-disconnect');
   if (menuFileDisc) menuFileDisc.addEventListener('click', () => disconnectSession());
@@ -1272,10 +1272,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const sessId = targetSessionId || (window.SessionManager ? window.SessionManager.activeSessionId : 'default');
-      await api.connect(profile, sessId);
+      const connRes = await api.connect(profile, sessId);
 
       if (window.SessionManager) {
         window.SessionManager.updateSessionConnectionState(sessId, true, profile);
+        const sessionObj = window.SessionManager.getSession(sessId);
+        if (sessionObj && connRes) {
+          sessionObj.remoteOS = connRes.remoteOS || 'linux';
+        }
       }
 
       const initialRemotePath = targetRemotePath || profile.remotePath || '/';
