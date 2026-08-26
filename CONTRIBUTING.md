@@ -24,7 +24,7 @@ Please be respectful and constructive in all discussions, issues, and code revie
 - Clearly explain the problem the feature solves and how you envision it working within DevsFTP.
 
 ### 3. Submitting Pull Requests (PRs)
-1. Fork the repository and create your feature branch from `main`:
+1. Fork the repository and create your feature branch from `master`:
    ```bash
    git checkout -b feature/my-amazing-feature
    ```
@@ -36,7 +36,7 @@ Please be respectful and constructive in all discussions, issues, and code revie
 3. Ensure all new JavaScript source files include the standard **GNU GPL-3.0 header notice**:
    ```javascript
    /**
-     * DevsFTP — The SFTP & FTP Client for Windows
+    * DevsFTP — Works with you, not against you.
     * Copyright (C) 2026 DevsFTP.com
     *
     * This program is free software: you can redistribute it and/or modify
@@ -44,7 +44,7 @@ Please be respectful and constructive in all discussions, issues, and code revie
     * the Free Software Foundation, version 3 of the License.
     */
    ```
-4. Commit your changes with descriptive commit messages and submit a Pull Request targeting `main`.
+4. Commit your changes with descriptive commit messages and submit a Pull Request targeting `master`.
 
 ---
 
