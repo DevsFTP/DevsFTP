@@ -10,7 +10,6 @@
 *.log
 .devs_userData/
 .devssh_userData/
-DevsWWW/
 
 # OS Generated Files
 .DS_Store
