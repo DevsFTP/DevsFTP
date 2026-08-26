@@ -6,7 +6,7 @@ DevsFTP is built as a local-first application. We do not store, synchronize, or 
 
 ## 1. Local Vault Cryptography
 All connection profiles are stored on your local disk. When you set a Master Password, the application implements the following security pipeline offline:
-* **Key Derivation**: Derived locally using PBKDF2 with **100,000 iterations**.
+* **Key Derivation**: Derived locally using PBKDF2 with **800,000 iterations**.
 * **Encryption Cipher**: Profile configurations and passwords are encrypted using **AES-256-GCM**.
 * **Zero Cloud Trust**: There is no password recovery backend. If you lose your Master Password, your profiles cannot be decrypted or recovered.
 
