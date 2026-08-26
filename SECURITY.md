@@ -17,7 +17,7 @@ DevsFTP incorporates robust security controls and cryptographic protections:
 
 ### 1. Master Password Vault (AES-256-GCM)
 - **Encryption Standard**: All stored connection passwords, private keys, and passphrases are encrypted at rest using **AES-256-GCM (Galois/Counter Mode)** with 16-byte authentication tags.
-- **Key Derivation**: Master Key derivation uses **PBKDF2** with **800,000 iterations** (with silent auto-migration from legacy 100,000 iteration vaults) and a unique 16-byte random salt per vault.
+- **Key Derivation**: Master Key derivation uses **PBKDF2** with **800,000 iterations** and a unique 16-byte random salt per vault.
 - **Master Lock Screen**: Startup unlock modal (`master-unlock-modal`) prevents unauthorized access to connection credentials. Includes a 3-strike failed attempt lockout requiring manual application close to secure the vault.
 - **Auto-Lock Idle Security**: Vault automatically locks credentials after a configurable inactivity timeout.
 
