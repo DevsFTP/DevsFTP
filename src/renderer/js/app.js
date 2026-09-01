@@ -85,6 +85,192 @@ window.DevsApp = {
     if (window.SSHTerminal) {
       window.SSHTerminal.setTheme(currentTheme, colorHex);
     }
+  },
+
+  copyToClipboard(text) {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {}
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch (err) {
+      console.error('Clipboard copy error:', err);
+      return false;
+    }
+  },
+
+  async exportWorkspacePackage() {
+    const api = window.devsFTP || window.pulseFTP;
+    try {
+      let profiles = [];
+      if (api && api.profiles && api.profiles.getAll) {
+        try { profiles = await api.profiles.getAll(); } catch (e) {}
+      }
+      
+      const localBm = (window.FileBrowser && typeof window.FileBrowser.getLocalBookmarks === 'function') ? window.FileBrowser.getLocalBookmarks() : [];
+      const globalBm = (window.FileBrowser && typeof window.FileBrowser.getGlobalBookmarks === 'function') ? window.FileBrowser.getGlobalBookmarks() : [];
+      const profileBm = (window.FileBrowser && typeof window.FileBrowser.getProfileBookmarksMap === 'function') ? window.FileBrowser.getProfileBookmarksMap() : {};
+
+      const preferences = {
+        theme: localStorage.getItem('devsftp_pref_theme') || 'system',
+        autoupload: localStorage.getItem('devsftp_pref_autoupload') || 'prompt',
+        conflictPolicy: localStorage.getItem('devsftp_pref_conflict_policy') || 'prompt',
+        notifyTransfers: localStorage.getItem('devsftp_pref_notify_transfers') !== 'false',
+        notifyChime: localStorage.getItem('devsftp_pref_notify_chime') !== 'false',
+        autoupdate: localStorage.getItem('devsftp_pref_autoupdate') !== 'false',
+        termFont: localStorage.getItem('devsftp_pref_term_font') || 'Cascadia Code, Consolas, monospace',
+        termFontSize: localStorage.getItem('devsftp_pref_term_fontsize') || 13,
+        termCursorStyle: localStorage.getItem('devsftp_pref_term_cursor_style') || 'block',
+        termCursorBlink: localStorage.getItem('devsftp_pref_term_cursor_blink') !== 'false',
+        termScrollback: localStorage.getItem('devsftp_pref_term_scrollback') || 5000,
+        transferSettings: localStorage.getItem('devsftp_transfer_settings') || null
+      };
+
+      let scheduledJobs = [];
+      if (api && api.jobs && api.jobs.getAll) {
+        try { scheduledJobs = await api.jobs.getAll(); } catch (e) {}
+      }
+
+      const bundle = {
+        devsftpVersion: '1.0.1',
+        exportedAt: new Date().toISOString(),
+        profiles: profiles || [],
+        bookmarks: {
+          local: localBm || [],
+          profile: profileBm || {},
+          global: globalBm || []
+        },
+        preferences,
+        scheduledJobs: scheduledJobs || []
+      };
+
+      const jsonString = JSON.stringify(bundle, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `devsftp-workspace-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('info', `📦 Exported Unified Workspace Package (${profiles.length} profile(s), ${globalBm.length + localBm.length} bookmark(s), preferences, scheduled jobs).`);
+      }
+    } catch (err) {
+      console.error('Failed to export workspace package:', err);
+      alert(`Failed to export workspace package: ${err.message}`);
+    }
+  },
+
+  async importWorkspacePackage(jsonContent = null) {
+    const api = window.devsFTP || window.pulseFTP;
+    if (!jsonContent) {
+      jsonContent = prompt('Paste your DevsFTP Workspace Package JSON content to import:');
+      if (!jsonContent) return;
+    }
+
+    try {
+      const bundle = JSON.parse(jsonContent);
+      let countProfiles = 0;
+      let countBookmarks = 0;
+      let countJobs = 0;
+
+      // 1. Import Profiles
+      if (bundle.profiles && Array.isArray(bundle.profiles)) {
+        if (api && api.profiles && api.profiles.upsert) {
+          for (const p of bundle.profiles) {
+            await api.profiles.upsert(p);
+            countProfiles++;
+          }
+        }
+      } else if (Array.isArray(bundle)) {
+        if (api && api.profiles && api.profiles.import) {
+          await api.profiles.import(JSON.stringify(bundle));
+          countProfiles = bundle.length;
+        }
+      }
+
+      // 2. Import Bookmarks
+      if (bundle.bookmarks) {
+        if (bundle.bookmarks.local && Array.isArray(bundle.bookmarks.local)) {
+          const existingLocal = window.FileBrowser ? window.FileBrowser.getLocalBookmarks() : [];
+          const merged = Array.from(new Set([...existingLocal, ...bundle.bookmarks.local]));
+          localStorage.setItem('devsftp_local_bookmarks', JSON.stringify(merged));
+          countBookmarks += bundle.bookmarks.local.length;
+        }
+        if (bundle.bookmarks.profile && typeof bundle.bookmarks.profile === 'object') {
+          const existingMap = window.FileBrowser ? window.FileBrowser.getProfileBookmarksMap() : {};
+          Object.assign(existingMap, bundle.bookmarks.profile);
+          localStorage.setItem('devsftp_profile_bookmarks', JSON.stringify(existingMap));
+        }
+        if (bundle.bookmarks.global && Array.isArray(bundle.bookmarks.global)) {
+          const existingGlobal = window.FileBrowser ? window.FileBrowser.getGlobalBookmarks() : [];
+          const mergedGlobal = [...existingGlobal];
+          bundle.bookmarks.global.forEach(g => {
+            if (!mergedGlobal.some(x => x.path === g.path && x.profileId === g.profileId)) {
+              mergedGlobal.push(g);
+              countBookmarks++;
+            }
+          });
+          localStorage.setItem('devsftp_global_bookmarks', JSON.stringify(mergedGlobal));
+        }
+      }
+
+      // 3. Import Preferences
+      if (bundle.preferences && typeof bundle.preferences === 'object') {
+        const prefs = bundle.preferences;
+        if (prefs.theme) localStorage.setItem('devsftp_pref_theme', prefs.theme);
+        if (prefs.autoupload) localStorage.setItem('devsftp_pref_autoupload', prefs.autoupload);
+        if (prefs.conflictPolicy) localStorage.setItem('devsftp_pref_conflict_policy', prefs.conflictPolicy);
+        if (prefs.notifyTransfers !== undefined) localStorage.setItem('devsftp_pref_notify_transfers', prefs.notifyTransfers);
+        if (prefs.notifyChime !== undefined) localStorage.setItem('devsftp_pref_notify_chime', prefs.notifyChime);
+        if (prefs.autoupdate !== undefined) localStorage.setItem('devsftp_pref_autoupdate', prefs.autoupdate);
+        if (prefs.termFont) localStorage.setItem('devsftp_pref_term_font', prefs.termFont);
+        if (prefs.termFontSize) localStorage.setItem('devsftp_pref_term_fontsize', prefs.termFontSize);
+        if (prefs.termCursorStyle) localStorage.setItem('devsftp_pref_term_cursor_style', prefs.termCursorStyle);
+        if (prefs.termCursorBlink !== undefined) localStorage.setItem('devsftp_pref_term_cursor_blink', prefs.termCursorBlink);
+        if (prefs.termScrollback) localStorage.setItem('devsftp_pref_term_scrollback', prefs.termScrollback);
+        if (prefs.transferSettings) localStorage.setItem('devsftp_transfer_settings', typeof prefs.transferSettings === 'string' ? prefs.transferSettings : JSON.stringify(prefs.transferSettings));
+      }
+
+      // 4. Import Scheduled Jobs
+      if (bundle.scheduledJobs && Array.isArray(bundle.scheduledJobs)) {
+        if (api && api.jobs && api.jobs.upsert) {
+          for (const job of bundle.scheduledJobs) {
+            await api.jobs.upsert(job);
+            countJobs++;
+          }
+        }
+      }
+
+      alert(`✓ Workspace Package imported cleanly!\n• Profiles: ${countProfiles}\n• Bookmarks: ${countBookmarks}\n• Scheduled Jobs: ${countJobs}`);
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('info', `📥 Imported Unified Workspace Package (${countProfiles} profiles, ${countBookmarks} bookmarks, ${countJobs} jobs).`);
+      }
+
+      if (window.ConnectionDialog && window.ConnectionDialog.loadProfiles) {
+        window.ConnectionDialog.loadProfiles();
+      }
+      if (window.FileBrowser && window.FileBrowser.renderGlobalBookmarksModal) {
+        window.FileBrowser.renderGlobalBookmarksModal();
+      }
+    } catch (err) {
+      console.error('Failed to import workspace package:', err);
+      alert(`Failed to import workspace package: ${err.message}`);
+    }
   }
 };
 
@@ -233,13 +419,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (resolve) resolve(result);
   };
 
+  const uploadPromptDiscardBtn = document.getElementById('btn-upload-save-discard');
+  const uploadPromptProfile = document.getElementById('upload-save-modal-profile');
+
   const openUploadPrompt = (data) => {
     if (isUploadPromptSuppressed()) {
-      return Promise.resolve(true);
+      return Promise.resolve('upload');
     }
 
     if (!uploadPromptModal) {
-      return Promise.resolve(confirm(`Detected changes saved in ${data.fileName}.\nDo you want to automatically upload changes back to remote server?`));
+      return Promise.resolve(confirm(`Detected changes saved in ${data.fileName}.\nDo you want to automatically upload changes back to remote server?`) ? 'upload' : 'queue');
     }
 
     return new Promise((resolve) => {
@@ -247,9 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (uploadPromptFile) uploadPromptFile.textContent = data.fileName || 'cached file';
       if (uploadPromptRemote) uploadPromptRemote.textContent = data.remotePath || '/';
-      if (uploadPromptMessage) {
-        uploadPromptMessage.textContent = `A local save was detected for ${data.fileName || 'the cached file'}. Upload the latest changes back to the remote server now?`;
-      }
+      if (uploadPromptProfile) uploadPromptProfile.textContent = data.profileName || data.profileId || 'Connection';
       if (uploadPromptCheckbox) uploadPromptCheckbox.checked = false;
 
       uploadPromptModal.setAttribute('aria-hidden', 'false');
@@ -262,16 +449,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (uploadPromptCheckbox && uploadPromptCheckbox.checked) {
         setUploadPromptSuppressed(true);
       }
-      closeUploadPrompt(true);
+      closeUploadPrompt('upload');
     });
   }
 
   if (uploadPromptCancelBtn) {
-    uploadPromptCancelBtn.addEventListener('click', () => closeUploadPrompt(false));
+    uploadPromptCancelBtn.addEventListener('click', () => closeUploadPrompt('queue'));
+  }
+
+  if (uploadPromptDiscardBtn) {
+    uploadPromptDiscardBtn.addEventListener('click', () => closeUploadPrompt('discard'));
   }
 
   if (uploadPromptCloseBtn) {
-    uploadPromptCloseBtn.addEventListener('click', () => closeUploadPrompt(false));
+    uploadPromptCloseBtn.addEventListener('click', () => closeUploadPrompt('queue'));
   }
 
   if (uploadPromptModal) {
@@ -405,13 +596,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnClearSavedSessions = document.getElementById('btn-clear-saved-sessions');
     if (btnClearSavedSessions) {
       btnClearSavedSessions.addEventListener('click', () => {
-        localStorage.removeItem('devsftp_workspace_saved_tabs');
-        const msg = document.getElementById('clear-sessions-msg');
-        if (msg) {
-          msg.style.display = 'inline-block';
-          setTimeout(() => { msg.style.display = 'none'; }, 3000);
-        }
-        if (window.LogViewer) window.LogViewer.addEntry('info', '[Workspace Storage] Saved workspace sessions storage cleared cleanly.');
+        window.verifyMasterPasswordIfEnabled(() => {
+          localStorage.removeItem('devsftp_workspace_saved_tabs');
+          const msg = document.getElementById('clear-sessions-msg');
+          if (msg) {
+            msg.style.display = 'inline-block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+          }
+          if (window.LogViewer) window.LogViewer.addEntry('info', '[Workspace Storage] Saved workspace sessions storage cleared cleanly.');
+        });
       });
     }
 
@@ -586,30 +779,34 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (btnResetPrefs) btnResetPrefs.addEventListener('click', () => {
-      if (resetPrefsModal) { resetPrefsModal.classList.add('active'); resetPrefsModal.setAttribute('aria-hidden', 'false'); }
+      window.verifyMasterPasswordIfEnabled(() => {
+        if (resetPrefsModal) { resetPrefsModal.classList.add('active'); resetPrefsModal.setAttribute('aria-hidden', 'false'); }
+      });
     });
     if (btnResetPrefsCancel) btnResetPrefsCancel.addEventListener('click', closeResetModal);
     if (btnResetPrefsCancelX) btnResetPrefsCancelX.addEventListener('click', closeResetModal);
     if (btnResetPrefsConfirm) btnResetPrefsConfirm.addEventListener('click', () => {
-      const prefKeys = [
-        'devsftp_pref_theme',
-        'devsftp_pref_restore_tabs',
-        'devsftp_pref_auto_check_updates',
-        'devsftp_pref_autoupdate',
-        'devsftp_pref_notify_transfers',
-        'devsftp_pref_notify_chime',
-        'devsftp_pref_term_font',
-        'devsftp_pref_term_fontsize',
-        'devsftp_pref_term_cursor_style',
-        'devsftp_pref_term_cursor_blink',
-        'devsftp_pref_term_scrollback',
-        'devsftp_workspace_panel_prefs',
-        'devsftp_live_edit_upload_prompt_disabled',
-        'devsftp_preferences_last_section'
-      ];
-      prefKeys.forEach(k => localStorage.removeItem(k));
-      closeResetModal();
-      window.location.reload();
+      window.verifyMasterPasswordIfEnabled(() => {
+        const prefKeys = [
+          'devsftp_pref_theme',
+          'devsftp_pref_restore_tabs',
+          'devsftp_pref_auto_check_updates',
+          'devsftp_pref_autoupdate',
+          'devsftp_pref_notify_transfers',
+          'devsftp_pref_notify_chime',
+          'devsftp_pref_term_font',
+          'devsftp_pref_term_fontsize',
+          'devsftp_pref_term_cursor_style',
+          'devsftp_pref_term_cursor_blink',
+          'devsftp_pref_term_scrollback',
+          'devsftp_workspace_panel_prefs',
+          'devsftp_live_edit_upload_prompt_disabled',
+          'devsftp_preferences_last_section'
+        ];
+        prefKeys.forEach(k => localStorage.removeItem(k));
+        closeResetModal();
+        window.location.reload();
+      });
     });
 
     const prefAutoCheck = document.getElementById('pref-auto-check-updates');
@@ -749,14 +946,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const drawer = document.getElementById('bottom-drawer');
     const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
+    const btnHeaderToggleDrawer = document.getElementById('btn-header-toggle-drawer');
 
     if (panelConfig.collapsed) {
       drawer.classList.add('collapsed');
       btnToggleDrawer.textContent = '▲ Expand';
+      if (btnHeaderToggleDrawer) btnHeaderToggleDrawer.classList.remove('active');
     } else {
       drawer.classList.remove('collapsed');
       drawer.style.height = `${panelConfig.height}px`;
       btnToggleDrawer.textContent = '▼ Minimize';
+      if (btnHeaderToggleDrawer) btnHeaderToggleDrawer.classList.add('active');
     }
 
     saveWorkspacePrefs(prefs);
@@ -791,7 +991,81 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   const btnToggleDrawer = document.getElementById('btn-toggle-drawer');
-  btnToggleDrawer.addEventListener('click', () => toggleActivePanelCollapse());
+  if (btnToggleDrawer) btnToggleDrawer.addEventListener('click', () => toggleActivePanelCollapse());
+
+  // Top Header Action Toolbar Slide-Out Collapsible Controller
+  const btnHeaderToggleToolbar = document.getElementById('btn-header-toggle-toolbar');
+  const toolbarSlidingContent = document.getElementById('toolbar-sliding-content');
+
+  const setHeaderToolbarState = (isCollapsed) => {
+    if (!toolbarSlidingContent || !btnHeaderToggleToolbar) return;
+    if (isCollapsed) {
+      toolbarSlidingContent.classList.add('collapsed');
+      btnHeaderToggleToolbar.classList.remove('active');
+      localStorage.setItem('devsftp_header_toolbar_collapsed', 'true');
+    } else {
+      toolbarSlidingContent.classList.remove('collapsed');
+      btnHeaderToggleToolbar.classList.add('active');
+      localStorage.setItem('devsftp_header_toolbar_collapsed', 'false');
+    }
+  };
+
+  const savedToolbarState = localStorage.getItem('devsftp_header_toolbar_collapsed');
+  const isSavedCollapsed = savedToolbarState !== null ? (savedToolbarState === 'true') : true;
+  setHeaderToolbarState(isSavedCollapsed);
+
+  if (btnHeaderToggleToolbar) {
+    btnHeaderToggleToolbar.addEventListener('click', () => {
+      const currentlyCollapsed = toolbarSlidingContent ? toolbarSlidingContent.classList.contains('collapsed') : false;
+      setHeaderToolbarState(!currentlyCollapsed);
+      btnHeaderToggleToolbar.blur();
+    });
+  }
+
+  // Clear sticky focus state on mouse release/leave for clean accent color resetting
+  ['mouseup', 'mouseleave', 'mouseout'].forEach(evtType => {
+    document.addEventListener(evtType, (e) => {
+      const btn = e.target.closest('button');
+      if (btn) btn.blur();
+    });
+  });
+
+  window.updateHeaderDrawerBadges = function(queueCount, tunnelsCount) {
+    const queueBadge = document.getElementById('header-badge-queue');
+    const tunnelsBadge = document.getElementById('header-badge-tunnels');
+    const group = document.getElementById('header-drawer-badge-group');
+
+    let hasAny = false;
+    if (queueBadge) {
+      if (typeof queueCount === 'number' && queueCount > 0) {
+        queueBadge.textContent = `⚡${queueCount}`;
+        queueBadge.style.display = 'inline-block';
+        hasAny = true;
+      } else {
+        queueBadge.style.display = 'none';
+      }
+    }
+    if (tunnelsBadge) {
+      if (typeof tunnelsCount === 'number' && tunnelsCount > 0) {
+        tunnelsBadge.textContent = `🔀${tunnelsCount}`;
+        tunnelsBadge.style.display = 'inline-block';
+        hasAny = true;
+      } else {
+        tunnelsBadge.style.display = 'none';
+      }
+    }
+    if (group) {
+      group.style.display = hasAny ? 'inline-flex' : 'none';
+    }
+  };
+
+  // Keyboard shortcut Ctrl+J / Ctrl+` for drawer toggle
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 'j' || e.key === 'J' || e.key === '`')) {
+      e.preventDefault();
+      toggleActivePanelCollapse();
+    }
+  });
 
   const splitter = document.getElementById('workspace-splitter');
   const drawer = document.getElementById('bottom-drawer');
@@ -844,32 +1118,57 @@ document.addEventListener('DOMContentLoaded', () => {
   const themeBtn = document.getElementById('theme-toggle');
   const prefTheme = document.getElementById('pref-theme');
 
+  const getSystemTheme = () => (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
   const toggleTheme = (themeName) => {
     const html = document.documentElement;
-    const current = html.getAttribute('data-theme') || 'dark';
-    const next = themeName || (current === 'dark' ? 'light' : 'dark');
-    html.setAttribute('data-theme', next);
-    if (themeBtn) themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+    let targetSetting = themeName;
 
-    if (prefTheme && prefTheme.value !== next) {
-      prefTheme.value = next;
+    if (!targetSetting) {
+      const currentSetting = localStorage.getItem('devsftp_pref_theme') || 'system';
+      if (currentSetting === 'system') targetSetting = 'dark';
+      else if (currentSetting === 'dark') targetSetting = 'light';
+      else targetSetting = 'system';
     }
 
     try {
-      localStorage.setItem('devsftp_pref_theme', next);
+      localStorage.setItem('devsftp_pref_theme', targetSetting);
     } catch (e) {}
+
+    const effectiveTheme = targetSetting === 'system' ? getSystemTheme() : targetSetting;
+    html.setAttribute('data-theme', effectiveTheme);
+
+    if (themeBtn) {
+      if (targetSetting === 'system') themeBtn.textContent = '💻';
+      else themeBtn.textContent = effectiveTheme === 'dark' ? '🌙' : '☀️';
+      themeBtn.title = `Theme: ${targetSetting.toUpperCase()} (Click to toggle System/Dark/Light)`;
+    }
+
+    if (prefTheme && prefTheme.value !== targetSetting) {
+      prefTheme.value = targetSetting;
+    }
 
     const activeAccent = html.style.getPropertyValue('--accent-primary-hex') || '#68a063';
     if (window.SSHTerminal) {
-      window.SSHTerminal.setTheme(next, activeAccent);
+      window.SSHTerminal.setTheme(effectiveTheme, activeAccent);
     }
 
-    if (window.LogViewer) window.LogViewer.addEntry('info', `Switched UI theme to ${next} mode.`);
+    if (window.LogViewer) window.LogViewer.addEntry('info', `Switched UI theme to ${targetSetting} mode (${effectiveTheme}).`);
   };
 
-  // Restore saved theme preference on startup
-  const savedTheme = localStorage.getItem('devsftp_pref_theme') || 'dark';
+  // Restore saved theme preference on startup (defaults to 'system')
+  const savedTheme = localStorage.getItem('devsftp_pref_theme') || 'system';
   toggleTheme(savedTheme);
+
+  // Listen to OS System Theme changes live
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const current = localStorage.getItem('devsftp_pref_theme') || 'system';
+      if (current === 'system') {
+        toggleTheme('system');
+      }
+    });
+  }
 
   if (themeBtn) {
     themeBtn.addEventListener('click', () => toggleTheme());
@@ -891,12 +1190,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const isAnyActive = (notifyTransfers && notifyTransfers.checked) || (notifyChime && notifyChime.checked);
       if (isAnyActive) {
         notifyBadge.textContent = 'Active';
-        notifyBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-        notifyBadge.style.color = '#34D399';
+        notifyBadge.className = 'tag-badge badge-active';
       } else {
         notifyBadge.textContent = 'Disabled';
-        notifyBadge.style.background = 'rgba(100, 116, 139, 0.2)';
-        notifyBadge.style.color = '#94A3B8';
+        notifyBadge.className = 'tag-badge badge-disabled';
       }
     }
 
@@ -905,35 +1202,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (autoupdateCb && autoupdateBadge) {
       if (autoupdateCb.checked) {
         autoupdateBadge.textContent = 'Active';
-        autoupdateBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-        autoupdateBadge.style.color = '#34D399';
+        autoupdateBadge.className = 'tag-badge badge-active';
       } else {
         autoupdateBadge.textContent = 'Disabled';
-        autoupdateBadge.style.background = 'rgba(100, 116, 139, 0.2)';
-        autoupdateBadge.style.color = '#94A3B8';
+        autoupdateBadge.className = 'tag-badge badge-disabled';
       }
     }
   };
-
-  const prefNotifyTransfers = document.getElementById('pref-notify-transfers');
-  if (prefNotifyTransfers) {
-    const stored = localStorage.getItem('devsftp_pref_notify_transfers');
-    if (stored !== null) prefNotifyTransfers.checked = (stored === 'true');
-    prefNotifyTransfers.addEventListener('change', (e) => {
-      localStorage.setItem('devsftp_pref_notify_transfers', e.target.checked ? 'true' : 'false');
-      window.updateGeneralBadges();
-    });
-  }
-
-  const prefNotifyChime = document.getElementById('pref-notify-chime');
-  if (prefNotifyChime) {
-    const stored = localStorage.getItem('devsftp_pref_notify_chime');
-    if (stored !== null) prefNotifyChime.checked = (stored === 'true');
-    prefNotifyChime.addEventListener('change', (e) => {
-      localStorage.setItem('devsftp_pref_notify_chime', e.target.checked ? 'true' : 'false');
-      window.updateGeneralBadges();
-    });
-  }
 
   const prefAutoupdate = document.getElementById('pref-autoupdate');
   if (prefAutoupdate) {
@@ -941,7 +1216,127 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stored !== null) prefAutoupdate.checked = (stored === 'true');
     prefAutoupdate.addEventListener('change', (e) => {
       localStorage.setItem('devsftp_pref_autoupdate', e.target.checked ? 'true' : 'false');
-      window.updateGeneralBadges();
+    });
+  }
+
+  // =========================================================================
+  // Notifications Settings Persistence & Master Controls
+  // =========================================================================
+  const NOTIF_KEYS = [
+    { id: 'pref-notify-tray', key: 'devsftp_pref_notify_tray' },
+    { id: 'pref-notify-file-save', key: 'devsftp_pref_notify_file_save' },
+    { id: 'pref-notify-transfers', key: 'devsftp_pref_notify_transfers' },
+    { id: 'pref-notify-jobs', key: 'devsftp_pref_notify_jobs' },
+    { id: 'pref-notify-reconnect', key: 'devsftp_pref_notify_reconnect' },
+    { id: 'pref-notify-chime', key: 'devsftp_pref_notify_chime' }
+  ];
+
+  window.shouldSendNotification = (categoryKey) => {
+    const keyMap = {
+      'tray': 'devsftp_pref_notify_tray',
+      'file-save': 'devsftp_pref_notify_file_save',
+      'transfers': 'devsftp_pref_notify_transfers',
+      'jobs': 'devsftp_pref_notify_jobs',
+      'reconnect': 'devsftp_pref_notify_reconnect',
+      'chime': 'devsftp_pref_notify_chime'
+    };
+    const storageKey = keyMap[categoryKey];
+    if (!storageKey) return true;
+    const val = localStorage.getItem(storageKey);
+    return val === null || val === 'true';
+  };
+
+  window.updateNotificationBadges = () => {
+    const masterBadge = document.getElementById('notif-master-badge');
+    let enabledCount = 0;
+    NOTIF_KEYS.forEach(item => {
+      const el = document.getElementById(item.id);
+      if (el && el.checked) enabledCount++;
+    });
+
+    if (masterBadge) {
+      if (enabledCount > 0) {
+        masterBadge.textContent = 'Active';
+        masterBadge.className = 'tag-badge badge-active';
+      } else {
+        masterBadge.textContent = 'Disabled';
+        masterBadge.className = 'tag-badge badge-disabled';
+      }
+    }
+  };
+
+  NOTIF_KEYS.forEach(item => {
+    const el = document.getElementById(item.id);
+    if (el) {
+      const stored = localStorage.getItem(item.key);
+      if (stored !== null) el.checked = (stored === 'true');
+      el.addEventListener('change', (e) => {
+        localStorage.setItem(item.key, e.target.checked ? 'true' : 'false');
+        window.updateNotificationBadges();
+      });
+    }
+  });
+
+  const btnNotifEnableAll = document.getElementById('btn-notif-enable-all');
+  if (btnNotifEnableAll) {
+    btnNotifEnableAll.addEventListener('click', () => {
+      NOTIF_KEYS.forEach(item => {
+        const el = document.getElementById(item.id);
+        if (el) {
+          el.checked = true;
+          localStorage.setItem(item.key, 'true');
+        }
+      });
+      window.updateNotificationBadges();
+      if (window.LogViewer) window.LogViewer.addEntry('info', 'Enabled all native OS notifications & audio chimes.');
+    });
+  }
+
+  const btnNotifDisableAll = document.getElementById('btn-notif-disable-all');
+  if (btnNotifDisableAll) {
+    btnNotifDisableAll.addEventListener('click', () => {
+      NOTIF_KEYS.forEach(item => {
+        const el = document.getElementById(item.id);
+        if (el) {
+          el.checked = false;
+          localStorage.setItem(item.key, 'false');
+        }
+      });
+      window.updateNotificationBadges();
+      if (window.LogViewer) window.LogViewer.addEntry('info', 'Muted all native OS notifications & audio chimes.');
+    });
+  }
+
+  window.updateNotificationBadges();
+
+  const prefCloseBehavior = document.getElementById('pref-close-behavior');
+  const closeBadge = document.getElementById('close-behavior-badge');
+  const updateCloseBadge = (behavior) => {
+    if (!closeBadge) return;
+    if (behavior === 'tray') {
+      closeBadge.textContent = 'System Tray';
+      closeBadge.className = 'tag-badge badge-active';
+    } else {
+      closeBadge.textContent = 'Exit';
+      closeBadge.className = 'tag-badge badge-disabled';
+    }
+  };
+
+  if (prefCloseBehavior) {
+    const api = window.devsFTP || window.pulseFTP;
+    if (api && api.getCloseBehavior) {
+      api.getCloseBehavior().then(behavior => {
+        const effectiveBehavior = behavior || 'tray';
+        prefCloseBehavior.value = effectiveBehavior;
+        updateCloseBadge(effectiveBehavior);
+      }).catch(() => {});
+    }
+    prefCloseBehavior.addEventListener('change', (e) => {
+      const behavior = e.target.value;
+      if (api && api.saveCloseBehavior) {
+        api.saveCloseBehavior(behavior);
+      }
+      updateCloseBadge(behavior);
     });
   }
 
@@ -1037,15 +1432,27 @@ document.addEventListener('DOMContentLoaded', () => {
     dropdowns.forEach(dd => dd.classList.remove('active'));
   });
 
-  // Direct Settings Top Menu Button (Opens Preferences directly to last used section)
-  const menuSettingsBtn = document.getElementById('menu-settings-btn');
-  if (menuSettingsBtn) {
-    menuSettingsBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdowns.forEach(dd => dd.classList.remove('active'));
-      window.ConnectionDialog.openPreferences(); // No section passed -> recalls last saved section!
-    });
-  }
+  // Top Navigation Settings Dropdown Menu Actions
+  const settingActions = [
+    { id: 'menu-settings-general', section: 'general' },
+    { id: 'menu-settings-notifications', section: 'notifications' },
+    { id: 'menu-settings-workspace', section: 'workspace' },
+    { id: 'menu-settings-terminal', section: 'terminal' },
+    { id: 'menu-settings-transfers', section: 'transfers' },
+    { id: 'menu-settings-security', section: 'security' }
+  ];
+
+  settingActions.forEach(item => {
+    const el = document.getElementById(item.id);
+    if (el) {
+      el.addEventListener('click', () => {
+        dropdowns.forEach(dd => dd.classList.remove('active'));
+        if (window.ConnectionDialog) {
+          window.ConnectionDialog.openPreferences(item.section);
+        }
+      });
+    }
+  });
 
   // Top Menu Actions
   const menuFileNew = document.getElementById('menu-file-new');
@@ -1186,69 +1593,184 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const btnToolsCacheClear = document.getElementById('btn-tools-cache-clear');
-  if (btnToolsCacheClear) {
-    btnToolsCacheClear.addEventListener('click', async () => {
-      const api = getApi();
-      if (api && api.clearCache) {
-        try {
-          await api.clearCache();
-          const msg = document.getElementById('clear-cache-msg');
-          if (msg) {
-            msg.style.display = 'inline-block';
-            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+  // Master Password Verification Helper for Destructive Cleanup Actions
+  window.verifyMasterPasswordIfEnabled = async function(onSuccess, promptMsgText) {
+    const api = getApi();
+    if (!api || !api.profiles || !api.profiles.master) {
+      if (typeof onSuccess === 'function') onSuccess();
+      return;
+    }
+
+    try {
+      const status = await api.profiles.master.getStatus();
+      if (!status || !status.enabled) {
+        if (typeof onSuccess === 'function') onSuccess();
+        return;
+      }
+
+      const modal = document.getElementById('master-auth-modal');
+      const pwdInput = document.getElementById('master-auth-password');
+      const errDiv = document.getElementById('master-auth-error');
+      const msgEl = document.getElementById('master-auth-prompt-msg');
+      const btnSubmit = document.getElementById('btn-master-auth-submit');
+      const btnCancel = document.getElementById('btn-master-auth-cancel');
+      const btnClose = document.getElementById('btn-master-auth-close');
+
+      if (!modal) {
+        if (typeof onSuccess === 'function') onSuccess();
+        return;
+      }
+
+      if (msgEl) {
+        msgEl.textContent = promptMsgText || 'Master Password Vault is active. Enter your Master Password to authorize this action:';
+      }
+      if (pwdInput) {
+        pwdInput.value = '';
+        pwdInput.style.borderColor = '';
+      }
+      if (errDiv) {
+        errDiv.style.display = 'none';
+      }
+
+      const closeModal = () => {
+        modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
+      };
+
+      const attemptAuthorize = async () => {
+        const pwd = pwdInput ? pwdInput.value.trim() : '';
+        if (!pwd) {
+          if (errDiv) {
+            errDiv.style.display = 'block';
+            errDiv.textContent = '⚠️ Master Password cannot be empty.';
           }
-          if (window.LogViewer) window.LogViewer.addEntry('info', '[Cache Clean] Local remote-file cache cleared cleanly.');
-        } catch (err) {
-          console.error('Failed to clear cache:', err);
-          alert(`Failed to clear cache: ${err.message}`);
+          if (pwdInput) pwdInput.focus();
+          return;
         }
-      }
-    });
-  }
 
-  const menuToolsExport = document.getElementById('menu-tools-export');
-  if (menuToolsExport) {
-    menuToolsExport.addEventListener('click', async () => {
-      const api = getApi();
-      if (api && api.profiles && api.profiles.export) {
         try {
-          const jsonString = await api.profiles.export();
-          const blob = new Blob([jsonString], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'devsftp-profiles-backup.json';
-          a.click();
-        } catch (err) {
-          console.error('Failed to export profiles:', err);
-          alert(`Failed to export profiles: ${err.message}`);
-        }
-      }
-    });
-  }
-
-  const menuToolsImport = document.getElementById('menu-tools-import');
-  if (menuToolsImport) {
-    menuToolsImport.addEventListener('click', async () => {
-      const api = getApi();
-      if (api && api.selectFileOrFolder) {
-        const jsonPath = await api.selectFileOrFolder({
-          title: 'Select Exported Profiles JSON File',
-          filters: [{ name: 'JSON Files', extensions: ['json'] }],
-          properties: ['openFile']
-        });
-        if (jsonPath) {
-          const fileContent = prompt('Paste exported profiles JSON content to import:');
-          if (fileContent && api.profiles.import) {
-            const ok = await api.profiles.import(fileContent);
-            if (ok) {
-              alert('Profiles imported successfully!');
-              window.ConnectionDialog.renderConnectionProfileList();
-            } else {
-              alert('Failed to parse profile JSON.');
+          const ok = await api.profiles.master.unlock(pwd);
+          if (ok) {
+            closeModal();
+            if (window.LogViewer) window.LogViewer.addEntry('info', '🔓 Master Password verified successfully.');
+            if (typeof onSuccess === 'function') onSuccess();
+          } else {
+            if (errDiv) {
+              errDiv.style.display = 'block';
+              errDiv.textContent = '⚠️ Incorrect Master Password. Access denied.';
+            }
+            if (pwdInput) {
+              pwdInput.style.borderColor = '#F87171';
+              pwdInput.select();
             }
           }
+        } catch (err) {
+          if (errDiv) {
+            errDiv.style.display = 'block';
+            errDiv.textContent = `⚠️ Verification error: ${err.message || err}`;
+          }
         }
+      };
+
+      if (btnSubmit) btnSubmit.onclick = attemptAuthorize;
+      if (btnCancel) btnCancel.onclick = closeModal;
+      if (btnClose) btnClose.onclick = closeModal;
+      if (pwdInput) {
+        pwdInput.onkeydown = (e) => {
+          if (e.key === 'Enter') attemptAuthorize();
+        };
+      }
+
+      modal.setAttribute('aria-hidden', 'false');
+      modal.classList.add('active');
+      if (pwdInput) setTimeout(() => pwdInput.focus(), 100);
+    } catch (err) {
+      // Fail CLOSED — do NOT grant access on IPC error
+      console.error('Master password verification IPC error:', err && err.message);
+    }
+  };
+
+
+
+  const btnToolsCacheClear = document.getElementById('btn-tools-cache-clear');
+  if (btnToolsCacheClear) {
+    btnToolsCacheClear.addEventListener('click', () => {
+      window.verifyMasterPasswordIfEnabled(async () => {
+        const api = getApi();
+        if (api && api.clearCache) {
+          try {
+            await api.clearCache();
+            const msg = document.getElementById('clear-cache-msg');
+            if (msg) {
+              msg.style.display = 'inline-block';
+              setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            }
+            if (window.LogViewer) window.LogViewer.addEntry('info', '[Cache Clean] Local remote-file cache cleared cleanly.');
+          } catch (err) {
+            console.error('Failed to clear cache:', err);
+            alert(`Failed to clear cache: ${err.message}`);
+          }
+        }
+      });
+    });
+  }
+
+  const handleExportBundle = () => {
+    if (window.DevsApp && window.DevsApp.exportWorkspacePackage) {
+      window.DevsApp.exportWorkspacePackage();
+    }
+  };
+
+  const handleImportBundle = () => {
+    if (window.DevsApp && window.DevsApp.importWorkspacePackage) {
+      window.DevsApp.importWorkspacePackage();
+    }
+  };
+
+  const menuToolsExportBundle = document.getElementById('menu-tools-export-bundle');
+  if (menuToolsExportBundle) menuToolsExportBundle.addEventListener('click', handleExportBundle);
+
+  const menuToolsImportBundle = document.getElementById('menu-tools-import-bundle');
+  if (menuToolsImportBundle) menuToolsImportBundle.addEventListener('click', handleImportBundle);
+
+  const btnSettingsExportBundle = document.getElementById('btn-settings-export-bundle');
+  if (btnSettingsExportBundle) btnSettingsExportBundle.addEventListener('click', handleExportBundle);
+
+  const btnSettingsImportBundle = document.getElementById('btn-settings-import-bundle');
+  if (btnSettingsImportBundle) btnSettingsImportBundle.addEventListener('click', handleImportBundle);
+
+  const menuToolsNotifications = document.getElementById('menu-tools-notifications');
+  if (menuToolsNotifications) {
+    menuToolsNotifications.addEventListener('click', () => {
+      if (window.ConnectionDialog) {
+        window.ConnectionDialog.openPreferences('notifications');
+      }
+    });
+  }
+
+  const menuToolsPendingEdits = document.getElementById('menu-tools-pending-edits');
+  if (menuToolsPendingEdits) {
+    menuToolsPendingEdits.addEventListener('click', () => {
+      if (window.PendingEditsManager && window.PendingEditsManager.openModal) {
+        window.PendingEditsManager.openModal();
+      }
+    });
+  }
+
+  const menuToolsDirCompare = document.getElementById('menu-tools-dir-compare');
+  if (menuToolsDirCompare) {
+    menuToolsDirCompare.addEventListener('click', () => {
+      if (window.DirectoryCompare && window.DirectoryCompare.toggle) {
+        window.DirectoryCompare.toggle();
+      }
+    });
+  }
+
+  const menuToolsBookmarksManager = document.getElementById('menu-tools-bookmarks-manager');
+  if (menuToolsBookmarksManager) {
+    menuToolsBookmarksManager.addEventListener('click', () => {
+      if (window.FileBrowser) {
+        window.FileBrowser.renderGlobalBookmarksModal();
       }
     });
   }
@@ -1259,6 +1781,8 @@ document.addEventListener('DOMContentLoaded', () => {
       window.ConnectionDialog.openPreferences('about');
     });
   }
+
+
 
   // =========================================================================
   // 4. Session Connection Execution & Disconnect Management
@@ -1420,11 +1944,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const stream = document.getElementById('editor-debug-stream');
       if (!stream) return;
       const text = Array.from(stream.children).map(el => el.textContent).join('\n');
-      navigator.clipboard.writeText(text).then(() => {
+      if (!text) return;
+      const copied = window.DevsApp ? window.DevsApp.copyToClipboard(text) : false;
+      if (copied) {
         const orig = btnCopyDebug.textContent;
         btnCopyDebug.textContent = '✓ Copied!';
         setTimeout(() => { btnCopyDebug.textContent = orig; }, 2000);
-      }).catch(() => {});
+      }
     });
   }
 
@@ -1436,7 +1962,314 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const api = window.devsFTP || window.pulseFTP;
+  // =========================================================================
+  // Pending Local Edits Manager & Queue Controller
+  // =========================================================================
+  window.PendingEditsManager = {
+    items: new Map(),
+
+    add(data) {
+      if (!data || !data.localPath) return;
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      this.items.set(data.localPath, {
+        ...data,
+        savedAt: data.savedAt || now.toISOString(),
+        modifiedAt: dateStr
+      });
+      this.updateUI();
+    },
+
+    remove(localPath) {
+      if (this.items.has(localPath)) {
+        this.items.delete(localPath);
+        this.updateUI();
+      }
+    },
+
+    clear() {
+      this.items.clear();
+      this.updateUI();
+    },
+
+    getAll() {
+      return Array.from(this.items.values());
+    },
+
+    updateUI() {
+      const badge = document.getElementById('pending-edits-count-badge');
+      const count = this.items.size;
+      if (badge) {
+        badge.textContent = count;
+        badge.style.display = count > 0 ? 'inline-block' : 'none';
+      }
+    },
+
+    async openModal() {
+      const modal = document.getElementById('pending-edits-modal');
+      const titleEl = document.getElementById('pending-edits-modal-title');
+      const tbodyEl = document.getElementById('pending-edits-tbody');
+      const summaryEl = document.getElementById('pending-edits-summary');
+      const profileFilterEl = document.getElementById('pending-edits-profile-filter');
+      const dateFilterEl = document.getElementById('pending-edits-filter-select');
+
+      if (!modal || !tbodyEl) return;
+
+      // Lookup profile definitions from connection profiles store
+      const api = window.devsFTP || window.pulseFTP;
+      const savedProfilesMap = new Map();
+      if (api && api.profiles && api.profiles.getAll) {
+        try {
+          const allProfs = await api.profiles.getAll();
+          if (Array.isArray(allProfs)) {
+            allProfs.forEach(p => savedProfilesMap.set(p.id, p));
+          }
+        } catch (e) {}
+      }
+
+      // Auto-purge stale items older than 7 days to protect system performance (Issue safety guard)
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      for (const [pathKey, item] of this.items.entries()) {
+        const itemTime = item.timestamp || (item.savedAt ? new Date(item.savedAt).getTime() : 0);
+        if (itemTime > 0 && (now - itemTime > SEVEN_DAYS_MS)) {
+          this.items.delete(pathKey);
+        }
+      }
+      this.updateUI();
+
+      let list = this.getAll();
+
+      // Enrich items with real Profile Name and Accent Color
+      list.forEach(item => {
+        const pId = item.profileId || 'default';
+        const matched = savedProfilesMap.get(pId);
+        if (matched) {
+          item.profileName = matched.name;
+          item.profileColor = matched.accentColor || matched.color || '#68a063';
+        } else if (!item.profileName || item.profileName === item.host || item.profileName === 'Connection') {
+          item.profileName = (pId === 'default' ? 'Local Workspace' : 'Server Profile');
+          item.profileColor = item.color || '#68a063';
+        }
+      });
+
+      // Populate Profile Filter options (Format: Profile Name)
+      if (profileFilterEl) {
+        const currentSelected = profileFilterEl.value || 'all';
+        const profilesMap = new Map();
+        list.forEach(item => {
+          const profId = item.profileId || 'default';
+          const profName = item.profileName || 'Server Profile';
+          const color = item.profileColor || item.color || '#68a063';
+          profilesMap.set(profId, { name: profName, color });
+        });
+
+        let profileOptions = '<option value="all">All Server Profiles</option>';
+        for (const [pId, info] of profilesMap.entries()) {
+          profileOptions += `<option value="${pId}" ${currentSelected === pId ? 'selected' : ''}>● ${info.name}</option>`;
+        }
+        profileFilterEl.innerHTML = profileOptions;
+
+        profileFilterEl.onchange = () => this.openModal();
+      }
+
+      if (dateFilterEl) {
+        dateFilterEl.onchange = () => this.openModal();
+      }
+
+      // Apply Filters
+      const selectedProfile = profileFilterEl ? profileFilterEl.value : 'all';
+      const selectedDate = dateFilterEl ? dateFilterEl.value : 'all';
+
+      if (selectedProfile && selectedProfile !== 'all') {
+        list = list.filter(item => (item.profileId || 'default') === selectedProfile);
+      }
+      if (selectedDate === 'modified_today') {
+        const todayStr = new Date().toDateString();
+        list = list.filter(item => item.savedAt && new Date(item.savedAt).toDateString() === todayStr);
+      }
+
+      if (titleEl) titleEl.textContent = `✏️ Pending Remote Edits Manager (${list.length})`;
+
+      if (summaryEl) {
+        summaryEl.innerHTML = `
+          <span style="color: hsl(var(--text-muted));">Pending Files: <strong style="color: #F59E0B;">${list.length}</strong></span> |
+          <span style="color: #34D399; margin-left: 6px;">Auto-Purge: <strong>7 Days</strong></span>
+        `;
+      }
+
+      if (list.length === 0) {
+        tbodyEl.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; padding: 30px; color: hsl(var(--text-muted)); font-size: 12px;">
+              ✓ No pending local file edits matching current filter. All edited files are in sync with remote servers.
+            </td>
+          </tr>
+        `;
+      } else {
+        const escapeHtml = (str) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        tbodyEl.innerHTML = list.map(item => {
+          const accentColor = item.profileColor || item.color || '#68a063';
+          const profileName = item.profileName || item.profileId || 'Default Server';
+          const formatDateVal = (val) => {
+            if (!val) return 'Today';
+            const d = new Date(val);
+            if (isNaN(d.getTime())) return val;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          };
+          const modifiedDateStr = item.modifiedAt || formatDateVal(item.savedAt || item.timestamp);
+          return `
+            <tr style="border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 12px;">
+              <td style="text-align: center; vertical-align: middle;">
+                <input type="checkbox" class="pending-edit-cb" data-path="${escapeHtml(item.localPath)}" checked style="margin: 0; cursor: pointer;">
+              </td>
+              <td style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(item.localPath)}">
+                📄 ${escapeHtml(item.fileName || item.localPath)}
+              </td>
+              <td style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(profileName)}">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${accentColor}; flex-shrink: 0;"></span>
+                  <span>${escapeHtml(profileName)}</span>
+                </div>
+              </td>
+              <td style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--text-secondary));" title="${escapeHtml(item.remotePath)}">
+                ${escapeHtml(item.remotePath)}
+              </td>
+              <td style="text-align: center; vertical-align: middle; font-size: 11px; color: hsl(var(--text-muted)); font-family: var(--font-mono);">
+                ${escapeHtml(modifiedDateStr)}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        const selectAllCb = document.getElementById('pending-edits-select-all');
+        if (selectAllCb) {
+          selectAllCb.checked = true;
+          selectAllCb.onchange = (e) => {
+            tbodyEl.querySelectorAll('.pending-edit-cb').forEach(cb => { cb.checked = e.target.checked; });
+          };
+        }
+      }
+
+      modal.setAttribute('aria-hidden', 'false');
+      modal.classList.add('active');
+    },
+
+    async uploadItemWithOverwriteProtection(item) {
+      if (!item) return;
+      const api = window.devsFTP || window.pulseFTP;
+      if (!api) return;
+
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Uploading pending edited file: ${item.fileName}`);
+      if (window.TransferQueue) {
+        window.TransferQueue.addTransfer('upload', item.localPath, item.remotePath);
+      }
+
+      try {
+        // Enforce strict overwrite protection (skipConflictCheck is NOT set)
+        await api.uploadFile(item.localPath, item.remotePath, item.sessionId, { profileId: item.profileId });
+        this.remove(item.localPath);
+        if (window.LogViewer) window.LogViewer.addEntry('info', `✓ Upload complete for pending edit: ${item.fileName}`);
+        if (window.FileBrowser) window.FileBrowser.refreshRemote(window.FileBrowser.remotePath);
+        this.openModal();
+      } catch (err) {
+        if (window.LogViewer) window.LogViewer.addEntry('error', `Upload error for pending file ${item.fileName}: ${err.message}`);
+      }
+    },
+
+    async discardItem(item) {
+      if (!item) return;
+      const api = window.devsFTP || window.pulseFTP;
+      if (api && api.dismissBatch) {
+        await api.dismissBatch([item]);
+      }
+      this.remove(item.localPath);
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Discarded local edits for: ${item.fileName}`);
+      this.openModal();
+    },
+
+    async syncAll() {
+      const tbodyEl = document.getElementById('pending-edits-tbody');
+      const checkedPaths = new Set();
+      if (tbodyEl) {
+        tbodyEl.querySelectorAll('.pending-edit-cb:checked').forEach(cb => checkedPaths.add(cb.getAttribute('data-path')));
+      }
+      const list = this.getAll().filter(item => checkedPaths.size === 0 || checkedPaths.has(item.localPath));
+      if (list.length === 0) return;
+      for (const item of list) {
+        await this.uploadItemWithOverwriteProtection(item);
+      }
+    },
+
+    async discardAll() {
+      const tbodyEl = document.getElementById('pending-edits-tbody');
+      const checkedPaths = new Set();
+      if (tbodyEl) {
+        tbodyEl.querySelectorAll('.pending-edit-cb:checked').forEach(cb => checkedPaths.add(cb.getAttribute('data-path')));
+      }
+      const list = this.getAll().filter(item => checkedPaths.size === 0 || checkedPaths.has(item.localPath));
+      if (list.length === 0) return;
+      const api = window.devsFTP || window.pulseFTP;
+      if (api && api.dismissBatch) {
+        await api.dismissBatch(list);
+      }
+      list.forEach(item => this.remove(item.localPath));
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Discarded ${list.length} pending local file edit(s).`);
+      this.openModal();
+    }
+  };
+
+  // Wire Pending Edits Toolbar & Modal Buttons
+  const btnPendingEdits = document.getElementById('btn-pending-edits');
+  if (btnPendingEdits) {
+    btnPendingEdits.addEventListener('click', () => {
+      if (window.PendingEditsManager) {
+        window.PendingEditsManager.openModal();
+      }
+    });
+  }
+
+  // Wire Directory Compare Toolbar Button
+  const btnDirCompareHeader = document.getElementById('btn-dir-compare');
+  if (btnDirCompareHeader) {
+    btnDirCompareHeader.addEventListener('click', () => {
+      if (window.DirectoryCompare) {
+        window.DirectoryCompare.compare();
+      }
+    });
+  }
+
+
+
+  const btnPendingClose = document.getElementById('btn-pending-edits-close');
+  const btnPendingCancel = document.getElementById('btn-pending-edits-cancel');
+  const modalPending = document.getElementById('pending-edits-modal');
+
+  const closePendingModal = () => {
+    if (modalPending) {
+      modalPending.classList.remove('active');
+      modalPending.setAttribute('aria-hidden', 'true');
+    }
+  };
+
+  if (btnPendingClose) btnPendingClose.addEventListener('click', closePendingModal);
+  if (btnPendingCancel) btnPendingCancel.addEventListener('click', closePendingModal);
+
+  const btnPendingSyncAll = document.getElementById('btn-pending-edits-sync-all');
+  if (btnPendingSyncAll) {
+    btnPendingSyncAll.addEventListener('click', async () => {
+      await window.PendingEditsManager.syncAll();
+    });
+  }
+
+  const btnPendingDiscardAll = document.getElementById('btn-pending-edits-discard-all');
+  if (btnPendingDiscardAll) {
+    btnPendingDiscardAll.addEventListener('click', async () => {
+      await window.PendingEditsManager.discardAll();
+    });
+  }
+
+  const api = getApi();
   if (api && api.onCacheDebugEvent) {
     api.onCacheDebugEvent((data) => {
       if (window.EditorDebug) window.EditorDebug.addEntry(data.stage, data.msg, data.details);
@@ -1445,57 +2278,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (api && api.onCacheFileSaved) {
     api.onCacheFileSaved(async (data) => {
-      if (window.EditorDebug) window.EditorDebug.addEntry('STAGE 4', `RENDERER RECEIVED = YES (local save event for ${data.fileName})`, data);
-      if (window.LogViewer) window.LogViewer.addEntry('info', `Local save detected for cached file: ${data.fileName}`);
-      logDiagnostic('save detected', {
-        fileName: data.fileName,
-        localPath: data.localPath,
-        remotePath: data.remotePath,
-        sessionId: data.sessionId
-      });
-      
-      const autouploadElem = document.getElementById('pref-autoupload');
-      const autouploadPref = autouploadElem ? autouploadElem.value : 'prompt';
-      let shouldUpload = autouploadPref === 'auto' || isUploadPromptSuppressed();
-      
-      if (!shouldUpload) {
-        shouldUpload = await openUploadPrompt(data);
-      }
-
-      if (shouldUpload) {
-        if (window.EditorDebug) window.EditorDebug.addEntry('STAGE 5', `UPLOAD STARTED = YES (uploading ${data.fileName} to remote server)`, { remotePath: data.remotePath, sessionId: data.sessionId });
-        logDiagnostic('upload started', {
+      try {
+        if (window.EditorDebug) window.EditorDebug.addEntry('STAGE 4', `RENDERER RECEIVED = YES (local save event for ${data.fileName})`, data);
+        if (window.LogViewer) window.LogViewer.addEntry('info', `Local save detected for cached file: ${data.fileName}`);
+        logDiagnostic('save detected', {
           fileName: data.fileName,
           localPath: data.localPath,
           remotePath: data.remotePath,
           sessionId: data.sessionId
         });
-        if (window.TransferQueue) {
-          window.TransferQueue.addTransfer('upload', data.localPath, data.remotePath);
+
+        // Send Native OS Desktop Notification on File Save Detection
+        if (window.shouldSendNotification && window.shouldSendNotification('file-save')) {
+          if (api && api.sendOSNotification) {
+            api.sendOSNotification('✏️ File Edit Saved', `${data.fileName} was saved in external editor and queued for sync.`);
+          }
         }
-        try {
-          await api.uploadFile(data.localPath, data.remotePath, data.sessionId, { profileId: data.profileId });
-          if (window.EditorDebug) window.EditorDebug.addEntry('STAGE 6', `UPLOAD COMPLETE = YES (${data.fileName} updated on remote server)`);
-          logDiagnostic('upload completed', {
-            fileName: data.fileName,
-            localPath: data.localPath,
-            remotePath: data.remotePath,
-            sessionId: data.sessionId
-          });
-        } catch (err) {
-          logDiagnostic('upload failed', {
-            fileName: data.fileName,
-            localPath: data.localPath,
-            remotePath: data.remotePath,
-            sessionId: data.sessionId,
-            error: err && err.message ? err.message : String(err),
-            stack: err && err.stack ? err.stack : null
-          }, 'error');
-          throw err;
+
+        // Always register in PendingEditsManager
+        window.PendingEditsManager.add(data);
+        
+        const autouploadElem = document.getElementById('pref-autoupload');
+        const autouploadPref = autouploadElem ? autouploadElem.value : 'prompt';
+        let action = (autouploadPref === 'auto' || isUploadPromptSuppressed()) ? 'upload' : 'prompt';
+        
+        if (action === 'prompt') {
+          action = await openUploadPrompt(data);
         }
-        if (window.FileBrowser) {
-          window.FileBrowser.refreshRemote(window.FileBrowser.remotePath);
+
+        if (action === 'upload') {
+          await window.PendingEditsManager.uploadItemWithOverwriteProtection(data);
+        } else if (action === 'discard') {
+          await window.PendingEditsManager.discardItem(data);
+        } else {
+          if (window.LogViewer) window.LogViewer.addEntry('info', `Saved ${data.fileName} to Pending Local Edits queue.`);
         }
+      } catch (err) {
+        if (window.LogViewer) window.LogViewer.addEntry('error', `Cache file saved handler error: ${err.message}`);
       }
     });
   }
@@ -1505,6 +2324,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!Array.isArray(batchItems) || batchItems.length === 0) return;
       if (window.LogViewer) window.LogViewer.addEntry('info', `Startup recovery: ${batchItems.length} modified file(s) detected.`);
 
+      // Add recovered items to PendingEditsManager
+      batchItems.forEach(item => window.PendingEditsManager.add(item));
+
       const modal = document.getElementById('batch-upload-modal');
       const titleEl = document.getElementById('batch-upload-modal-title');
       const summaryEl = document.getElementById('batch-upload-summary');
@@ -1512,53 +2334,82 @@ document.addEventListener('DOMContentLoaded', () => {
       const confirmBtn = document.getElementById('btn-batch-modal-confirm');
       const cancelBtn = document.getElementById('btn-batch-modal-cancel');
       const closeBtn = document.getElementById('btn-batch-modal-close');
+      const openGlobalBtn = document.getElementById('btn-batch-modal-open-global');
 
       if (!modal || !listEl) return;
 
+      const escapeHtml = (str) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
       if (titleEl) {
-        titleEl.textContent = batchItems.length === 1 ? '⚡ Unsaved Remote Edit Detected' : `⚡ ${batchItems.length} Unsaved Remote Edits Detected`;
+        titleEl.textContent = '⚡ Unsaved Remote Edits';
       }
       if (summaryEl) {
         summaryEl.textContent = batchItems.length === 1
-          ? 'The following modified file was saved while DevsFTP was closed. Would you like to sync it back to its remote server in the background?'
-          : `The following ${batchItems.length} modified files were saved while DevsFTP was closed. Would you like to sync them back to their remote servers in the background?`;
+          ? 'You have 1 pending file edit in the sync queue.'
+          : `You have ${batchItems.length} pending file edits in the sync queue.`;
       }
 
-      listEl.innerHTML = batchItems.map(item => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color)); border-radius: 4px; font-family: var(--font-ui); font-size: 12px;">
-          <div style="display: flex; flex-direction: column; gap: 2px;">
-            <span style="font-weight: 600; color: hsl(var(--text-primary));">📄 ${item.fileName}</span>
-            <span style="font-size: 10px; color: hsl(var(--text-muted)); font-family: var(--font-mono);">${item.remotePath}</span>
+      // Group items per server profile with file count and profile accent dot (matching global modal)
+      const profilesMap = new Map();
+      batchItems.forEach(item => {
+        const key = item.profileName || item.profileId || 'Default Server';
+        if (!profilesMap.has(key)) {
+          const accentColor = item.profileColor || item.color || '#68a063';
+          profilesMap.set(key, { name: key, accentColor, count: 0 });
+        }
+        profilesMap.get(key).count += 1;
+      });
+
+      listEl.innerHTML = Array.from(profilesMap.values()).map(info => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: hsl(var(--bg-primary)); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; font-family: var(--font-ui); font-size: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" class="batch-profile-cb" data-profile-name="${escapeHtml(info.name)}" checked style="margin: 0; cursor: pointer;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${info.accentColor}; flex-shrink: 0;"></span>
+            <span style="font-weight: 600; color: hsl(var(--text-primary));">${escapeHtml(info.name)}</span>
           </div>
-          <span style="font-size: 11px; padding: 2px 8px; border-radius: 12px; background: hsl(var(--bg-tertiary)); color: hsl(var(--accent-color)); font-weight: 600;">
-            🌐 ${item.profileName} (${item.host})
-          </span>
+          <span class="tag-badge badge-active">${info.count} ${info.count === 1 ? 'file' : 'files'}</span>
         </div>
       `).join('');
 
-      const closeModal = () => {
+      // Ignore / Close handler simply hides modal (DOES NOT DISCARD PENDING EDITS)
+      const hideModal = () => {
         modal.classList.remove('active');
-        if (api && api.dismissBatch) {
-          api.dismissBatch(batchItems);
-        }
       };
 
-      if (cancelBtn) cancelBtn.onclick = closeModal;
-      if (closeBtn) closeBtn.onclick = closeModal;
+      if (cancelBtn) cancelBtn.onclick = hideModal;
+      if (closeBtn) closeBtn.onclick = hideModal;
+
+      if (openGlobalBtn) {
+        openGlobalBtn.onclick = () => {
+          hideModal();
+          if (window.PendingEditsManager && window.PendingEditsManager.openModal) {
+            window.PendingEditsManager.openModal();
+          }
+        };
+      }
 
       if (confirmBtn) {
         confirmBtn.onclick = async () => {
-          closeModal();
-          if (window.LogViewer) window.LogViewer.addEntry('info', `Initiating background batch upload for ${batchItems.length} file(s)...`);
+          hideModal();
+          const checkedProfiles = new Set(
+            Array.from(listEl.querySelectorAll('.batch-profile-cb:checked')).map(cb => cb.getAttribute('data-profile-name'))
+          );
+          const itemsToUpload = batchItems.filter(item => {
+            const key = item.profileName || item.profileId || 'Default Server';
+            return checkedProfiles.has(key);
+          });
+          if (itemsToUpload.length === 0) return;
 
-          batchItems.forEach(item => {
+          if (window.LogViewer) window.LogViewer.addEntry('info', `Initiating background batch upload for ${itemsToUpload.length} file(s)...`);
+
+          itemsToUpload.forEach(item => {
             if (window.TransferQueue) {
               window.TransferQueue.addTransfer('upload', item.localPath, item.remotePath);
             }
           });
 
           try {
-            const res = await api.uploadBatchBackground({ items: batchItems, forceOverwrite: false });
+            const res = await api.uploadBatchBackground({ items: itemsToUpload, forceOverwrite: false });
             if (res && res.conflicts && res.conflicts.length > 0) {
               const names = res.conflicts.map(c => c.fileName).join(', ');
               if (window.LogViewer) window.LogViewer.addEntry('warning', `⚠️ Remote conflict detected for: ${names}`);
@@ -1570,7 +2421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (window.LogViewer) window.LogViewer.addEntry('info', `Skipped conflicted file(s): ${names}`);
               }
             } else {
-              if (window.LogViewer) window.LogViewer.addEntry('info', `✓ Background upload complete: ${batchItems.length} file(s) synced to remote servers.`);
+              if (window.LogViewer) window.LogViewer.addEntry('info', `✓ Background upload complete: ${itemsToUpload.length} file(s) synced to remote servers.`);
             }
             if (window.FileBrowser) {
               window.FileBrowser.refreshRemote(window.FileBrowser.remotePath);
@@ -1659,10 +2510,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let activeConflictState = { resolve: null };
   let batchConflictAction = null;
+  let conflictQueue = [];
+
+  const updateConflictModalBatchState = () => {
+    const totalCount = 1 + conflictQueue.length;
+    const titleEl = document.getElementById('conflict-modal-title');
+    const subTitleEl = document.getElementById('conflict-modal-subtitle');
+    const overwriteBtn = document.getElementById('btn-conflict-overwrite');
+    const skipBtn = document.getElementById('btn-conflict-skip');
+
+    if (totalCount > 1) {
+      if (titleEl) titleEl.textContent = `⚠️ File Overwrite Conflict (1 of ${totalCount} files)`;
+      if (subTitleEl) subTitleEl.textContent = `Multiple files in this transfer already exist. Choose how to resolve:`;
+      if (conflictApplyBatch && conflictApplyBatch.dataset.userToggled !== 'true') {
+        conflictApplyBatch.checked = true;
+      }
+    } else {
+      if (titleEl) titleEl.textContent = `⚠️ File Overwrite Conflict`;
+      if (subTitleEl) subTitleEl.textContent = `The destination file already exists. Choose how to resolve this conflict:`;
+    }
+
+    if (conflictApplyBatch && conflictApplyBatch.checked && totalCount > 1) {
+      if (overwriteBtn) overwriteBtn.textContent = `⚡ Overwrite All (${totalCount})`;
+      if (skipBtn) skipBtn.textContent = `⏭️ Skip All (${totalCount})`;
+    } else {
+      if (overwriteBtn) overwriteBtn.textContent = `⚡ Overwrite`;
+      if (skipBtn) skipBtn.textContent = `⏭️ Skip File`;
+    }
+  };
+
+  const showConflictData = (data) => {
+    const src = data.localStat || { name: (data.localPath || 'file').replace(/\\/g, '/').split('/').pop(), size: 0, modifyTime: '-' };
+    const dst = data.remoteStat || { name: (data.remotePath || 'file').split('/').pop(), size: 0, modifyTime: '-' };
+
+    if (conflictSrcName) conflictSrcName.textContent = src.name;
+    if (conflictSrcSize) conflictSrcSize.textContent = `Size: ${window.FileBrowser ? window.FileBrowser.formatSize(src.size) : src.size + ' B'}`;
+    if (conflictSrcMtime) conflictSrcMtime.textContent = `Modified: ${src.modifyTime ? new Date(src.modifyTime).toLocaleString() : '-'}`;
+
+    if (conflictDstName) conflictDstName.textContent = dst.name;
+    if (conflictDstSize) conflictDstSize.textContent = `Size: ${window.FileBrowser ? window.FileBrowser.formatSize(dst.size) : dst.size + ' B'}`;
+    if (conflictDstMtime) conflictDstMtime.textContent = `Modified: ${dst.modifyTime ? new Date(dst.modifyTime).toLocaleString() : '-'}`;
+
+    updateConflictModalBatchState();
+
+    if (conflictModal) {
+      conflictModal.setAttribute('aria-hidden', 'false');
+      conflictModal.classList.add('active');
+    }
+  };
+
+  if (conflictApplyBatch) {
+    conflictApplyBatch.addEventListener('change', () => {
+      conflictApplyBatch.dataset.userToggled = 'true';
+      updateConflictModalBatchState();
+    });
+  }
 
   window.FileConflictDialog = {
     resetBatch() {
       batchConflictAction = null;
+      conflictQueue = [];
+      if (conflictApplyBatch) {
+        delete conflictApplyBatch.dataset.userToggled;
+        conflictApplyBatch.checked = false;
+      }
     },
     async resolveConflict(data) {
       if (data && data.partialTransfer === true) {
@@ -1700,38 +2611,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (!conflictModal) return 'overwrite';
 
+      if (activeConflictState.resolve !== null) {
+        return new Promise((resolve) => {
+          conflictQueue.push({ data, resolve });
+          updateConflictModalBatchState();
+        });
+      }
+
       return new Promise((resolve) => {
         activeConflictState.resolve = resolve;
-
-        const src = data.localStat || { name: (data.localPath || 'file').replace(/\\/g, '/').split('/').pop(), size: 0, modifyTime: '-' };
-        const dst = data.remoteStat || { name: (data.remotePath || 'file').split('/').pop(), size: 0, modifyTime: '-' };
-
-        if (conflictSrcName) conflictSrcName.textContent = src.name;
-        if (conflictSrcSize) conflictSrcSize.textContent = `Size: ${window.FileBrowser ? window.FileBrowser.formatSize(src.size) : src.size + ' B'}`;
-        if (conflictSrcMtime) conflictSrcMtime.textContent = `Modified: ${src.modifyTime ? new Date(src.modifyTime).toLocaleString() : '-'}`;
-
-        if (conflictDstName) conflictDstName.textContent = dst.name;
-        if (conflictDstSize) conflictDstSize.textContent = `Size: ${window.FileBrowser ? window.FileBrowser.formatSize(dst.size) : dst.size + ' B'}`;
-        if (conflictDstMtime) conflictDstMtime.textContent = `Modified: ${dst.modifyTime ? new Date(dst.modifyTime).toLocaleString() : '-'}`;
-
-        if (conflictApplyBatch) conflictApplyBatch.checked = false;
-
-        conflictModal.setAttribute('aria-hidden', 'false');
-        conflictModal.classList.add('active');
+        showConflictData(data);
       });
     }
   };
 
   const closeConflictModal = (action) => {
     if (!conflictModal) return;
-    conflictModal.classList.remove('active');
-    conflictModal.setAttribute('aria-hidden', 'true');
     if (conflictApplyBatch && conflictApplyBatch.checked) {
       batchConflictAction = action;
     }
     const resolve = activeConflictState.resolve;
     activeConflictState.resolve = null;
     if (resolve) resolve(action);
+
+    if (conflictQueue.length > 0) {
+      const next = conflictQueue.shift();
+      if (batchConflictAction) {
+        next.resolve(batchConflictAction);
+        while (conflictQueue.length > 0) {
+          const item = conflictQueue.shift();
+          item.resolve(batchConflictAction);
+        }
+        conflictModal.classList.remove('active');
+        conflictModal.setAttribute('aria-hidden', 'true');
+      } else {
+        activeConflictState.resolve = next.resolve;
+        showConflictData(next.data);
+      }
+    } else {
+      conflictModal.classList.remove('active');
+      conflictModal.setAttribute('aria-hidden', 'true');
+    }
   };
 
   const btnConflictOverwrite = document.getElementById('btn-conflict-overwrite');

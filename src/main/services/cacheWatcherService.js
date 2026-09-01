@@ -82,7 +82,9 @@ class CacheWatcherService {
       const codeEditorPath = this.getSystemCodeEditorPath();
       if (codeEditorPath && fs.existsSync(codeEditorPath)) {
         execFile(codeEditorPath, [localPath], (err) => {
-          if (err && shell && shell.openPath) shell.openPath(localPath);
+          // Fix 8 (MEDIUM): shell.openPath() returns a Promise — attach .catch() to prevent
+          // an unhandled rejection if the fallback open also fails.
+          if (err && shell && shell.openPath) shell.openPath(localPath).catch(() => {});
         });
         return;
       }
@@ -93,6 +95,9 @@ class CacheWatcherService {
         if (errMsg) {
           logCacheDiagnostic('openPath failed', { localPath, errMsg }, 'error');
         }
+      // Fix 7 (HIGH): Catch rejected promise from shell.openPath() and log diagnostically.
+      }).catch(err => {
+        logCacheDiagnostic && logCacheDiagnostic('openPath error', { err: err.message }, 'error');
       });
     }
   }
@@ -160,6 +165,8 @@ class CacheWatcherService {
     const profileName = profile && profile.name ? profile.name : 'Connection';
     const host = profile && profile.host ? profile.host : 'localhost';
 
+    const color = (profile && (profile.accentColor || profile.color)) ? (profile.accentColor || profile.color) : '#68a063';
+
     try {
       logCacheDiagnostic('watcher created', { localPath, remotePath, profileId, sessionId, host, skipOpenApp });
     } catch (e) {}
@@ -185,6 +192,7 @@ class CacheWatcherService {
       profileId,
       profileName,
       host,
+      color,
       remotePath,
       downloadedAt: (existingMeta && existingMeta.downloadedAt) ? existingMeta.downloadedAt : new Date().toISOString(),
       remoteMtime: remoteStats.modifyTime || (existingMeta ? existingMeta.remoteMtime : null),
@@ -207,6 +215,8 @@ class CacheWatcherService {
       hash: currentHash,
       remotePath,
       profileId,
+      profileName,
+      color,
       sessionId,
       debounceTimer: null
     };
@@ -234,6 +244,8 @@ class CacheWatcherService {
               localPath,
               remotePath,
               profileId,
+              profileName: watcherRecord.profileName || (manifest ? manifest.profileName : 'Connection'),
+              color: watcherRecord.color || (manifest ? manifest.color : '#68a063'),
               sessionId: watcherRecord.sessionId,
               fileName: path.basename(remotePath)
             });
@@ -396,9 +408,19 @@ class CacheWatcherService {
   stopWatching(localPath) {
     if (this.watchers.has(localPath)) {
       const record = this.watchers.get(localPath);
+      if (record.debounceTimer) clearTimeout(record.debounceTimer);
       if (record.watcher) record.watcher.close();
       this.watchers.delete(localPath);
     }
+  }
+
+  stopWatchingBySessionId(sessionId) {
+    if (!sessionId) return;
+    this.watchers.forEach((record, localPath) => {
+      if (record.sessionId === sessionId) {
+        this.stopWatching(localPath);
+      }
+    });
   }
 
   markUploaded(localPath) {
@@ -429,12 +451,14 @@ class CacheWatcherService {
           });
           logCacheDiagnostic('dismissed startup batch item baseline', { localPath: item.localPath, currentHash });
         }
+        this.stopWatching(item.localPath);
       }
     });
   }
 
   clearCache() {
     this.watchers.forEach(record => {
+      if (record.debounceTimer) clearTimeout(record.debounceTimer);
       if (record.watcher) record.watcher.close();
     });
     this.watchers.clear();

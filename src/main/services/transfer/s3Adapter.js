@@ -49,9 +49,11 @@ class S3Adapter {
     return await this.service.list(remotePath);
   }
 
-  async downloadStream(remotePath, localPath, offset = 0, onProgress) {
+  async downloadStream(remotePath, localPath, offset = 0, onProgress, options = {}) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
+    if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
     const adapterProgress = (transferred, total) => {
+      if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
         onProgress({
           transferred,
@@ -63,9 +65,11 @@ class S3Adapter {
     return await this.service.downloadFile(remotePath, localPath, adapterProgress, offset);
   }
 
-  async uploadStream(localPath, remotePath, offset = 0, onProgress) {
+  async uploadStream(localPath, remotePath, offset = 0, onProgress, options = {}) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
+    if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
     const adapterProgress = (transferred, total) => {
+      if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
         onProgress({
           transferred,

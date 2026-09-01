@@ -90,6 +90,7 @@ let jobRunnerService = null;
 let transferEngine = null;
 let activeConfig = null;
 const sshTerminalServices = new Map();
+let sshTerminalService = null;
 let cacheWatcherService = null;
 let exclusionService = null;
 let dirSizeService = null;
@@ -451,7 +452,7 @@ function createWindow() {
     height: 880,
     minWidth: 1020,
     minHeight: 680,
-    title: 'DevsFTP — The SFTP & FTP Client for Windows',
+    title: 'DevsFTP',
     icon: getAppIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -481,6 +482,8 @@ function createWindow() {
   if (transferEngine) transferEngine.cacheWatcherService = cacheWatcherService;
   sshTerminalService = new SSHTerminalService(mainWindow);
   dirSizeService = new DirSizeService(mainWindow);
+
+  createSystemTray();
 
   // If Master Password is NOT enabled, start background daemons immediately.
   // If Master Password IS enabled, daemons will start only after master password is confirmed unlocked.
@@ -528,8 +531,21 @@ function createWindow() {
     }
   }, 600);
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.on('close', (event) => {
+    if (app.isQuitting) {
+      mainWindow = null;
+      return;
+    }
+    const currentPref = loadCloseBehaviorPref();
+    if (currentPref === 'tray' && appTray && !appTray.isDestroyed()) {
+      event.preventDefault();
+      mainWindow.hide();
+      sendOSNotification('DevsFTP', 'DevsFTP is running in the background. Double-click system tray icon to restore.');
+    } else {
+      mainWindow = null;
+      app.isQuitting = true;
+      app.quit();
+    }
   });
 
   mainWindow.webContents.on('did-finish-load', () => {
@@ -608,6 +624,10 @@ async function handleHostKeyVerification({ host, port, fingerprint }) {
       const cleanupOnWindowReloadOrClose = () => {
         clearTimeout(timeout);
         ipcMain.removeListener('ssh:host-key-verify-response', onResponse);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.off('closed', cleanupOnWindowReloadOrClose);
+          try { mainWindow.webContents.off('did-start-navigation', cleanupOnWindowReloadOrClose); } catch (e) {}
+        }
         resolve(false);
       };
 
@@ -670,6 +690,7 @@ if (!gotTheLock) {
 }
 
 app.on('before-quit', () => {
+  app.isQuitting = true;
   writeDebugLog({
     scope: 'main',
     event: 'before-quit',
@@ -963,6 +984,13 @@ function triggerAutoReconnect(sessionId, config, protocol) {
         await newSession.connect(config, (type, msg) => sendLog(type, msg));
       }
 
+      // Verify session was not closed by user while reconnect was awaiting (HIGH-10)
+      if (!autoReconnectState.has(sessionId)) {
+        sendLog('info', `[Auto-Reconnect] Session [${sessionId}] was closed during reconnect attempt. Disconnecting re-established session.`);
+        try { newSession.disconnect(); } catch (e) {}
+        return;
+      }
+
       newSession.onUnexpectedClose = () => triggerAutoReconnect(sessionId, config, protocol);
 
       activeSessions.set(sessionId, { session: newSession, config, protocol });
@@ -1097,6 +1125,9 @@ registerLoggedHandle('connection:connect', async (_event, config, sessionId) => 
 
 registerLoggedHandle('connection:disconnect', async (_event, sessionId) => {
   const sessId = sessionId || 'default';
+  if (cacheWatcherService) {
+    cacheWatcherService.stopWatchingBySessionId(sessId);
+  }
   if (autoReconnectState.has(sessId)) {
     const st = autoReconnectState.get(sessId);
     if (st.timer) clearTimeout(st.timer);
@@ -1125,10 +1156,8 @@ registerLoggedHandle('connection:disconnect', async (_event, sessionId) => {
 // Remote File Operations
 registerLoggedHandle('remote:list', async (_event, remotePath, sessionId) => {
   const cleanPath = normalizePOSIXPath(remotePath);
-  console.log('[DEBUG MAIN IPC] remote:list received:', { remotePath: cleanPath, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) {
-    console.warn('[DEBUG MAIN IPC] remote:list failed: No active session for sessionId:', sessionId);
     throw new Error('No active remote session for tab.');
   }
   return await session.list(cleanPath);
@@ -1136,7 +1165,6 @@ registerLoggedHandle('remote:list', async (_event, remotePath, sessionId) => {
 
 registerLoggedHandle('remote:mkdir', async (_event, remotePath, sessionId, mode) => {
   const cleanPath = normalizePOSIXPath(remotePath);
-  console.log('[DEBUG MAIN IPC] remote:mkdir received:', { remotePath: cleanPath, sessionId, mode });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   await session.mkdir(cleanPath, mode);
@@ -1146,7 +1174,6 @@ registerLoggedHandle('remote:mkdir', async (_event, remotePath, sessionId, mode)
 
 registerLoggedHandle('remote:delete', async (_event, remotePath, isDir, sessionId) => {
   const cleanPath = normalizePOSIXPath(remotePath);
-  console.log('[DEBUG MAIN IPC] remote:delete received:', { remotePath: cleanPath, isDir, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   await session.delete(cleanPath, isDir);
@@ -1156,7 +1183,6 @@ registerLoggedHandle('remote:delete', async (_event, remotePath, isDir, sessionI
 
 registerLoggedHandle('remote:chmod', async (_event, remotePath, mode, sessionId) => {
   const cleanPath = normalizePOSIXPath(remotePath);
-  console.log('[DEBUG MAIN IPC] remote:chmod received:', { remotePath: cleanPath, mode, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.chmod) {
@@ -1170,7 +1196,6 @@ registerLoggedHandle('remote:chmod', async (_event, remotePath, mode, sessionId)
 registerLoggedHandle('remote:rename', async (_event, oldPath, newPath, sessionId) => {
   const cleanOldPath = normalizePOSIXPath(oldPath);
   const cleanNewPath = normalizePOSIXPath(newPath);
-  console.log('[DEBUG MAIN IPC] remote:rename received:', { oldPath: cleanOldPath, newPath: cleanNewPath, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   await session.rename(cleanOldPath, cleanNewPath);
@@ -1181,7 +1206,6 @@ registerLoggedHandle('remote:rename', async (_event, oldPath, newPath, sessionId
 registerLoggedHandle('remote:copy', async (_event, srcPath, destPath, sessionId) => {
   const cleanSrc = normalizePOSIXPath(srcPath);
   const cleanDest = normalizePOSIXPath(destPath);
-  console.log('[DEBUG MAIN IPC] remote:copy received:', { srcPath: cleanSrc, destPath: cleanDest, sessionId });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.copy) {
@@ -1193,12 +1217,12 @@ registerLoggedHandle('remote:copy', async (_event, srcPath, destPath, sessionId)
 });
 
 registerLoggedHandle('remote:exec-command', async (_event, cmdString, sessionId) => {
-  sendLog('info', `[DEBUG MAIN IPC] remote:exec-command received: cmd="${cmdString}"`);
+  const safeCmd = String(cmdString || '');
+  sendLog('info', `Executing remote command: cmd="${safeCmd.length > 200 ? safeCmd.substring(0, 200) + '...' : safeCmd}"`);
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.execCommand) {
     const res = await session.execCommand(cmdString);
-    sendLog('info', `[DEBUG MAIN IPC] remote:exec-command result: code=${res.code} stdout="${res.stdout.trim()}" stderr="${res.stderr.trim()}"`);
     return res;
   }
   throw new Error('Command execution is not supported on this protocol.');
@@ -1211,11 +1235,11 @@ registerLoggedHandle('remote:get-os', async (_event, sessionId) => {
 
 registerLoggedHandle('local:exec-command', async (_event, cmdString) => {
   const { exec } = require('child_process');
-  sendLog('info', `[DEBUG MAIN IPC] local:exec-command received: cmd="${cmdString}"`);
+  const safeCmd = String(cmdString || '');
+  sendLog('info', `Executing local command: cmd="${safeCmd.length > 200 ? safeCmd.substring(0, 200) + '...' : safeCmd}"`);
   return new Promise((resolve) => {
     exec(cmdString, (error, stdout, stderr) => {
       const code = error ? (error.code || 1) : 0;
-      sendLog('info', `[DEBUG MAIN IPC] local:exec-command result: code=${code}`);
       resolve({
         code,
         stdout: stdout || '',
@@ -1227,7 +1251,6 @@ registerLoggedHandle('local:exec-command', async (_event, cmdString) => {
 
 registerLoggedHandle('remote:create-file', async (_event, remotePath, sessionId, mode) => {
   const cleanPath = normalizePOSIXPath(remotePath);
-  console.log('[DEBUG MAIN IPC] remote:create-file received:', { remotePath: cleanPath, sessionId, mode });
   const session = getActiveSessionInstance(sessionId);
   if (!session || !session.connected) throw new Error('Not connected');
   if (session.createFile) {
@@ -1235,8 +1258,11 @@ registerLoggedHandle('remote:create-file', async (_event, remotePath, sessionId,
   } else {
     const tempLocal = path.join(app.getPath('userData'), 'temp_empty.txt');
     fs.writeFileSync(tempLocal, '');
-    await session.uploadFile(tempLocal, cleanPath, null);
-    try { fs.unlinkSync(tempLocal); } catch (e) {}
+    try {
+      await session.uploadFile(tempLocal, cleanPath, null);
+    } finally {
+      try { if (fs.existsSync(tempLocal)) fs.unlinkSync(tempLocal); } catch (e) {}
+    }
   }
   sendLog('info', `Created remote file: ${cleanPath} (mode: ${mode || 'default'})`);
   return true;
@@ -1341,12 +1367,33 @@ registerLoggedHandle('local:list', async (_event, targetPath) => {
 });
 
 registerLoggedHandle('local:drives', async () => {
-  const drives = ['C:\\'];
-  ['D', 'E', 'F', 'G', 'H', 'Z'].forEach(letter => {
-    const p = `${letter}:\\`;
-    if (fs.existsSync(p)) drives.push(p);
-  });
+  const isWin = process.platform === 'win32';
+  const drives = [];
+  if (isWin) {
+    ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\', 'Z:\\'].forEach(letter => {
+      try {
+        if (fs.existsSync(letter)) drives.push({ label: `${letter} Drive`, path: letter });
+      } catch (e) {}
+    });
+  } else {
+    drives.push({ label: '/ Root', path: '/' });
+    ['/mnt', '/media'].forEach(mnt => {
+      try {
+        if (fs.existsSync(mnt)) {
+          const sub = fs.readdirSync(mnt);
+          sub.forEach(s => {
+            const p = path.join(mnt, s);
+            if (fs.existsSync(p)) drives.push({ label: `/mnt/${s}`, path: p });
+          });
+        }
+      } catch (e) {}
+    });
+  }
   return drives;
+});
+
+registerLoggedHandle('app:get-version', async () => {
+  return app.getVersion();
 });
 
 registerLoggedHandle('local:home', async () => {
@@ -1366,7 +1413,9 @@ registerLoggedHandle('local:open', async (_event, localPath) => {
       if (codeEditorPath && fs.existsSync(codeEditorPath)) {
         const { execFile } = require('child_process'); // Avoid shell injection (Issue 13.2)
         sendLog('info', `Opening local code file in system code editor (${path.basename(codeEditorPath)}): ${normalized}`);
-        execFile(codeEditorPath, [normalized]);
+        execFile(codeEditorPath, [normalized], (err) => {
+          if (err) sendLog('error', `Failed to open editor: ${err.message}`);
+        });
         return true;
       }
     }
@@ -1447,6 +1496,137 @@ registerLoggedHandle('transfer:upload', async (_event, localPath, remotePath, se
   return result;
 });
 
+registerLoggedHandle('transfer:remote-to-remote', async (_event, { taskId, sourcePath, targetProfileId, targetPath, sourceSessionId, isDir }) => {
+  const sourceSession = getActiveSessionInstance(sourceSessionId);
+  if (!sourceSession || !sourceSession.connected) {
+    throw new Error('Source server session is not connected.');
+  }
+
+  let targetSessionObj = getSessionByProfileId(targetProfileId);
+  let targetSession = targetSessionObj ? targetSessionObj.session : null;
+  let isTempTargetSession = false;
+
+  if (!targetSession) {
+    const targetConfig = profileStore.getById(targetProfileId);
+    if (!targetConfig) {
+      throw new Error(`Target profile '${targetProfileId}' not found in vault.`);
+    }
+    const protocol = targetConfig.protocol || 'sftp';
+    if (protocol === 'sftp') {
+      targetSession = new SFTPService();
+      await targetSession.connect(targetConfig, (type, msg) => sendLog(type, msg), handleHostKeyVerification);
+    } else if (protocol === 'webdav') {
+      targetSession = new WebDAVService();
+      await targetSession.connect(targetConfig, (type, msg) => sendLog(type, msg));
+    } else if (protocol === 's3') {
+      targetSession = new S3Service();
+      await targetSession.connect(targetConfig, (type, msg) => sendLog(type, msg));
+    } else {
+      targetSession = new FTPService();
+      await targetSession.connect(targetConfig, (type, msg) => sendLog(type, msg));
+    }
+    isTempTargetSession = true;
+  }
+
+  const cleanSourcePath = normalizePOSIXPath(sourcePath);
+  const cleanTargetPath = normalizePOSIXPath(targetPath);
+
+  sendLog('info', `Starting Remote-to-Remote transfer: ${cleanSourcePath} -> ${cleanTargetPath} (Profile: ${targetProfileId})`);
+
+  const task = {
+    id: taskId || ('r2r_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6)),
+    type: 'remote-to-remote',
+    source: cleanSourcePath,
+    dest: cleanTargetPath,
+    profileId: targetProfileId,
+    sessionId: sourceSessionId,
+    status: 'Running'
+  };
+
+  if (transferEngine) {
+    transferEngine.upsertQueueTask(task);
+  }
+
+  try {
+    const srcAdapter = transferEngine.getAdapter(sourceSession);
+    const destAdapter = transferEngine.getAdapter(targetSession);
+
+    if (isDir) {
+      if (typeof sourceSession.downloadDir === 'function' && typeof targetSession.uploadDir === 'function') {
+        const tempFolder = path.join(app.getPath('userData'), 'r2r_temp_' + Date.now());
+        fs.mkdirSync(tempFolder, { recursive: true });
+        await sourceSession.downloadDir(cleanSourcePath, tempFolder);
+        await targetSession.uploadDir(tempFolder, cleanTargetPath);
+        try { fs.rmSync(tempFolder, { recursive: true, force: true }); } catch (e) {}
+      } else {
+        throw new Error('Directory transfer not supported by one of the selected protocol adapters.');
+      }
+    } else {
+      const tempFile = path.join(app.getPath('userData'), 'r2r_tmp_' + Date.now() + '_' + path.basename(cleanSourcePath));
+
+      // Phase 1: Download from source server using srcAdapter (0% -> 50% progress)
+      await srcAdapter.downloadStream(cleanSourcePath, tempFile, 0, (progress) => {
+        task.bytesTransferred = progress.transferred;
+        task.totalBytes = progress.total;
+        task.percentage = Math.min(50, parseFloat(((progress.transferred / Math.max(1, progress.total)) * 50).toFixed(1)));
+        if (transferEngine) {
+          transferEngine.upsertQueueTask(task);
+          transferEngine.notifyWindow('transfer:progress', { ...progress, taskId: task.id, type: 'download' });
+        }
+      });
+
+      // Phase 2: Upload to target server using destAdapter (50% -> 100% progress)
+      await destAdapter.uploadStream(tempFile, cleanTargetPath, 0, (progress) => {
+        task.bytesTransferred = progress.transferred;
+        task.totalBytes = progress.total;
+        task.percentage = Math.min(100, parseFloat((50 + ((progress.transferred / Math.max(1, progress.total)) * 50)).toFixed(1)));
+        if (transferEngine) {
+          transferEngine.upsertQueueTask(task);
+          transferEngine.notifyWindow('transfer:progress', { ...progress, taskId: task.id, type: 'upload' });
+        }
+      });
+
+      try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (e) {}
+    }
+
+    task.status = 'Completed';
+    task.percentage = 100;
+    if (transferEngine) {
+      transferEngine.upsertQueueTask(task);
+      transferEngine.logHistory(task, 'Success');
+      transferEngine.notifyWindow('transfer:progress', {
+        taskId: task.id,
+        percentage: 100,
+        status: 'Completed',
+        transferred: task.totalBytes || 1,
+        total: task.totalBytes || 1
+      });
+    }
+    sendLog('info', `✅ Remote-to-Remote transfer finished: ${cleanSourcePath} -> ${cleanTargetPath}`);
+    return true;
+  } catch (err) {
+    task.status = 'Failed';
+    if (transferEngine) {
+      transferEngine.upsertQueueTask(task);
+      transferEngine.logHistory(task, 'Failed', err.message);
+      transferEngine.notifyWindow('transfer:progress', {
+        taskId: task.id,
+        status: 'Failed',
+        error: err.message
+      });
+    }
+    sendLog('error', `❌ Remote-to-Remote transfer failed: ${err.message}`);
+    throw err;
+  } finally {
+    if (isTempTargetSession && targetSession) {
+      try { targetSession.disconnect(); } catch (e) {}
+    }
+    // Clean up any leftover temp files/folders regardless of success or failure
+    try { if (typeof tempFile !== 'undefined' && tempFile && fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (e) {}
+    try { if (typeof tempFolder !== 'undefined' && tempFolder && fs.existsSync(tempFolder)) fs.rmSync(tempFolder, { recursive: true, force: true }); } catch (e) {}
+  }
+});
+
 registerLoggedHandle('history:get-all', async () => {
   return transferEngine ? transferEngine.history : [];
 });
@@ -1465,6 +1645,13 @@ registerLoggedHandle('transfer:remove-item', async (_event, id) => {
 
 registerLoggedHandle('transfer:save-queue', async (_event, queue) => {
   return transferEngine ? transferEngine.saveQueue(queue) : [];
+});
+
+registerLoggedHandle('transfer:set-options', async (_event, options) => {
+  if (transferEngine && options) {
+    transferEngine.setOptions(options);
+  }
+  return true;
 });
 
 // Developer Remote Edit Workflow
@@ -1989,6 +2176,8 @@ registerLoggedHandle('system:calculate-dir-size', async (_event, targetPath, isR
         tempSession = new SFTPService();
       } else if (protocol === 'webdav') {
         tempSession = new WebDAVService();
+      } else if (protocol === 's3') {
+        tempSession = new S3Service();
       } else {
         tempSession = new FTPService();
       }
@@ -1998,6 +2187,7 @@ registerLoggedHandle('system:calculate-dir-size', async (_event, targetPath, isR
         session = tempSession;
       } catch (err) {
         console.error('[DirSizeService] Failed to establish temporary session:', err);
+        try { tempSession.disconnect(); } catch (e) {}
         return false;
       }
     }
@@ -2035,6 +2225,38 @@ registerLoggedHandle('system:save-dir-size-prefs', async (_event, prefs) => {
   try {
     fs.writeFileSync(prefsFile, JSON.stringify(prefs, null, 2), 'utf8');
     sendLog('info', 'Directory size calculation preferences saved.');
+    return { success: true };
+  } catch (e) {
+    return { success: false };
+  }
+});
+
+let closeBehaviorPref = 'tray';
+
+function loadCloseBehaviorPref() {
+  const userDataPath = app ? app.getPath('userData') : path.join(process.cwd(), '.devs_userData');
+  const file = path.join(userDataPath, 'devsftp_close_behavior.json');
+  try {
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      closeBehaviorPref = data.behavior || 'tray';
+    }
+  } catch (e) {}
+  return closeBehaviorPref;
+}
+
+registerLoggedHandle('system:get-close-behavior', async () => {
+  return loadCloseBehaviorPref();
+});
+
+registerLoggedHandle('system:save-close-behavior', async (_event, behavior) => {
+  closeBehaviorPref = behavior || 'exit';
+  const userDataPath = app ? app.getPath('userData') : path.join(process.cwd(), '.devs_userData');
+  const file = path.join(userDataPath, 'devsftp_close_behavior.json');
+  try {
+    if (!fs.existsSync(userDataPath)) fs.mkdirSync(userDataPath, { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ behavior: closeBehaviorPref }), 'utf8');
+    sendLog('info', `Updated window close behavior preference to: ${closeBehaviorPref}`);
     return { success: true };
   } catch (e) {
     return { success: false };

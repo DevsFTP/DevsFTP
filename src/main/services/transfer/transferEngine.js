@@ -35,6 +35,9 @@ class TransferEngine {
     this.queue = this._loadQueue();
     this.history = this._loadHistory();
 
+    this.activeDestinationLocks = new Set();
+    this.cancellationTokens = new Map();
+
     // Mark any interrupted running tasks from previous session as 'Waiting to Resume'
     this.queue.forEach(item => {
       if (item.status === 'Running' || item.status === 'In Progress') {
@@ -45,7 +48,37 @@ class TransferEngine {
         }
       }
     });
+
+    this.maxConcurrency = 3;
+    this.speedLimitKBps = 0;
+
     this._saveQueue();
+  }
+
+  setOptions(opts = {}) {
+    if (opts.maxConcurrency !== undefined) {
+      this.maxConcurrency = Math.max(1, parseInt(opts.maxConcurrency, 10) || 3);
+    }
+    if (opts.speedLimitKBps !== undefined) {
+      this.speedLimitKBps = Math.max(0, parseInt(opts.speedLimitKBps, 10) || 0);
+    }
+    if (this.logFn) {
+      const speedTxt = this.speedLimitKBps > 0 ? `${this.speedLimitKBps} KB/s` : 'Unlimited';
+      this.logFn('info', `⚙️ [TransferEngine] Settings updated: Max Concurrency: ${this.maxConcurrency} | Speed Limit: ${speedTxt}`);
+    }
+  }
+
+  cancelTransfer(taskId) {
+    const task = this.queue.find(q => q.id === taskId);
+    if (task) {
+      task.status = 'Cancelled';
+      this.upsertQueueTask(task);
+    }
+    if (this.cancellationTokens.has(taskId)) {
+      const controller = this.cancellationTokens.get(taskId);
+      try { controller.abort(); } catch (e) {}
+      this.cancellationTokens.delete(taskId);
+    }
   }
 
   getQueue() {
@@ -69,6 +102,7 @@ class TransferEngine {
   }
 
   removeQueueItem(id) {
+    this.cancelTransfer(id);
     this.queue = this.queue.filter(q => q.id !== id);
     this._saveQueue();
     return this.queue;
@@ -134,7 +168,9 @@ class TransferEngine {
   _saveHistory() {
     try {
       const trimmed = this.history.slice(-500);
-      fs.writeFileSync(this.historyFilePath, JSON.stringify(trimmed, null, 2), 'utf8');
+      const tempPath = this.historyFilePath + '.tmp';
+      fs.writeFileSync(tempPath, JSON.stringify(trimmed, null, 2), 'utf8');
+      fs.renameSync(tempPath, this.historyFilePath);
     } catch (e) {
       this.logFn('error', `[TransferEngine] Failed to write transfer history file: ${e.message}`);
     }
@@ -177,7 +213,7 @@ class TransferEngine {
     if (session.client && typeof session.client.getFileContents === 'function') return new WebDAVAdapter(session);
     if (session.client) return new FTPAdapter(session);
     
-    return new SFTPAdapter(session);
+    throw new Error(`Unsupported protocol service: ${name}`);
   }
 
   /**
@@ -261,6 +297,15 @@ class TransferEngine {
   async executeTransfer(task, session, options = {}) {
     const adapter = this.getAdapter(session);
     if (!adapter) throw new Error('No valid protocol adapter available');
+    if (options.speedLimitKBps === undefined && this.speedLimitKBps > 0) {
+      options.speedLimitKBps = this.speedLimitKBps;
+    }
+
+    const lockKey = `${task.dest}`;
+    if (this.activeDestinationLocks.has(lockKey)) {
+      throw new Error(`A transfer to destination "${task.dest}" is already in progress.`);
+    }
+    this.activeDestinationLocks.add(lockKey);
 
     // Reuse existing task object in queue if available (Issue 3.3)
     const existingIndex = this.queue.findIndex(q => q.source === task.source && q.dest === task.dest && q.profileId === task.profileId && q.status !== 'Completed');
@@ -270,6 +315,10 @@ class TransferEngine {
     } else {
       this.queue.push(targetTask);
     }
+
+    const abortController = new AbortController();
+    this.cancellationTokens.set(targetTask.id, abortController);
+    options.signal = abortController.signal;
 
     const startedAt = new Date().toISOString();
     targetTask.startedAt = startedAt;
@@ -291,9 +340,11 @@ class TransferEngine {
 
     this.logFn('info', `[TransferEngine] ${targetTask.type.toUpperCase()} ${targetTask.source} -> ${targetTask.dest} (Resume Offset: ${offset} B, Start %: ${targetTask.percentage || 0}%)`);
 
+    let isDirectory = false;
+    let workingLocalDest = targetTask.dest;
+
     try {
       // Determine if source is directory (Issue 3.1 & 3.2 integration)
-      let isDirectory = false;
       if (targetTask.type === 'download') {
         if (session.stat) {
           try {
@@ -346,24 +397,99 @@ class TransferEngine {
         return true;
       }
 
-      // Single file transfer stream logic
+      // Single file transfer stream logic — use .part temp file for local downloads & remote uploads (HIGH-05)
       if (targetTask.type === 'download') {
-        await adapter.downloadStream(targetTask.source, targetTask.dest, offset, (progress) => {
-          targetTask.bytesTransferred = progress.transferred;
-          targetTask.totalBytes = progress.total;
-          targetTask.percentage = progress.percentage;
-          this.upsertQueueTask(targetTask);
-          this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, remotePath: targetTask.source, localPath: targetTask.dest, type: 'download' });
-        });
+        workingLocalDest = targetTask.dest + '.part';
+
+        // Fix 2: Register abort listener early so stalled adapters (no progress callbacks) are also signalled
+        let earlyAbortReject = null;
+        const earlyAbortPromise = new Promise((_, rej) => { earlyAbortReject = rej; });
+        const onEarlyAbort = () => earlyAbortReject(new Error('Transfer cancelled by user'));
+        if (options.signal) {
+          if (options.signal.aborted) {
+            throw new Error('Transfer cancelled by user');
+          }
+          options.signal.addEventListener('abort', onEarlyAbort, { once: true });
+        }
+
+        try {
+          await Promise.race([
+            adapter.downloadStream(targetTask.source, workingLocalDest, offset, (progress) => {
+              if (options.signal && options.signal.aborted) {
+                throw new Error('Transfer cancelled by user');
+              }
+              targetTask.bytesTransferred = progress.transferred;
+              targetTask.totalBytes = progress.total;
+              targetTask.percentage = progress.percentage;
+              this.upsertQueueTask(targetTask);
+              this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, remotePath: targetTask.source, localPath: targetTask.dest, type: 'download' });
+            }, options),
+            earlyAbortPromise
+          ]);
+        } finally {
+          if (options.signal) {
+            try { options.signal.removeEventListener('abort', onEarlyAbort); } catch (e) {}
+          }
+        }
+
+        // Fix 1: Rename .part temp file to final destination with retry (handles EBUSY/EPERM on Windows)
+        if (fs.existsSync(workingLocalDest)) {
+          let renamed = false;
+          for (let attempt = 0; attempt < 3 && !renamed; attempt++) {
+            try {
+              if (attempt > 0) await new Promise(r => setTimeout(r, 500));
+              fs.renameSync(workingLocalDest, targetTask.dest);
+              renamed = true;
+            } catch (renameErr) {
+              if (attempt === 2) throw renameErr;
+            }
+          }
+          workingLocalDest = targetTask.dest;
+        }
       } else {
-        await adapter.uploadStream(targetTask.source, targetTask.dest, offset, (progress) => {
-          targetTask.bytesTransferred = progress.transferred;
-          targetTask.totalBytes = progress.total;
-          targetTask.percentage = progress.percentage;
-          this.upsertQueueTask(targetTask);
-          this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, localPath: targetTask.source, remotePath: targetTask.dest, type: 'upload' });
-        });
+        const workingRemoteDest = targetTask.dest + '.part';
+        let uploadSuccess = false;
+
+        // Fix 2: Register abort listener early so stalled adapters (no progress callbacks) are also signalled
+        let earlyUploadAbortReject = null;
+        const earlyUploadAbortPromise = new Promise((_, rej) => { earlyUploadAbortReject = rej; });
+        const onEarlyUploadAbort = () => earlyUploadAbortReject(new Error('Transfer cancelled by user'));
+        if (options.signal) {
+          if (options.signal.aborted) {
+            throw new Error('Transfer cancelled by user');
+          }
+          options.signal.addEventListener('abort', onEarlyUploadAbort, { once: true });
+        }
+
+        try {
+          await Promise.race([
+            adapter.uploadStream(targetTask.source, workingRemoteDest, offset, (progress) => {
+              if (options.signal && options.signal.aborted) {
+                throw new Error('Transfer cancelled by user');
+              }
+              targetTask.bytesTransferred = progress.transferred;
+              targetTask.totalBytes = progress.total;
+              targetTask.percentage = progress.percentage;
+              this.upsertQueueTask(targetTask);
+              this.notifyWindow('transfer:progress', { ...progress, taskId: targetTask.id, localPath: targetTask.source, remotePath: targetTask.dest, type: 'upload' });
+            }, options),
+            earlyUploadAbortPromise
+          ]);
+          // Atomic remote rename on upload stream completion
+          if (session.rename) {
+            await session.rename(workingRemoteDest, targetTask.dest);
+          }
+          uploadSuccess = true;
+        } finally {
+          if (options.signal) {
+            try { options.signal.removeEventListener('abort', onEarlyUploadAbort); } catch (e) {}
+          }
+          if (!uploadSuccess && session.delete) {
+            try { await session.delete(workingRemoteDest, false); } catch (e) {}
+          }
+        }
       }
+
 
       // Verification Pipeline Phase 1: Verifying State
       targetTask.status = 'Verifying';
@@ -404,6 +530,10 @@ class TransferEngine {
       return true;
 
     } catch (err) {
+      // Clean up orphaned .part temp file on download failure/cancellation
+      if (targetTask.type === 'download' && workingLocalDest.endsWith('.part') && fs.existsSync(workingLocalDest)) {
+        try { fs.unlinkSync(workingLocalDest); } catch (e) {}
+      }
       // Preserve terminal states: Cancelled and Failed must not be overwritten
       if (targetTask.status !== 'Cancelled' && targetTask.status !== 'Failed') {
         targetTask.status = 'Waiting to Resume';
@@ -414,6 +544,9 @@ class TransferEngine {
       }
       this.upsertQueueTask(targetTask);
       throw err;
+    } finally {
+      this.activeDestinationLocks.delete(lockKey);
+      this.cancellationTokens.delete(targetTask.id);
     }
   }
 }

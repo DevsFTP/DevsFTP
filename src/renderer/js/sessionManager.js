@@ -86,7 +86,8 @@ window.SessionManager = {
   },
 
   createSession(profile, isConnected = false) {
-    const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const randomUuid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID().split('-')[0] : Math.random().toString(36).substring(2, 8);
+    const sessionId = `sess_${Date.now()}_${randomUuid}`;
     const defaultLocal = (window.FileBrowser && window.FileBrowser.localPath) ? window.FileBrowser.localPath : 'C:\\';
     const session = {
       sessionId,
@@ -201,10 +202,11 @@ window.SessionManager = {
         statusDot.className = 'status-indicator online';
         statusDot.style.backgroundColor = '';
       }
-      if (statusText) statusText.textContent = `Connected (${session.profile.protocol.toUpperCase()})`;
+      const proto = (session.profile && session.profile.protocol) ? session.profile.protocol.toUpperCase() : 'CONNECTED';
+      if (statusText) statusText.textContent = `Connected (${proto})`;
       if (remoteTag) {
         remoteTag.style.display = 'inline-block';
-        remoteTag.textContent = session.profile.protocol.toUpperCase();
+        remoteTag.textContent = proto;
       }
     } else if (session.connectionState === 'reconnecting') {
       if (statusDot) {
@@ -234,11 +236,45 @@ window.SessionManager = {
     }
   },
 
+  async commitSessionPathsToProfile(session) {
+    if (!session || !session.profileId || session.profileId === 'default') return;
+    const api = window.devsFTP || window.pulseFTP;
+    if (api && api.profiles && api.profiles.getAll && api.profiles.save) {
+      try {
+        const all = await api.profiles.getAll();
+        const existing = all.find(p => p.id === session.profileId);
+        if (existing) {
+          let updated = false;
+          if (session.remotePath && existing.remotePath !== session.remotePath) {
+            existing.remotePath = session.remotePath;
+            updated = true;
+          }
+          if (session.localPath && existing.localPath !== session.localPath) {
+            existing.localPath = session.localPath;
+            updated = true;
+          }
+          if (updated) {
+            await api.profiles.save(existing);
+          }
+        }
+      } catch (e) {}
+    }
+  },
+
   updateActiveSessionRemoteState(remoteFiles, remotePath) {
     const active = this.getActiveSession();
     if (active) {
       active.remoteFiles = remoteFiles || [];
       active.remotePath = remotePath || '/';
+      this.commitSessionPathsToProfile(active);
+    }
+  },
+
+  updateActiveSessionLocalPath(localPath) {
+    const active = this.getActiveSession();
+    if (active) {
+      active.localPath = localPath || 'C:\\';
+      this.commitSessionPathsToProfile(active);
     }
   },
 
@@ -277,13 +313,19 @@ window.SessionManager = {
     active.remoteFiles = [];
     this.setActiveSession(active.sessionId);
     if (window.LogViewer) {
-      window.LogViewer.addEntry('info', `🔌 Disconnected active session tab [${active.sessionId}] (${active.profile.name || active.profile.host}).`);
+      const nameOrHost = (active.profile && (active.profile.name || active.profile.host)) ? (active.profile.name || active.profile.host) : 'Session';
+      window.LogViewer.addEntry('info', `🔌 Disconnected active session tab [${active.sessionId}] (${nameOrHost}).`);
     }
   },
 
   closeSession(sessionId) {
     const index = this.sessions.findIndex(s => s.sessionId === sessionId);
     if (index === -1) return;
+
+    const closingSess = this.sessions[index];
+    if (closingSess) {
+      this.commitSessionPathsToProfile(closingSess);
+    }
 
     // Disconnect backend SSH/SFTP connection for closed tab
     const getApi = () => window.devsFTP || window.pulseFTP;
@@ -298,7 +340,11 @@ window.SessionManager = {
       this.createDefaultSession();
     } else if (this.activeSessionId === sessionId) {
       const nextSession = this.sessions[Math.max(0, index - 1)];
-      this.setActiveSession(nextSession.sessionId);
+      if (nextSession && nextSession.sessionId) {
+        this.setActiveSession(nextSession.sessionId);
+      } else if (this.sessions[0] && this.sessions[0].sessionId) {
+        this.setActiveSession(this.sessions[0].sessionId);
+      }
     } else {
       this.renderTabs();
     }
@@ -458,7 +504,8 @@ window.SessionManager = {
         t && t.profile && t.profile.host && 
         t.profile.host !== 'localhost' && 
         t.profileId !== 'default' && 
-        t.profile.name !== 'Local Workspace'
+        t.profile.name !== 'Local Workspace' &&
+        (!t.profileId || (Array.isArray(allProfiles) && allProfiles.some(p => p.id === t.profileId)))
       );
 
       if (validSavedTabs.length === 0) {
@@ -469,6 +516,7 @@ window.SessionManager = {
 
       // Clear existing default session if we have valid remote server tabs to restore
       this.sessions = [];
+      const restorePromises = [];
 
       for (let i = 0; i < validSavedTabs.length; i++) {
         const tabData = validSavedTabs[i];
@@ -488,7 +536,7 @@ window.SessionManager = {
           if (tabData.localPath) restoredSess.localPath = tabData.localPath;
 
           if (window.connectToProfileSession) {
-            window.connectToProfileSession(prof, restoredSess.sessionId, true, tabData.remotePath, tabData.localPath)
+            const p = window.connectToProfileSession(prof, restoredSess.sessionId, true, tabData.remotePath, tabData.localPath)
               .then(() => {
                 log('info', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: ✓ Connection established cleanly for restored tab [${restoredSess.sessionId}].`);
               })
@@ -496,10 +544,15 @@ window.SessionManager = {
                 log('error', `Phase 8 [Tab ${i + 1}/${validSavedTabs.length}]: Connection failed for restored tab [${restoredSess.sessionId}]: ${err.message}`);
                 this.updateSessionConnectionState(restoredSess.sessionId, false, prof);
               });
+            restorePromises.push(p);
           }
         } else {
           log('warning', `Phase 6 [Tab ${i + 1}/${validSavedTabs.length}]: Skipping invalid saved tab data (missing host/profile).`);
         }
+      }
+
+      if (restorePromises.length > 0) {
+        await Promise.allSettled(restorePromises);
       }
 
       if (this.sessions.length > 0) {

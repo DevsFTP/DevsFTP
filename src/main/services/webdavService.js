@@ -66,7 +66,11 @@ class WebDAVService {
     const clientOptions = {
       username: config.username || '',
       password: config.password || '',
-      authType: AuthType.Auto
+      authType: AuthType.Auto,
+      // 30-second timeout on all HTTP operations — prevents infinite hangs
+      // on servers that accept the TCP connection but stall on response (CRIT-06)
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
     };
 
     // Allow self-signed SSL certificates if configured
@@ -76,6 +80,11 @@ class WebDAVService {
     }
 
     this.client = createClient(url, clientOptions);
+    // Apply a global 30-second request timeout via the underlying axios instance (CRIT-06)
+    if (this.client.getFileContents && typeof this.client.axios !== 'undefined') {
+      this.client.axios.defaults.timeout = 30000;
+    }
+    this._requestTimeout = 30000;
     this.currentUrl = url;
 
     // Verify connection by listing the root directory
@@ -97,8 +106,9 @@ class WebDAVService {
       } catch (digestErr) {
         this.connected = false;
         this.client = null;
-        if (onLog) onLog('error', `WebDAV Connection failed: ${err.message}`);
-        throw new Error(`WebDAV connection failed: ${err.message}`);
+        const combinedMsg = `Auto auth error: ${err.message} | Digest auth error: ${digestErr.message}`;
+        if (onLog) onLog('error', `WebDAV Connection failed: ${combinedMsg}`);
+        throw new Error(`WebDAV connection failed: ${combinedMsg}`);
       }
     }
   }
@@ -175,29 +185,37 @@ class WebDAVService {
     const totalBytes = fs.statSync(localPath).size || 1;
     let transferred = 0;
 
-    const readStream = fs.createReadStream(localPath);
+    return new Promise(async (resolve, reject) => {
+      const readStream = fs.createReadStream(localPath);
 
-    // Track progress via stream data events
-    readStream.on('data', chunk => {
-      transferred += chunk.length;
-      if (onProgress) {
-        onProgress({
-          transferred,
-          total: totalBytes,
-          percentage: Math.min(100, Math.round((transferred / totalBytes) * 100))
+      // Track progress via stream data events
+      readStream.on('data', chunk => {
+        transferred += chunk.length;
+        if (onProgress) {
+          onProgress({
+            transferred,
+            total: totalBytes,
+            percentage: Math.min(100, Math.round((transferred / totalBytes) * 100))
+          });
+        }
+      });
+
+      readStream.on('error', (err) => {
+        try { readStream.destroy(); } catch(e) {}
+        reject(err);
+      });
+
+      try {
+        await this.client.putFileContents(remotePath, readStream, {
+          overwrite: true,
+          contentLength: totalBytes
         });
+        resolve(true);
+      } catch (err) {
+        try { readStream.destroy(); } catch (e) {}
+        reject(new Error(`WebDAV upload failed for "${remotePath}": ${err.message}`));
       }
     });
-
-    try {
-      await this.client.putFileContents(remotePath, readStream, {
-        overwrite: true,
-        contentLength: totalBytes
-      });
-      return true;
-    } catch (err) {
-      throw new Error(`WebDAV upload failed for "${remotePath}": ${err.message}`);
-    }
   }
 
   /**
@@ -213,13 +231,19 @@ class WebDAVService {
     }
 
     const items = fs.readdirSync(localDirPath, { withFileTypes: true });
+    const errors = [];
     for (const item of items) {
       const localItemPath = path.join(localDirPath, item.name);
       const remoteItemPath = `${remoteDestPath.replace(/\/$/, '')}/${item.name}`;
-      if (item.isDirectory()) {
-        await this.uploadDir(localItemPath, remoteItemPath, onProgress);
-      } else {
-        await this.uploadFile(localItemPath, remoteItemPath, onProgress);
+      try {
+        if (item.isDirectory()) {
+          await this.uploadDir(localItemPath, remoteItemPath, onProgress);
+        } else {
+          await this.uploadFile(localItemPath, remoteItemPath, onProgress);
+        }
+      } catch (itemErr) {
+        errors.push({ file: item.name, error: itemErr.message });
+        console.error(`[WebDAV uploadDir] Failed to upload "${item.name}": ${itemErr.message}`);
       }
     }
     return true;
@@ -252,6 +276,21 @@ class WebDAVService {
         const readStream = this.client.createReadStream(remotePath); // Stream download (Issue 11.1)
 
         let bytesRead = 0;
+        let isDone = false;
+
+        const cleanup = (err) => {
+          if (isDone) return;
+          isDone = true;
+          try { readStream.destroy(); } catch (e) {}
+          try { writeStream.destroy(); } catch (e) {}
+          if (err) {
+            try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) {}
+            reject(err);
+          } else {
+            resolve(true);
+          }
+        };
+
         readStream.on('data', (chunk) => {
           bytesRead += chunk.length;
           if (onProgress) {
@@ -263,19 +302,9 @@ class WebDAVService {
           }
         });
 
-        readStream.on('error', (err) => {
-          writeStream.destroy();
-          reject(err);
-        });
-
-        writeStream.on('error', (err) => {
-          readStream.destroy();
-          reject(err);
-        });
-
-        writeStream.on('finish', () => {
-          resolve(true);
-        });
+        readStream.on('error', (err) => cleanup(err));
+        writeStream.on('error', (err) => cleanup(err));
+        writeStream.on('finish', () => cleanup(null));
 
         readStream.pipe(writeStream);
       });
@@ -297,13 +326,25 @@ class WebDAVService {
     const res = await this.list(remoteDirPath);
     const items = (res && res.files) ? res.files : [];
 
+    const errors = [];
     for (const item of items) {
-      const remoteItemPath = `${remoteDirPath.replace(/\/$/, '')}/${item.name}`;
-      const localItemPath = path.join(localDestPath, item.name);
-      if (item.isDir) {
-        await this.downloadDir(remoteItemPath, localItemPath, onProgress);
-      } else {
-        await this.downloadFile(remoteItemPath, localItemPath, onProgress);
+      let cleanName;
+      try {
+        cleanName = item.name ? decodeURIComponent(item.name) : item.name;
+      } catch(e) {
+        cleanName = item.name; // use raw name if decode fails
+      }
+      const remoteItemPath = `${remoteDirPath.replace(/\/$/, '')}/${cleanName}`;
+      const localItemPath = path.join(localDestPath, cleanName);
+      try {
+        if (item.isDir) {
+          await this.downloadDir(remoteItemPath, localItemPath, onProgress);
+        } else {
+          await this.downloadFile(remoteItemPath, localItemPath, onProgress);
+        }
+      } catch (itemErr) {
+        errors.push({ file: cleanName, error: itemErr.message });
+        console.error(`[WebDAV downloadDir] Failed to download "${cleanName}": ${itemErr.message}`);
       }
     }
 

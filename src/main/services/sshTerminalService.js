@@ -18,13 +18,17 @@ class SSHTerminalService {
   connect(config, verifyHostKeyFn) {
     return new Promise((resolve, reject) => {
       this.sshClient = new Client();
+      // Fix 12 (MEDIUM): Track whether the promise has already settled (resolved/rejected)
+      // so that a late 'error' event doesn't call reject() on an already-resolved promise.
+      let settled = false;
 
       this.sshClient.on('ready', () => {
         // Request interactive PTY shell
         this.sshClient.shell({ term: 'xterm-256color', cols: 80, rows: 24 }, (err, stream) => {
           if (err) {
             this.connected = false;
-            return reject(err);
+            if (!settled) { settled = true; reject(err); }
+            return;
           }
           this.shellStream = stream;
           this.connected = true;
@@ -39,6 +43,16 @@ class SSHTerminalService {
             }
           });
 
+          stream.on('error', (err) => {
+            this.connected = false;
+            if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
+              this.ipcWindow.webContents.send('ssh:terminal-data', {
+                sessionId: this.sessionId,
+                data: `\r\n\x1b[31m[SSH Terminal Error: ${err.message || err}]\x1b[0m\r\n`
+              });
+            }
+          });
+
           stream.on('close', () => {
             this.connected = false;
             if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
@@ -49,13 +63,40 @@ class SSHTerminalService {
             }
           });
 
+          settled = true;
           resolve(true);
         });
       });
 
       this.sshClient.on('error', (err) => {
         this.connected = false;
-        reject(err);
+        if (!settled) {
+          // Promise not yet resolved — reject it normally
+          settled = true;
+          reject(err);
+        } else {
+          // Fix 12 (MEDIUM): Promise already resolved — don't call reject() again.
+          // Disconnect cleanly and notify the renderer of the unexpected error instead.
+          this.disconnect();
+          if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
+            this.ipcWindow.webContents.send('ssh:terminal-data', {
+              sessionId: this.sessionId,
+              data: `\r\n\x1b[31m[SSH Connection Error: ${err.message || err}]\x1b[0m\r\n`
+            });
+          }
+        }
+      });
+
+      this.sshClient.on('close', () => {
+        if (this.connected) {
+          this.connected = false;
+          if (this.ipcWindow && !this.ipcWindow.isDestroyed()) {
+            this.ipcWindow.webContents.send('ssh:terminal-data', {
+              sessionId: this.sessionId,
+              data: '\r\n\x1b[31m[SSH Transport Connection Closed]\x1b[0m\r\n'
+            });
+          }
+        }
       });
 
       const connectOpts = {
@@ -63,6 +104,7 @@ class SSHTerminalService {
         port: parseInt(config.port || 22, 10),
         username: config.username,
         keepaliveInterval: 10000,
+        keepaliveCountMax: 3,  // MED-24: 3 missed keepalives = 30s freeze timeout before drop
         readyTimeout: 20000
       };
 
@@ -99,7 +141,11 @@ class SSHTerminalService {
 
   write(data) {
     if (this.shellStream && this.connected) {
-      this.shellStream.write(data);
+      try {
+        this.shellStream.write(data);
+      } catch (e) {
+        console.error('Error writing to SSH terminal stream:', e);
+      }
     }
   }
 
@@ -123,6 +169,7 @@ class SSHTerminalService {
     this.shellStream = null;
     this.sshClient = null;
     this.connected = false;
+    this.ipcWindow = null;
   }
 }
 

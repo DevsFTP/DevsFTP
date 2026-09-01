@@ -349,17 +349,17 @@ window.DirectoryCompare = {
         const isDiff = status !== 'identical';
         const chkAttr = isDiff ? 'checked' : '';
 
-        // Left column: Local File Info (Name + size + date inline with ellipsis)
+        // Left column: Local File Info (Name + date below)
         let localHtml = '';
+        let localSizeHtml = '<span class="compare-empty-cell">--</span>';
         if (loc) {
           const icon = loc.isDir ? '📁' : '📄';
-          const sizeDisplay = loc.isDir ? '' : ` (${this.formatBytes(loc.size)})`;
+          localSizeHtml = loc.isDir ? '--' : this.formatBytes(loc.size);
           localHtml = `
             <div style="display: flex; flex-direction: column; width: 100%; overflow: hidden;">
               <div style="display: flex; align-items: center; gap: 8px; width: 100%; overflow: hidden;">
                 <span class="file-icon" style="flex-shrink: 0;">${icon}</span>
                 <span style="${loc.isDir ? 'font-weight: 600;' : ''} text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex: 1; min-width: 0;" title="${name}">${name}</span>
-                ${loc.isDir ? '' : `<span class="compare-file-size" style="margin-left: auto; flex-shrink: 0;">${sizeDisplay}</span>`}
               </div>
               <div style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 24px; margin-top: 1px; font-family: var(--font-mono); flex-shrink: 0;">
                 ${this.formatTime(loc.mtime)}
@@ -370,17 +370,17 @@ window.DirectoryCompare = {
           localHtml = `<span class="compare-empty-cell" style="margin-left: 24px;">--</span>`;
         }
 
-        // Right column: Remote File Info (Name + size + date inline with ellipsis)
+        // Right column: Remote File Info (Name + date below)
         let remoteHtml = '';
+        let remoteSizeHtml = '<span class="compare-empty-cell">--</span>';
         if (rem) {
           const icon = rem.isDir ? '📁' : '📄';
-          const sizeDisplay = rem.isDir ? '' : ` (${this.formatBytes(rem.size)})`;
+          remoteSizeHtml = rem.isDir ? '--' : this.formatBytes(rem.size);
           remoteHtml = `
             <div style="display: flex; flex-direction: column; width: 100%; overflow: hidden;">
               <div style="display: flex; align-items: center; gap: 8px; width: 100%; overflow: hidden;">
                 <span class="file-icon" style="flex-shrink: 0;">${icon}</span>
                 <span style="${rem.isDir ? 'font-weight: 600;' : ''} text-overflow: ellipsis; overflow: hidden; white-space: nowrap; flex: 1; min-width: 0;" title="${name}">${name}</span>
-                ${rem.isDir ? '' : `<span class="compare-file-size" style="margin-left: auto; flex-shrink: 0;">${sizeDisplay}</span>`}
               </div>
               <div style="font-size: 10px; color: hsl(var(--text-muted)); margin-left: 24px; margin-top: 1px; font-family: var(--font-mono); flex-shrink: 0;">
                 ${this.formatTime(rem.mtime)}
@@ -418,25 +418,9 @@ window.DirectoryCompare = {
           badgeText = 'Size Mismatch';
         }
 
-        // Render middle cell components in 3 fixed-width flex columns to align vertically
-        const escName = name.replace(/'/g, "\\'");
-        const leftBtn = (isDiff && loc) ? `<button class="btn btn-qaction" onclick="window.DirectoryCompare.syncSingle('${escName}', 'upload')" title="Upload (➔)">➔</button>` : '';
-        const rightBtn = (isDiff && rem) ? `<button class="btn btn-qaction" onclick="window.DirectoryCompare.syncSingle('${escName}', 'download')" title="Download (🠔)">🠔</button>` : '';
-
         const middleHtml = `
-          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
-            <!-- Slot 1: Upload Arrow -->
-            <div style="width: 24px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
-              ${leftBtn}
-            </div>
-            <!-- Slot 2: Status Badge -->
-            <div style="width: 110px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
-              <span class="tag-badge" style="background-color: ${badgeBg}; color: ${badgeColor}; font-weight: 600; font-size: 10px; margin: 0; padding: 2px 6px; white-space: nowrap; line-height: 1.2; text-align: center; width: 100%; box-sizing: border-box;">${badgeText}</span>
-            </div>
-            <!-- Slot 3: Download Arrow -->
-            <div style="width: 24px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
-              ${rightBtn}
-            </div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 100%;">
+            <span class="tag-badge" style="background-color: ${badgeBg}; color: ${badgeColor}; font-weight: 600; font-size: 10px; margin: 0; padding: 3px 8px; white-space: nowrap; line-height: 1.2; text-align: center; box-sizing: border-box;">${badgeText}</span>
           </div>
         `;
 
@@ -445,15 +429,17 @@ window.DirectoryCompare = {
             <input type="checkbox" class="dir-compare-chk" data-name="${name}" data-status="${status}" ${chkAttr} style="cursor: pointer; margin: 0;">
           </td>
           <td class="file-name-cell">${localHtml}</td>
+          <td style="font-size: 11px; font-family: var(--font-mono); text-align: left; vertical-align: middle;">${localSizeHtml}</td>
           <td style="text-align: center; vertical-align: middle; padding: 6px 12px;">${middleHtml}</td>
           <td class="file-name-cell">${remoteHtml}</td>
+          <td style="font-size: 11px; font-family: var(--font-mono); text-align: left; vertical-align: middle;">${remoteSizeHtml}</td>
         `;
 
         tbody.appendChild(tr);
       });
 
       if (rowsRendered === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">No files match the selected filter.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">No files match the selected filter.</td></tr>`;
       }
     }
 

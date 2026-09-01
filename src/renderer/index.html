@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DevsFTP — The SFTP & FTP Client for Windows</title>
+  <title>DevsFTP</title>
   <link rel="icon" type="image/svg+xml" href="../../assets/icon.svg">
   <link rel="stylesheet" href="styles/main.css?v=20260812004200">
   <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css">
@@ -23,15 +23,30 @@
         </div>
       </div>
 
-      <button class="menu-item-btn" id="menu-settings-btn">Settings</button>
+      <div class="menu-item-dropdown" id="menu-settings">
+        <button class="menu-item-btn">Settings</button>
+        <div class="menu-dropdown-content">
+          <div class="dropdown-action" id="menu-settings-general">⚙️ General Settings</div>
+          <div class="dropdown-action" id="menu-settings-notifications">🔔 Notifications</div>
+          <div class="dropdown-action" id="menu-settings-workspace">🖥️ Workspace</div>
+          <div class="dropdown-action" id="menu-settings-terminal">💻 SSH Terminal</div>
+          <div class="dropdown-action" id="menu-settings-transfers">📊 Transfers</div>
+          <div class="dropdown-action" id="menu-settings-security">🔐 Security</div>
+        </div>
+      </div>
 
       <div class="menu-item-dropdown" id="menu-tools">
         <button class="menu-item-btn">Tools</button>
         <div class="menu-dropdown-content">
+          <div class="dropdown-action" id="menu-tools-notifications">🔔 Notifications...</div>
+          <div class="dropdown-action" id="menu-tools-pending-edits">📝 Pending Local Edits...</div>
+          <div class="dropdown-action" id="menu-tools-dir-compare">🔍 Directory Compare...</div>
+          <div class="dropdown-action" id="menu-tools-bookmarks-manager">⭐ Bookmarks Manager...</div>
+          <div class="dropdown-divider"></div>
           <div class="dropdown-action" id="menu-tools-cache">🧹 Clear Temp Cache...</div>
           <div class="dropdown-divider"></div>
-          <div class="dropdown-action" id="menu-tools-export">📤 Export Profiles (JSON)</div>
-          <div class="dropdown-action" id="menu-tools-import">📥 Import Profiles (JSON)</div>
+          <div class="dropdown-action" id="menu-tools-export-bundle">📦 Export...</div>
+          <div class="dropdown-action" id="menu-tools-import-bundle">📥 Import...</div>
         </div>
       </div>
 
@@ -85,11 +100,21 @@
         </span>
       </div>
 
-      <div class="connection-toolbar">
-        <button id="btn-dir-compare" class="btn" title="Compare active local and remote directory contents">🔍 Compare</button>
-        <button id="btn-header-new-session" class="btn">⚡ New Session</button>
-        <button id="btn-open-preferences" class="btn">⚙️ Settings</button>
-        <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙</button>
+      <div class="connection-toolbar" id="connection-toolbar">
+        <div class="toolbar-sliding-content collapsed" id="toolbar-sliding-content">
+          <button id="btn-pending-edits" class="btn" title="View and manage pending local file edits" style="display: inline-flex; align-items: center; gap: 5px;">📝 Pending Edits <span id="pending-edits-count-badge" style="display: none; background: #68a063; color: #052E16; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px;">0</span></button>
+          <button id="btn-dir-compare" class="btn" title="Compare active local and remote directory contents">🔍 Compare</button>
+          <button id="btn-header-global-bookmarks" class="btn" title="View and manage Global Bookmarks">🔖 Bookmarks</button>
+          <button id="btn-header-new-session" class="btn">⚡ New Session</button>
+          <button id="btn-open-preferences" class="btn">⚙️ Settings</button>
+          <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light/Dark Theme">🌙</button>
+        </div>
+        <button id="btn-header-toggle-toolbar" class="btn header-panel-toggle-btn" title="Toggle Header Action Toolbar (Slide Left/Right)" style="padding: 5px 9px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; flex-shrink: 0;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="panel-icon-svg">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="15" y1="3" x2="15" y2="21"></line>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -104,7 +129,7 @@
     <main class="workspace-main" id="workspace-main">
       
       <!-- Local File System Pane -->
-      <section class="file-pane" id="local-pane">
+      <section class="file-pane" id="local-pane" style="position: relative; overflow: hidden;">
         <div class="pane-header">
           <div class="pane-title-group">
             <span>💻 Local System</span>
@@ -112,7 +137,12 @@
               <option value="C:\">C:\ Drive</option>
             </select>
           </div>
-          <button id="btn-local-refresh" class="btn" style="padding: 2px 8px; font-size: 11px;">🔄 Refresh</button>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            <button id="btn-local-home" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Navigate to Home Directory">🏠 Home</button>
+            <button id="btn-local-root" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Navigate to System Drive Root (C:\)">⚡ Root</button>
+            <button id="btn-local-refresh" class="btn" style="padding: 2px 8px; font-size: 11px;">🔄 Refresh</button>
+            <button id="btn-local-bookmarks" class="btn" style="padding: 2px 8px; font-size: 11px;" title="View Local Bookmarks">🔖 Bookmarks</button>
+          </div>
         </div>
 
         <div class="breadcrumb-bar">
@@ -128,8 +158,8 @@
           <table class="file-table" id="local-file-table">
             <thead>
               <tr>
-                <th style="width: 50%;" class="sortable-header" data-sort-key="name" data-pane="local">Name <span class="sort-arrow"></span></th>
-                <th style="width: 25%;" class="sortable-header" data-sort-key="size" data-pane="local">Size <span class="sort-arrow"></span></th>
+                <th style="width: 50%;" class="sortable-header" data-sort-key="name" data-pane="local">Name <span class="sort-arrow"></span><div class="col-resizer"></div></th>
+                <th style="width: 25%;" class="sortable-header" data-sort-key="size" data-pane="local">Size <span class="sort-arrow"></span><div class="col-resizer"></div></th>
                 <th style="width: 25%;" class="sortable-header" data-sort-key="modified" data-pane="local">Modified <span class="sort-arrow"></span></th>
               </tr>
             </thead>
@@ -138,17 +168,36 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Local Bookmarks Drawer Panel (Nested in Local Pane) -->
+        <div id="local-bookmarks-drawer" class="bookmark-drawer-panel" aria-hidden="true">
+          <div class="bookmark-drawer-card">
+            <div class="bookmark-drawer-header">
+              <span class="bookmark-drawer-title">🔖 Local Bookmarks</span>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button id="btn-add-local-bookmark" class="btn btn-sm btn-primary" title="Add Current Local Directory to Local Bookmarks">+ Add Current Folder</button>
+                <button id="btn-close-local-bookmarks" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+              </div>
+            </div>
+            <div class="bookmark-drawer-body" id="local-bookmarks-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Remote File System Pane -->
-      <section class="file-pane" id="remote-pane">
+      <section class="file-pane" id="remote-pane" style="position: relative; overflow: hidden;">
         <div class="pane-header">
           <div class="pane-title-group">
             <span>🌐 Remote Server</span>
             <span id="remote-tag" class="tag-badge" style="display: none;">SFTP</span>
           </div>
           <div style="display: flex; gap: 4px; align-items: center;">
+            <button id="btn-remote-home" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Navigate to Home Directory (~)">🏠 Home</button>
+            <button id="btn-remote-root" class="btn" style="padding: 2px 8px; font-size: 11px;" title="Navigate to Server Root (/)">⚡ Root</button>
             <button id="btn-remote-refresh" class="btn" style="padding: 2px 8px; font-size: 11px;">🔄 Refresh</button>
+            <button id="btn-remote-bookmarks" class="btn" style="padding: 2px 8px; font-size: 11px;" title="View Profile Bookmarks">🔖 Bookmarks</button>
             <button id="btn-remote-disconnect" class="btn" style="padding: 2px 8px; font-size: 11px; display: none;">🔌 Disconnect</button>
             <button id="btn-remote-reconnect" class="btn" style="padding: 2px 8px; font-size: 11px; display: none;">🔌 Connect</button>
           </div>
@@ -167,9 +216,9 @@
           <table class="file-table" id="remote-file-table">
             <thead>
               <tr>
-                <th style="width: 40%;" class="sortable-header" data-sort-key="name" data-pane="remote">Name <span class="sort-arrow"></span></th>
-                <th style="width: 20%;" class="sortable-header" data-sort-key="size" data-pane="remote">Size <span class="sort-arrow"></span></th>
-                <th style="width: 20%;">Permissions</th>
+                <th style="width: 40%;" class="sortable-header" data-sort-key="name" data-pane="remote">Name <span class="sort-arrow"></span><div class="col-resizer"></div></th>
+                <th style="width: 20%;" class="sortable-header" data-sort-key="size" data-pane="remote">Size <span class="sort-arrow"></span><div class="col-resizer"></div></th>
+                <th style="width: 20%;">Permissions <div class="col-resizer"></div></th>
                 <th style="width: 20%;" class="sortable-header" data-sort-key="modified" data-pane="remote">Modified <span class="sort-arrow"></span></th>
               </tr>
             </thead>
@@ -177,6 +226,22 @@
               <tr><td colspan="4" style="text-align: center; color: hsl(var(--text-muted)); padding: 24px;">Select a profile and click Connect.</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Profile Bookmarks Drawer Panel (Nested in Remote Pane) -->
+        <div id="profile-bookmarks-drawer" class="bookmark-drawer-panel" aria-hidden="true">
+          <div class="bookmark-drawer-card">
+            <div class="bookmark-drawer-header">
+              <span class="bookmark-drawer-title" id="profile-bookmarks-title">🔖 Profile Bookmarks</span>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button id="btn-add-profile-bookmark" class="btn btn-sm btn-primary" title="Add Current Remote Directory to Profile Bookmarks">+ Add Current Folder</button>
+                <button id="btn-close-profile-bookmarks" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+              </div>
+            </div>
+            <div class="bookmark-drawer-body" id="profile-bookmarks-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
         </div>
       </section>
 
@@ -216,7 +281,33 @@
               <button id="btn-queue-resume-all" class="btn" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">▶️ Resume All</button>
               <button id="btn-queue-cancel-all" class="btn btn-danger" style="padding: 3px 10px; font-size: 11px; font-weight: 600;">⏹️ Cancel All</button>
             </div>
-            <div style="display: flex; gap: 6px; align-items: center;">
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">
+                <span>⚡ Max Parallel:</span>
+                <select id="queue-max-concurrency" class="compare-select" style="padding: 2px 6px; font-size: 11px;">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="8">8</option>
+                  <option value="10">10</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: hsl(var(--text-muted)); font-weight: 600;">
+                <span>🚀 Speed Limit:</span>
+                <select id="queue-speed-limit" class="compare-select" style="padding: 2px 6px; font-size: 11px;">
+                  <option value="0" selected>Unlimited</option>
+                  <option value="256">256 KB/s</option>
+                  <option value="500">500 KB/s</option>
+                  <option value="1024">1 MB/s</option>
+                  <option value="2048">2 MB/s</option>
+                  <option value="5120">5 MB/s</option>
+                  <option value="10240">10 MB/s</option>
+                </select>
+              </div>
+
               <button id="btn-clear-queue" class="btn" style="padding: 3px 10px; font-size: 11px;">🧹 Clear Completed</button>
             </div>
           </div>
@@ -373,6 +464,7 @@
     <div class="context-menu-item" id="ctx-open">📂 Open</div>
     <div class="context-menu-item" id="ctx-edit">📝 Edit in Default Editor</div>
     <div class="context-menu-item" id="ctx-download">⬇️ Download</div>
+    <div class="context-menu-item" id="ctx-download-as">📥 Download As...</div>
     <div class="context-menu-item" id="ctx-upload">⬆️ Upload</div>
     <div class="context-menu-item" id="ctx-rename">✏️ Rename</div>
     <div class="context-menu-item" id="ctx-delete" style="color: hsl(var(--status-danger));">🗑 Delete</div>
@@ -385,6 +477,37 @@
     <div class="context-menu-item" id="ctx-chmod">🔑 Permissions (chmod)</div>
 
     <div class="context-menu-separator" style="height: 1px; background-color: hsl(var(--border-subtle)); margin: 4px 0;"></div>
+
+    <!-- Group: Sort By -->
+    <div class="context-menu-item trigger-submenu" id="ctx-group-sort">
+      <span>🔀 Sort By</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu">
+        <div class="context-menu-item" id="ctx-sort-name">🔤 Name</div>
+        <div class="context-menu-item" id="ctx-sort-size">📏 Size</div>
+        <div class="context-menu-item" id="ctx-sort-date">🕒 Date Modified</div>
+        <div class="context-menu-item" id="ctx-sort-type">📁 Type</div>
+      </div>
+    </div>
+
+    <!-- Group: Bookmark -->
+    <div class="context-menu-item trigger-submenu" id="ctx-group-bookmark">
+      <span>🔖 Bookmark</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu">
+        <div class="context-menu-item" id="ctx-bookmark-add">⭐ Add</div>
+        <div class="context-menu-item" id="ctx-bookmark-remove" style="color: hsl(var(--status-danger));">🗑️ Remove</div>
+      </div>
+    </div>
+
+    <!-- Group: Remote-to-Remote Transfer -->
+    <div class="context-menu-item trigger-submenu" id="ctx-group-remote-transfer">
+      <span>🌐 Transfer to Remote</span>
+      <span style="margin-left: auto; font-size: 9px; opacity: 0.7;">❯</span>
+      <div class="context-submenu" id="ctx-remote-transfer-submenu">
+        <div class="context-menu-item disabled">No other server profiles</div>
+      </div>
+    </div>
 
     <!-- Group: Organize -->
     <div class="context-menu-item trigger-submenu" id="ctx-group-organize">
@@ -409,6 +532,9 @@
         <div class="context-menu-item" id="ssh-cmd-du">💾 Folder Size (du)</div>
       </div>
     </div>
+
+    <div class="context-menu-separator" style="height: 1px; background-color: hsl(var(--border-subtle)); margin: 4px 0;"></div>
+    <div class="context-menu-item" id="ctx-properties">ℹ️ Properties</div>
   </div>
 
   <!-- Queue Row Context Menu -->
@@ -1116,9 +1242,11 @@
             <thead style="position: sticky; top: 0; background: hsl(var(--bg-secondary)); z-index: 2;">
               <tr>
                 <th style="width: 36px; text-align: center; vertical-align: middle;"><input type="checkbox" id="dir-compare-select-all" checked title="Select / Deselect All" style="margin: 0; cursor: pointer;"></th>
-                <th style="width: 39%;">Local File</th>
-                <th style="width: 22%; text-align: center; vertical-align: middle;">Sync / Status</th>
-                <th style="width: 39%;">Remote File</th>
+                <th style="width: 28%;">Local File <div class="col-resizer"></div></th>
+                <th style="width: 14%;">Local Size <div class="col-resizer"></div></th>
+                <th style="width: 16%; text-align: center; vertical-align: middle;">Sync / Status <div class="col-resizer"></div></th>
+                <th style="width: 28%;">Remote File <div class="col-resizer"></div></th>
+                <th style="width: 14%;">Remote Size</th>
               </tr>
             </thead>
             <tbody id="dir-compare-modal-tbody">
@@ -1139,25 +1267,31 @@
   <!-- Batch Startup Background Upload Modal (#batch-upload-modal)               -->
   <!-- ========================================================================= -->
   <div id="batch-upload-modal" class="modal-overlay">
-    <div class="modal-card" style="width: 560px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+    <div class="modal-card" style="width: 480px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
       <div class="pref-modal-header">
-        <span class="modal-title" id="batch-upload-modal-title">⚡ Unsaved Remote Edits Detected</span>
+        <span class="modal-title" id="batch-upload-modal-title">⚡ Unsaved Remote Edits</span>
         <button id="btn-batch-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
       <div class="modal-body">
         <div class="detail-item" style="padding: 10px 14px;">
-          <span class="detail-label">Background Sync Summary</span>
-          <span class="detail-value" id="batch-upload-summary" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary)); font-family: var(--font-ui);">The following modified files were saved while DevsFTP was closed. Would you like to sync them back to their remote servers in the background?</span>
+          <span class="detail-label">Profiles & Pending Files</span>
+          <div id="batch-modal-file-list" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <!-- Populated dynamically with profile file counts -->
+          </div>
         </div>
 
-        <div id="batch-modal-file-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border: 1px solid hsl(var(--border-color)); border-radius: 6px; padding: 8px; background-color: hsl(var(--bg-primary));">
-          <!-- Populated dynamically -->
+        <div class="detail-item" style="padding: 10px 14px;">
+          <span class="detail-label">Summary</span>
+          <span class="detail-value" id="batch-upload-summary" style="font-size: 12px; line-height: 1.4; color: hsl(var(--text-secondary));">You have 1 pending file edit in the sync queue.</span>
         </div>
 
-        <div class="modal-footer">
-          <button id="btn-batch-modal-cancel" class="btn" style="padding: 8px 16px;">Cancel</button>
-          <button id="btn-batch-modal-confirm" class="btn btn-primary" style="padding: 8px 20px; font-weight: 600;">⚡ Upload All in Background</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button id="btn-batch-modal-cancel" class="btn" style="padding: 8px 16px;">Close</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-batch-modal-open-global" class="btn" style="padding: 8px 16px;">📂 Pending Edits Manager</button>
+            <button id="btn-batch-modal-confirm" class="btn btn-primary" style="padding: 8px 20px; font-weight: 600;">⚡ Upload All Now</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1368,8 +1502,11 @@
           <button class="pref-nav-btn active" data-section="general" id="nav-item-general">
             <span class="nav-icon">⚙️</span> General Settings
           </button>
+          <button class="pref-nav-btn" data-section="notifications" id="nav-item-notifications">
+            <span class="nav-icon">🔔</span> Notifications
+          </button>
           <button class="pref-nav-btn" data-section="workspace" id="nav-item-workspace">
-            <span class="nav-icon">🖥️</span> Workspace & Session
+            <span class="nav-icon">🖥️</span> Workspace
           </button>
           <button class="pref-nav-btn" data-section="terminal" id="nav-item-terminal">
             <span class="nav-icon">💻</span> SSH Terminal
@@ -1406,55 +1543,48 @@
 
               <div class="form-group" style="margin: 0;">
                 <select id="pref-theme" class="form-control" style="width: 100%;">
-                  <option value="dark" selected>Dark Mode (Charcoal Developer Palette)</option>
+                  <option value="system" selected>System Default (Follow OS Light/Dark Mode)</option>
+                  <option value="dark">Dark Mode (Charcoal Developer Palette)</option>
                   <option value="light">Light Mode</option>
                 </select>
               </div>
             </div>
 
-            <!-- Card 2: Desktop Notifications & Sound Alerts -->
+            <!-- Card 2: Window Close & System Tray Behavior -->
             <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 24px;">🔔</span>
+                  <span style="font-size: 24px;">📌</span>
                   <div>
-                    <div style="font-size: 13px; font-weight: 700;">Desktop System Notifications & Alerts</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Send native OS desktop notifications and play sound chimes when operations complete.</div>
+                    <div style="font-size: 13px; font-weight: 700;">Window Close & System Tray Behavior</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Configure what action is taken when clicking the window close (✕) button.</div>
                   </div>
                 </div>
-                <span id="general-notify-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+                <span id="close-behavior-badge" class="tag-badge badge-active">System Tray</span>
               </div>
 
-              <div style="display: flex; flex-direction: column; gap: 10px;">
-                <label class="upload-save-checkbox" style="cursor: pointer;">
-                  <input type="checkbox" id="pref-notify-transfers" checked>
-                  <span class="upload-save-checkbox-copy">
-                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Show Native OS Notifications on Completed Queue Transfers</span>
-                  </span>
-                </label>
-                <label class="upload-save-checkbox" style="cursor: pointer;">
-                  <input type="checkbox" id="pref-notify-chime" checked>
-                  <span class="upload-save-checkbox-copy">
-                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Play Notification Sound Chimes</span>
-                  </span>
-                </label>
+              <div class="form-group" style="margin: 0;">
+                <select id="pref-close-behavior" class="form-control" style="width: 100%;">
+                  <option value="tray" selected>Minimize to System Tray on window close (Keep running in background) (Default)</option>
+                  <option value="exit">Exit DevsFTP completely on window close</option>
+                </select>
               </div>
             </div>
 
-            <!-- Card 3: Automatic Updates & Startup -->
+            <!-- Card 3: Automatic Updates & Startup Release Checks (ALWAYS LAST IN GENERAL TAB) -->
             <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px;">
                   <span style="font-size: 24px;">🚀</span>
                   <div>
                     <div style="font-size: 13px; font-weight: 700;">Automatic Updates & Application Startup</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically check for DevsFTP software releases when launching the workspace.</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically check https://devsftp.com/version.json for software releases when launching the workspace.</div>
                   </div>
                 </div>
-                <span id="general-autoupdate-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+                <span id="general-autoupdate-badge" class="tag-badge badge-active">Active</span>
               </div>
 
-              <div class="form-group" style="margin: 0;">
+              <div style="display: flex; flex-direction: column; gap: 10px;">
                 <label class="upload-save-checkbox" style="cursor: pointer;">
                   <input type="checkbox" id="pref-autoupdate" checked>
                   <span class="upload-save-checkbox-copy">
@@ -1466,10 +1596,92 @@
 
           </div>
 
-          <!-- SECTION 2: Workspace & Session Restore -->
+          <!-- SECTION 2: Notifications -->
+          <div class="pref-section" id="pref-section-notifications">
+            <div class="pref-section-header">
+              <h3>Notification & Sound Settings</h3>
+            </div>
+
+            <!-- Card 1: Master Controls -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🔔</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Native OS Desktop Notifications & Alerts</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Global master controls and individual event toggles for native desktop toasts and audio chimes.</div>
+                  </div>
+                </div>
+                <span id="notif-master-badge" class="tag-badge badge-active">Active</span>
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 4px;">
+                <button id="btn-notif-enable-all" class="btn btn-sm btn-primary" style="font-size: 12px; padding: 5px 12px;">⚡ Enable All Notifications</button>
+                <button id="btn-notif-disable-all" class="btn btn-sm" style="font-size: 12px; padding: 5px 12px; background: hsl(var(--bg-surface)); border: 1px solid hsl(var(--border-color));">🚫 Disable All Notifications</button>
+              </div>
+            </div>
+
+            <!-- Card 2: Granular Category Checkboxes -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="font-size: 12px; font-weight: 700; color: hsl(var(--text-primary)); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 8px;">Individual Event Toggles</div>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-tray" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">System Tray Minimization Alert</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Show toast notification when DevsFTP is minimized to system tray.</span>
+                  </span>
+                </label>
+
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-file-save" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Live-Edit File Save Detection Alert</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Show toast notification when an opened remote file is saved in VS Code or external editor.</span>
+                  </span>
+                </label>
+
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-transfers" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Completed Queue Transfer Alert</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Show toast notification when file uploads/downloads complete.</span>
+                  </span>
+                </label>
+
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-jobs" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Scheduled Sync Job Completion Alert</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Show toast notification when automated background sync jobs finish.</span>
+                  </span>
+                </label>
+
+                <label class="upload-save-checkbox" style="cursor: pointer;">
+                  <input type="checkbox" id="pref-notify-reconnect" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Session Reconnect & Network Warning Alert</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Show toast notification when connections drop or auto-reconnect cleanly.</span>
+                  </span>
+                </label>
+
+                <label class="upload-save-checkbox" style="cursor: pointer; border-top: 1px solid hsl(var(--border-subtle)); padding-top: 10px;">
+                  <input type="checkbox" id="pref-notify-chime" checked>
+                  <span class="upload-save-checkbox-copy">
+                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Notification Sound Chimes</span>
+                    <span style="font-size: 11px; color: hsl(var(--text-muted)); display: block;">Play pleasant audio chime when notifications trigger.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- SECTION 2: Workspace -->
           <div class="pref-section" id="pref-section-workspace">
             <div class="pref-section-header">
-              <h3>Workspace & Session Restore Settings</h3>
+              <h3>Workspace Settings</h3>
             </div>
 
             <!-- Card 1: Restore Connection Tabs -->
@@ -1518,49 +1730,8 @@
               </div>
             </div>
 
-            <!-- Card 3: Saved Workspace Session Storage -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 24px;">🧹</span>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700;">Saved Workspace Session Storage</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears all saved session restoration data from local storage.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
-                <button id="btn-clear-saved-sessions" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Saved Sessions Storage</button>
-                <span id="clear-sessions-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Saved session storage cleared!</span>
-              </div>
-            </div>
-
-            <!-- Card 4: Automatic Update Availability Check -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 24px;">🔄</span>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700;">Automatic Update Availability Check</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Automatically checks https://devsftp.com/version.json on launch to notify you when a new version is available. DevsFTP never downloads or installs software in the background without your explicit consent.</div>
-                  </div>
-                </div>
-                <span id="update-check-pref-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
-              </div>
-
-              <div class="form-group" style="margin: 0;">
-                <label class="upload-save-checkbox" style="cursor: pointer;">
-                  <input type="checkbox" id="pref-auto-check-updates" checked>
-                  <span class="upload-save-checkbox-copy">
-                    <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Check for new version availability on launch</span>
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Card 5: Automatic Directory Size Calculation -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+            <!-- Card 3: Automatic Directory Size Calculation -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
               <div style="display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 24px;">📊</span>
                 <div>
@@ -1576,6 +1747,42 @@
                     <span class="upload-save-checkbox-title" style="font-size: 12px; font-weight: 600;">Automatically calculate folder sizes in background</span>
                   </span>
                 </label>
+              </div>
+            </div>
+
+            <!-- Card 4: Local Remote-File Cache & Storage Cleanup -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🧹</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Local Remote-File Cache & Storage</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears cached temporary local copies of remote files edited in external desktop applications.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                <button id="btn-tools-cache-clear" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
+                <span id="clear-cache-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Local file cache cleared!</span>
+              </div>
+            </div>
+
+            <!-- Card 5: Saved Workspace Session Storage (Final Option) -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🗑️</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Saved Workspace Session Storage</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears all saved session restoration data from local storage.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                <button id="btn-clear-saved-sessions" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Saved Sessions Storage</button>
+                <span id="clear-sessions-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Saved session storage cleared!</span>
               </div>
             </div>
 
@@ -1725,6 +1932,47 @@
               </div>
             </div>
 
+            <!-- Card 3: Transfer Queue Speed Limiter & Concurrency -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">🚀</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Transfer Queue Speed Limiter & Concurrency</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Configure maximum parallel file transfers and bandwidth rate limiting.</div>
+                  </div>
+                </div>
+                <span id="bandwidth-limits-badge" class="tag-badge" style="background: rgba(16, 185, 129, 0.2); color: #34D399; font-weight: 600;">Active</span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px;">
+                <div class="form-group" style="margin: 0;">
+                  <label class="form-label" for="pref-max-concurrency" style="font-size: 11px; font-weight: 600;">Max Parallel Transfers</label>
+                  <select id="pref-max-concurrency" class="form-control" style="width: 100%; font-size: 12px;">
+                    <option value="1">1 Parallel Transfer</option>
+                    <option value="2">2 Parallel Transfers</option>
+                    <option value="3" selected>3 Parallel Transfers (Default)</option>
+                    <option value="4">4 Parallel Transfers</option>
+                    <option value="5">5 Parallel Transfers</option>
+                    <option value="8">8 Parallel Transfers</option>
+                    <option value="10">10 Parallel Transfers</option>
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label class="form-label" for="pref-speed-limit" style="font-size: 11px; font-weight: 600;">Bandwidth Speed Limit</label>
+                  <select id="pref-speed-limit" class="form-control" style="width: 100%; font-size: 12px;">
+                    <option value="0" selected>Unlimited Bandwidth</option>
+                    <option value="256">256 KB/s</option>
+                    <option value="500">500 KB/s</option>
+                    <option value="1024">1 MB/s (1024 KB/s)</option>
+                    <option value="2048">2 MB/s (2048 KB/s)</option>
+                    <option value="5120">5 MB/s (5120 KB/s)</option>
+                    <option value="10240">10 MB/s (10240 KB/s)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- Card 4: Smart Exclusion Rules & Ignore Filters -->
             <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1751,7 +1999,7 @@
 
                 <div style="margin-top: 4px;">
                   <label class="form-label" for="pref-exclusion-patterns" style="font-size: 11px; font-weight: 700; color: hsl(var(--text-muted)); text-transform: uppercase;">Excluded Patterns (One per line)</label>
-                  <textarea id="pref-exclusion-patterns" class="form-control" rows="4" style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;" placeholder=".git&#10;.gitignore&#10;node_modules&#10;.env&#10;vendor&#10;.DS_Store&#10;Thumbs.db&#10;*.tmp&#10;*.log"></textarea>
+                  <textarea id="pref-exclusion-patterns" class="form-control" style="width: 100%; height: 95px; max-height: 95px; font-family: var(--font-mono); font-size: 11px; line-height: 1.5; overflow-y: auto; resize: none;" placeholder=".git&#10;.gitignore&#10;node_modules&#10;.env&#10;vendor&#10;.DS_Store&#10;Thumbs.db&#10;*.tmp&#10;*.log"></textarea>
                 </div>
                 <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px;">
                   <button id="btn-save-exclusion-rules" class="btn btn-primary" style="padding: 5px 14px; font-size: 11px; font-weight: 600;">⚡ Save Exclusion Settings</button>
@@ -1793,25 +2041,7 @@
               </div>
             </div>
 
-            <!-- Card 2: Local Remote-File Cache & Privacy -->
-            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <span style="font-size: 24px;">🧹</span>
-                  <div>
-                    <div style="font-size: 13px; font-weight: 700;">Local Remote-File Cache & Storage</div>
-                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Clears cached temporary local copies of remote files edited in external desktop applications.</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
-                <button id="btn-tools-cache-clear" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">🧹 Clear Local Remote-File Cache</button>
-                <span id="clear-cache-msg" style="font-size: 11px; color: #68a063; display: none; font-weight: 600;">✓ Local file cache cleared!</span>
-              </div>
-            </div>
-
-            <!-- Card 3: SSH Host Key & Fingerprint Verification -->
+            <!-- Card 2: SSH Host Key & Fingerprint Verification -->
             <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -1824,12 +2054,30 @@
               </div>
             </div>
 
+            <!-- Card 3: Unified Workspace Backup & Restore Package -->
+            <div style="border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 16px; background: hsl(var(--bg-primary)); display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 24px;">📦</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 700;">Unified Workspace Backup & Restore Package</div>
+                    <div style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">Export or restore server profiles, 3-layer bookmarks, workspace preferences, and scheduled jobs in a single <code>.json</code> package.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 4px;">
+                <button id="btn-settings-export-bundle" class="btn btn-primary" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">📦 Export Workspace Package (JSON)</button>
+                <button id="btn-settings-import-bundle" class="btn" style="padding: 6px 14px; font-size: 11px; font-weight: 600;">📥 Import Workspace Package (JSON)</button>
+              </div>
+            </div>
+
           </div>
 
           <!-- SECTION 6: About -->
           <div class="pref-section" id="pref-section-about">
             <div style="text-align: center; padding: 12px 0; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-              <div class="brand-logo" style="width: 56px; height: 56px; margin: 0 auto; border-radius: 14px;">
+              <div class="brand-logo" style="width: 56px; height: 56px; margin: 0 auto; background: transparent; border: none;">
                 <svg width="36" height="36" viewBox="0 0 512 512" fill="none" class="devsftp-logo-svg">
                   <!-- Connection Bridge & Remote Node (BEHIND D) -->
                   <path d="M150 256H426" class="logo-node-accent" stroke-width="18" stroke-linecap="round"/>
@@ -1844,7 +2092,7 @@
               </div>
               <div>
                 <h2 style="font-size: 22px; font-weight: 700; margin-top: 4px;">DevsFTP</h2>
-                <p style="font-size: 13px; color: var(--accent-primary-hex, #68a063); font-weight: 600; margin-top: 2px;">v1.0.0 (Production Release)</p>
+                <p style="font-size: 13px; color: var(--accent-primary-hex, #68a063); font-weight: 600; margin-top: 2px;">v1.0.1 (Production Release)</p>
               </div>
 
               <p style="font-size: 12px; color: hsl(var(--text-secondary)); max-width: 440px; margin: 0 auto; line-height: 1.5;">
@@ -2046,40 +2294,159 @@
   <!-- Upload Confirmation Dialog (Theme-Aware Live Edit Prompt)                 -->
   <!-- ========================================================================= -->
   <div id="upload-save-modal" class="modal-overlay upload-save-modal" aria-hidden="true">
-    <div class="modal-card upload-save-card" role="dialog" aria-modal="true" aria-labelledby="upload-save-modal-title">
-      <div class="upload-save-header">
-          <div class="upload-save-headline">
-            <div class="upload-save-icon" aria-hidden="true">⬆</div>
-            <div class="upload-save-title-group">
-              <div class="modal-title" id="upload-save-modal-title">Upload Saved Changes?</div>
-            </div>
-          </div>
+    <div class="modal-card upload-save-card" role="dialog" aria-modal="true" aria-labelledby="upload-save-modal-title" style="width: 500px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="upload-save-modal-title">⚡ Local File Edit Detected</span>
         <button id="btn-upload-save-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
       </div>
 
-      <div class="upload-save-body">
-        <div class="upload-save-details">
-          <div class="upload-save-row">
-            <span class="upload-save-label">File</span>
-            <span class="upload-save-value" id="upload-save-modal-file">cached file</span>
+      <div class="modal-body" style="padding: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #38BDF8; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>📝</span> <span>Hey! You modified a cached local file:</span>
+        </div>
+
+        <!-- Target Item File Card -->
+        <div class="detail-item" style="padding: 10px 14px; margin-bottom: 14px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+            <span style="font-weight: 700; color: hsl(var(--text-primary)); font-size: 13px;" id="upload-save-modal-file">cached_file.ext</span>
+            <span style="font-size: 10px; padding: 2px 8px; border-radius: 12px; background: hsl(var(--bg-tertiary)); color: hsl(var(--accent-color)); font-weight: 600;" id="upload-save-modal-profile">Connection</span>
           </div>
-          <div class="upload-save-row">
-            <span class="upload-save-label">Remote Path</span>
-            <span class="upload-save-value" id="upload-save-modal-remote">/</span>
+          <div style="font-size: 11px; font-family: var(--font-mono); color: hsl(var(--text-muted)); word-break: break-all;">
+            <strong>Remote Path:</strong> <span id="upload-save-modal-remote">/path/to/remote</span>
           </div>
         </div>
 
-        <label class="upload-save-checkbox">
+        <p style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.4; margin: 0 0 12px 0;">
+          Choose an action for this saved file. If saved to queue, you can retrieve and sync it anytime from the top navigation bar.
+        </p>
+
+        <label class="upload-save-checkbox" style="margin-bottom: 0;">
           <input type="checkbox" id="upload-save-modal-dont-show-again">
           <span class="upload-save-checkbox-copy">
-            <span class="upload-save-checkbox-title">Don't show this again</span>
+            <span class="upload-save-checkbox-title" style="font-size: 11px;">Automatically upload future edits during this session</span>
           </span>
         </label>
       </div>
 
-      <div class="modal-footer upload-save-footer">
-        <button id="btn-upload-save-cancel" class="btn" type="button">Not Now</button>
-        <button id="btn-upload-save-confirm" class="btn btn-primary" type="button">Upload Changes</button>
+      <div class="modal-footer" style="padding: 12px 16px; display: flex; justify-content: space-between; border-top: 1px solid hsl(var(--border-color)); flex-wrap: wrap; gap: 8px;">
+        <button id="btn-upload-save-discard" class="btn" type="button" style="color: #F87171; border-color: rgba(248,113,113,0.3);">🗑️ Discard Changes</button>
+        <div style="display: flex; gap: 8px;">
+          <button id="btn-upload-save-cancel" class="btn" type="button">⏳ Save to Queue</button>
+          <button id="btn-upload-save-confirm" class="btn btn-primary" type="button" style="font-weight: 600;">⚡ Upload & Sync</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Global Bookmarks Manager Modal (#global-bookmarks-modal)                  -->
+  <!-- ========================================================================= -->
+  <div id="global-bookmarks-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 920px; max-width: 95vw; height: 600px; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color)); display: flex; flex-direction: column;">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="global-bookmarks-modal-title">🔖 Global Bookmarks Manager</span>
+        <button id="btn-global-bookmarks-modal-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="height: calc(600px - 42px); display: flex; flex-direction: column; gap: 8px; padding: 12px; box-sizing: border-box; overflow: hidden;">
+        <div class="compare-toolbar">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 11px; font-weight: 600; color: hsl(var(--text-muted));">Filter:</span>
+            <select id="global-bookmarks-type-filter" class="compare-select">
+              <option value="all" selected>All Bookmark Types</option>
+              <option value="local">💻 Local System</option>
+              <option value="remote">🌐 Remote Servers</option>
+            </select>
+            <select id="global-bookmarks-profile-filter" class="compare-select">
+              <option value="all" selected>All Server Profiles</option>
+            </select>
+            <input type="text" id="global-bookmarks-search" class="search-input" placeholder="🔍 Search bookmarks..." style="width: 180px; font-size: 11px;">
+          </div>
+          <div id="global-bookmarks-summary" style="display: flex; gap: 12px; font-size: 11px; font-weight: 600;">
+            <!-- Summary inserted dynamically -->
+          </div>
+        </div>
+
+        <div class="file-list-container" style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; background-color: hsl(var(--bg-surface)); flex: 1; overflow-y: auto;">
+          <table class="file-table" style="margin: 0; table-layout: fixed; width: 100%;">
+            <thead style="position: sticky; top: 0; background: hsl(var(--bg-secondary)); z-index: 2;">
+              <tr>
+                <th style="width: 36px; text-align: center; vertical-align: middle;"><input type="checkbox" id="global-bookmarks-select-all" checked title="Select / Deselect All" style="margin: 0; cursor: pointer;"></th>
+                <th style="width: 30%;">Bookmark Name <div class="col-resizer"></div></th>
+                <th style="width: 22%;">Profile <div class="col-resizer"></div></th>
+                <th style="width: 28%;">Target Path <div class="col-resizer"></div></th>
+                <th style="width: 20%; text-align: center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="global-bookmarks-modal-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid hsl(var(--border-subtle)); display: flex; justify-content: space-between; align-items: center;">
+          <button id="btn-global-bookmarks-delete-selected" class="btn btn-danger" style="padding: 8px 16px;">🗑️ Discard Checked</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-add-global-local-folder" class="btn" style="padding: 8px 16px;" title="Add Current Local Folder">+ Add Local Folder</button>
+            <button id="btn-add-global-remote-folder" class="btn" style="padding: 8px 16px;" title="Add Current Remote Folder">+ Add Remote Folder</button>
+            <button id="btn-global-bookmarks-cancel" class="btn" style="padding: 8px 16px;">✕ Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- Pending Edits Manager Modal (#pending-edits-modal)                        -->
+  <!-- ========================================================================= -->
+  <div id="pending-edits-modal" class="modal-overlay">
+    <div class="modal-card" style="width: 920px; max-width: 95vw; height: 600px; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color)); display: flex; flex-direction: column;">
+      <div class="pref-modal-header">
+        <span class="modal-title" id="pending-edits-modal-title">✏️ Pending Remote Edits Manager</span>
+        <button id="btn-pending-edits-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="height: calc(600px - 42px); display: flex; flex-direction: column; gap: 8px; padding: 12px; box-sizing: border-box; overflow: hidden;">
+        <div class="compare-toolbar">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="font-size: 11px; font-weight: 600; color: hsl(var(--text-muted));">Filter:</span>
+            <select id="pending-edits-filter-select" class="compare-select">
+              <option value="all" selected>All Pending Files</option>
+              <option value="modified_today">Modified Today</option>
+            </select>
+            <select id="pending-edits-profile-filter" class="compare-select">
+              <option value="all" selected>All Server Profiles</option>
+            </select>
+          </div>
+          <div id="pending-edits-summary" style="display: flex; gap: 12px; font-size: 11px;">
+            <!-- Summary details dynamically inserted -->
+          </div>
+        </div>
+
+        <div class="file-list-container" style="border: 1px solid hsl(var(--border-color)); border-radius: 6px; background-color: hsl(var(--bg-surface)); flex: 1; overflow-y: auto;">
+          <table class="file-table" style="margin: 0; table-layout: fixed; width: 100%;">
+            <thead style="position: sticky; top: 0; background: hsl(var(--bg-secondary)); z-index: 2;">
+              <tr>
+                <th style="width: 36px; text-align: center; vertical-align: middle;"><input type="checkbox" id="pending-edits-select-all" checked title="Select / Deselect All" style="margin: 0; cursor: pointer;"></th>
+                <th style="width: 30%;">File <div class="col-resizer"></div></th>
+                <th style="width: 22%;">Profile <div class="col-resizer"></div></th>
+                <th style="width: 28%;">Target <div class="col-resizer"></div></th>
+                <th style="width: 20%; text-align: center;">Date</th>
+              </tr>
+            </thead>
+            <tbody id="pending-edits-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid hsl(var(--border-subtle)); display: flex; justify-content: space-between; align-items: center;">
+          <button id="btn-pending-edits-discard-all" class="btn btn-danger" style="padding: 8px 16px;">🗑️ Discard Checked</button>
+          <div style="display: flex; gap: 8px;">
+            <button id="btn-pending-edits-cancel" class="btn" style="padding: 8px 16px;">✕ Close</button>
+            <button id="btn-pending-edits-sync-all" class="btn btn-primary" style="padding: 8px 24px; font-weight: 600;">⚡ Upload Checked Files</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2133,16 +2500,16 @@
   <div id="file-conflict-modal" class="modal-overlay" aria-hidden="true">
     <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
       <div class="pref-modal-header">
-        <span class="modal-title">⚠️ File Overwrite Conflict</span>
+        <span class="modal-title" id="conflict-modal-title">⚠️ File Overwrite Conflict</span>
         <button id="btn-conflict-close" class="btn btn-sm modal-close-btn" title="Skip">✕ Skip</button>
       </div>
 
       <div class="modal-body">
-        <p style="font-size: 12px; color: hsl(var(--text-secondary)); margin: 0;">
+        <p id="conflict-modal-subtitle" style="font-size: 12px; color: hsl(var(--text-secondary)); margin: 0;">
           The destination file already exists. Choose how to resolve this conflict:
         </p>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-size: 11px;">
+        <div id="conflict-single-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 6px; padding: 10px; font-size: 11px;">
           <div>
             <div style="font-weight: 700; color: #38BDF8; margin-bottom: 4px;">Source File</div>
             <div id="conflict-src-name" style="font-weight: 600; color: hsl(var(--text-primary));">file.txt</div>
@@ -2157,7 +2524,7 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" id="conflict-apply-batch-group">
           <label class="upload-save-checkbox">
             <input type="checkbox" id="conflict-apply-batch">
             <span class="upload-save-checkbox-copy">
@@ -2361,6 +2728,36 @@
     </div>
   </div>
 
+  <!-- Master Password Verification Modal (#master-auth-modal) -->
+  <div id="master-auth-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="width: 440px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border-color)); background: hsl(var(--bg-tertiary));">
+        <span class="modal-title" style="font-weight: 700; color: hsl(var(--text-primary));">🔐 Master Password Verification</span>
+        <button id="btn-master-auth-close" class="btn btn-sm modal-close-btn" title="Cancel">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <p id="master-auth-prompt-msg" style="font-size: 12px; color: hsl(var(--text-secondary)); line-height: 1.5; margin: 0;">
+          Master Password Vault is active. Enter your Master Password to authorize this action:
+        </p>
+
+        <div class="form-group" style="margin: 0;">
+          <label class="form-label" for="master-auth-password" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 11px; color: hsl(var(--text-muted));">Master Password</label>
+          <input type="password" id="master-auth-password" class="form-control" placeholder="••••••••" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 13px;">
+        </div>
+
+        <div id="master-auth-error" style="color: #F87171; font-size: 12px; font-weight: 600; display: none; padding: 8px 12px; background: rgba(248, 113, 113, 0.1); border: 1px solid rgba(248, 113, 113, 0.3); border-radius: 6px;">
+          ⚠️ Incorrect Master Password. Access denied.
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; border: none; padding: 0;">
+          <button id="btn-master-auth-cancel" class="btn" style="padding: 8px 18px; font-size: 12px;">Cancel</button>
+          <button id="btn-master-auth-submit" class="btn btn-primary" style="padding: 8px 18px; font-size: 12px; font-weight: 600;">🔓 Authorize Action</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- SSH Command Parameter Prompt Modal -->
   <div id="ssh-prompt-modal" class="modal-overlay">
     <div class="modal-card" style="width: 460px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));">
@@ -2378,6 +2775,90 @@
         <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
           <button id="btn-ssh-prompt-cancel" class="btn" type="button">Cancel</button>
           <button id="btn-ssh-prompt-submit" class="btn btn-primary" type="button" style="font-weight: 600;">⚡ Execute</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File / Folder Properties Modal (#file-properties-modal) -->
+  <div id="file-properties-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border-color)); background: hsl(var(--bg-tertiary));">
+        <span class="modal-title" id="file-props-title" style="font-weight: 700; color: hsl(var(--text-primary));">ℹ️ Item Properties</span>
+        <button id="btn-file-props-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid hsl(var(--border-subtle)); border-radius: 8px;">
+          <span id="file-props-icon" style="font-size: 32px;">📄</span>
+          <div style="min-width: 0; flex: 1;">
+            <div id="file-props-name" style="font-size: 14px; font-weight: 700; color: hsl(var(--text-primary)); word-break: break-all;">filename.txt</div>
+            <div id="file-props-type-badge" style="font-size: 11px; color: hsl(var(--text-muted)); margin-top: 2px;">File</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 12px; background: hsl(var(--bg-primary)); border: 1px solid hsl(var(--border-color)); border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 6px;">
+            <span style="color: hsl(var(--text-muted));">Location / Path:</span>
+            <span id="file-props-path" style="font-family: var(--font-mono); color: hsl(var(--text-primary)); word-break: break-all; max-width: 320px; text-align: right;">/path</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 6px;">
+            <span style="color: hsl(var(--text-muted));">Size:</span>
+            <span id="file-props-size" style="font-family: var(--font-mono); font-weight: 600; color: hsl(var(--text-primary));">0 B</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 6px;">
+            <span style="color: hsl(var(--text-muted));">Last Modified:</span>
+            <span id="file-props-mtime" style="font-family: var(--font-mono); color: hsl(var(--text-primary));">-</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid hsl(var(--border-subtle)); padding-bottom: 6px;">
+            <span style="color: hsl(var(--text-muted));">Permissions Mode:</span>
+            <span id="file-props-chmod" style="font-family: var(--font-mono); color: var(--accent-primary-hex, #68a063); font-weight: 600;">rw-r--r-- (0644)</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: hsl(var(--text-muted));">System Pane:</span>
+            <span id="file-props-pane" style="font-weight: 600; color: hsl(var(--text-primary));">Remote Server</span>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; padding-top: 8px;">
+          <button id="btn-file-props-ok" class="btn btn-primary" style="padding: 6px 20px; font-weight: 600;">OK</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remote-to-Remote Server Transfer Picker Modal (#remote-transfer-modal) -->
+  <div id="remote-transfer-modal" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" style="width: 520px; max-width: 95vw; padding: 0; overflow: hidden; background-color: hsl(var(--bg-secondary)); border: 1px solid hsl(var(--border-color));" role="dialog">
+      <div class="pref-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border-color)); background: hsl(var(--bg-tertiary));">
+        <span class="modal-title" style="font-weight: 700; color: hsl(var(--text-primary));">🌐 Remote-to-Remote Server Transfer</span>
+        <button id="btn-remote-transfer-close" class="btn btn-sm modal-close-btn" title="Close">✕ Close</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(0,0,0,0.25); border: 1px solid hsl(var(--border-subtle)); border-radius: 8px;">
+          <span style="font-size: 28px;">🌐</span>
+          <div style="min-width: 0; flex: 1;">
+            <div id="remote-transfer-source-summary" style="font-size: 13px; font-weight: 700; color: hsl(var(--text-primary)); word-break: break-all;">Source Items: 0 selected</div>
+            <div id="remote-transfer-source-path" style="font-size: 11px; font-family: var(--font-mono); color: hsl(var(--text-muted)); margin-top: 2px;">From: /</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 11px; color: hsl(var(--text-muted));">Destination Remote Server Profile</label>
+          <select id="remote-transfer-target-profile" class="form-control" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 13px; font-family: var(--font-mono);">
+            <option value="">Select Destination Server Profile...</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 11px; color: hsl(var(--text-muted));">Destination Remote Path</label>
+          <input type="text" id="remote-transfer-target-path" class="form-control" value="/" placeholder="/destination/path/" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-size: 13px; font-family: var(--font-mono);">
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; border: none; padding: 0;">
+          <button id="btn-remote-transfer-cancel" class="btn">Cancel</button>
+          <button id="btn-remote-transfer-submit" class="btn btn-primary" style="font-weight: 600;">⚡ Start Remote Transfer</button>
         </div>
       </div>
     </div>

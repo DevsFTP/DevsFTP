@@ -48,25 +48,37 @@ class FTPService {
         options.secure = 'implicit';
       }
 
+      this.client.ftp.timeout = 30000;
       await this.client.access(options);
       this.connected = true;
 
       // Monitor control socket connection drops for auto-reconnect support
       if (this.client.ftp && this.client.ftp.socket) {
         const socket = this.client.ftp.socket;
-        const handleClose = () => {
+        if (this._handleClose) {
+          try { socket.off('close', this._handleClose); } catch (e) {}
+        }
+        // Fix 5 (MEDIUM): Remove any accumulated 'error' listeners before attaching a new one
+        // to prevent listener leaks across reconnect cycles.
+        if (this._handleSocketError) {
+          try { socket.off('error', this._handleSocketError); } catch (e) {}
+        }
+        this._handleClose = () => {
           if (this.connected) {
             this.connected = false;
             if (onLog) onLog('warning', 'FTP Control connection closed unexpectedly.');
             if (typeof this.onUnexpectedClose === 'function') {
-              this.onUnexpectedClose();
+              const cb = this.onUnexpectedClose;
+              this.onUnexpectedClose = null;
+              cb();
             }
           }
         };
-        socket.on('close', handleClose);
-        socket.on('error', () => {
+        this._handleSocketError = () => {
           // Socket error will lead to a close event, handled above
-        });
+        };
+        socket.on('close', this._handleClose);
+        socket.on('error', this._handleSocketError);
       }
 
       if (onLog) onLog('info', 'FTP/FTPS Session established successfully.');
@@ -243,6 +255,9 @@ class FTPService {
       if (!fs.existsSync(localDestPath)) {
         fs.mkdirSync(localDestPath, { recursive: true });
       }
+      // Fix 6 (LOW): basic-ftp's downloadToDir does not expose a per-transfer progress
+      // callback at the directory level, so onProgress cannot be forwarded here.
+      // Use downloadFile() with its onProgress parameter for individual file progress tracking.
       await this.client.downloadToDir(localDestPath, normRemote);
       return true;
     });

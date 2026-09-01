@@ -41,7 +41,9 @@ class SFTPService {
           
           this.sftp.realpath('.', (realErr, absPath) => {
             let remoteOS = 'linux';
-            if (!realErr && absPath) {
+            if (realErr) {
+              if (onLog) onLog('warning', `realpath('.') check failed (${realErr.message}). Defaulting remote OS to LINUX.`);
+            } else if (absPath) {
               const clean = absPath.replace(/\\/g, '/');
               if (/^[a-zA-Z]:/i.test(clean) || /^\/[a-zA-Z]:/i.test(clean)) {
                 remoteOS = 'windows';
@@ -66,7 +68,9 @@ class SFTPService {
         if (wasConnected) {
           // Trigger unexpected close instead of rejecting the settled promise (Issue 10.1)
           if (!this.isManualDisconnect && typeof this.onUnexpectedClose === 'function') {
-            this.onUnexpectedClose();
+            const cb = this.onUnexpectedClose;
+            this.onUnexpectedClose = null;
+            cb();
           }
         } else {
           reject(err);
@@ -82,7 +86,9 @@ class SFTPService {
         }
         if (onLog) onLog('warning', 'SSH Connection closed.');
         if (wasConnected && !this.isManualDisconnect && typeof this.onUnexpectedClose === 'function') {
-          this.onUnexpectedClose();
+          const cb = this.onUnexpectedClose;
+          this.onUnexpectedClose = null;
+          cb();
         }
       });
 
@@ -243,62 +249,69 @@ class SFTPService {
       this.sftp.readdir(normalizedPath, async (err, list) => {
         if (err) return reject(err);
 
-        // Build entries — symlinks need a follow-up stat to resolve target type (D3)
-        const regularEntries = [];
-        const symlinkEntries = [];
+        try {
+          // Build entries — symlinks need a follow-up stat to resolve target type (D3)
+          const regularEntries = [];
+          const symlinkEntries = [];
 
-        for (const item of list) {
-          const isDir = (item.attrs.mode & 0o040000) === 0o040000 || item.longname.startsWith('d');
-          const isLink = (item.attrs.mode & 0o120000) === 0o120000 || item.longname.startsWith('l');
-          const type = isDir ? 'd' : (isLink ? 'l' : '-');
+          for (const item of list) {
+            // Fix 1 (HIGH): Guard against malformed SFTP entries missing attrs or longname
+            if (!item.attrs || !item.longname) continue;
 
-          const entry = {
-            name: item.filename,
-            path: normalizePOSIXPath(`${normalizedPath}/${item.filename}`),
-            type: type,
-            isDir: isDir,
-            size: item.attrs.size || 0,
-            modifyTime: item.attrs.mtime ? new Date(item.attrs.mtime * 1000).toISOString() : new Date().toISOString(),
-            permissions: formatPermissions(item.attrs.mode),
-            mode: item.attrs.mode
-          };
+            const isDir = (item.attrs.mode & 0o040000) === 0o040000 || item.longname.startsWith('d');
+            const isLink = (item.attrs.mode & 0o120000) === 0o120000 || item.longname.startsWith('l');
+            const type = isDir ? 'd' : (isLink ? 'l' : '-');
 
-          if (isLink) {
-            symlinkEntries.push(entry);
-          } else {
-            regularEntries.push(entry);
+            const entry = {
+              name: item.filename,
+              path: normalizePOSIXPath(`${normalizedPath}/${item.filename}`),
+              type: type,
+              isDir: isDir,
+              size: item.attrs.size || 0,
+              modifyTime: item.attrs.mtime ? new Date(item.attrs.mtime * 1000).toISOString() : new Date().toISOString(),
+              permissions: formatPermissions(item.attrs.mode),
+              mode: item.attrs.mode
+            };
+
+            if (isLink) {
+              symlinkEntries.push(entry);
+            } else {
+              regularEntries.push(entry);
+            }
           }
+
+          // Resolve symlink target types with throttled concurrency (max 10) (Fix D3)
+          const SYMLINK_CONCURRENCY = 10;
+          const resolvedLinks = [];
+          for (let i = 0; i < symlinkEntries.length; i += SYMLINK_CONCURRENCY) {
+            const batch = symlinkEntries.slice(i, i + SYMLINK_CONCURRENCY);
+            const batchResults = await Promise.all(batch.map(entry =>
+              new Promise((resResolve) => {
+                this.sftp.stat(entry.path, (statErr, stats) => {
+                  if (!statErr && stats) {
+                    entry.isDir = (stats.mode & 0o040000) === 0o040000;
+                    if (entry.isDir) entry.type = 'd';
+                  }
+                  resResolve(entry);
+                });
+              })
+            ));
+            resolvedLinks.push(...batchResults);
+          }
+
+          const items = [...regularEntries, ...resolvedLinks];
+
+          // Sort directories first, then files alphabetically
+          items.sort((a, b) => {
+            if (a.isDir && !b.isDir) return -1;
+            if (!a.isDir && b.isDir) return 1;
+            return a.name.localeCompare(b.name);
+          });
+
+          resolve({ currentPath: normalizedPath, files: items });
+        } catch (cbErr) {
+          reject(cbErr);
         }
-
-        // Resolve symlink target types with throttled concurrency (max 10) (Fix D3)
-        const SYMLINK_CONCURRENCY = 10;
-        const resolvedLinks = [];
-        for (let i = 0; i < symlinkEntries.length; i += SYMLINK_CONCURRENCY) {
-          const batch = symlinkEntries.slice(i, i + SYMLINK_CONCURRENCY);
-          const batchResults = await Promise.all(batch.map(entry =>
-            new Promise((resResolve) => {
-              this.sftp.stat(entry.path, (statErr, stats) => {
-                if (!statErr && stats) {
-                  entry.isDir = (stats.mode & 0o040000) === 0o040000;
-                  if (entry.isDir) entry.type = 'd';
-                }
-                resResolve(entry);
-              });
-            })
-          ));
-          resolvedLinks.push(...batchResults);
-        }
-
-        const items = [...regularEntries, ...resolvedLinks];
-
-        // Sort directories first, then files alphabetically
-        items.sort((a, b) => {
-          if (a.isDir && !b.isDir) return -1;
-          if (!a.isDir && b.isDir) return 1;
-          return a.name.localeCompare(b.name);
-        });
-
-        resolve({ currentPath: normalizedPath, files: items });
       });
     });
   }
@@ -328,7 +341,10 @@ class SFTPService {
         };
 
         this.sftp.fastGet(remotePath, localPath, options, (err) => {
-          if (err) return reject(err);
+          if (err) {
+            try { if (fs.existsSync(localPath)) fs.unlinkSync(localPath); } catch (e) {}
+            return reject(err);
+          }
           resolve(true);
         });
       });
@@ -405,7 +421,11 @@ class SFTPService {
 
     try {
       await this.mkdir(normRemote);
-    } catch (e) {}
+    } catch (e) {
+      // Fix 4 (LOW): Only swallow "already exists" failures.
+      // SFTP error code 4 (SSH_FX_FAILURE) is what most servers return for mkdir-on-existing-dir.
+      if (e && e.code !== 4 && !String(e.message || '').includes('exist')) throw e;
+    }
 
     // Use async readdir to avoid blocking the event loop (Fix A2/D1)
     const items = await fs.promises.readdir(localDirPath, { withFileTypes: true });
@@ -442,7 +462,10 @@ class SFTPService {
           if (mode) {
             const octal = typeof mode === 'string' ? parseInt(mode, 8) : mode;
             if (!isNaN(octal)) {
-              return this.sftp.chmod(normPath, octal, () => resolve(true));
+              return this.sftp.chmod(normPath, octal, (chmodErr) => {
+                if (chmodErr) return reject(chmodErr);
+                resolve(true);
+              });
             }
           }
           resolve(true);
@@ -460,7 +483,10 @@ class SFTPService {
         if (mode) {
           const octal = typeof mode === 'string' ? parseInt(mode, 8) : mode;
           if (!isNaN(octal)) {
-            return this.sftp.chmod(normPath, octal, () => resolve(true));
+            return this.sftp.chmod(normPath, octal, (chmodErr) => {
+              if (chmodErr) return reject(chmodErr);
+              resolve(true);
+            });
           }
         }
         resolve(true);
@@ -476,7 +502,12 @@ class SFTPService {
       let res = null;
       try {
         res = await this.list(normPath);
-      } catch (e) {}
+      } catch (e) {
+        // Fix 2 (MEDIUM): Listing failed — continue deletion with empty children list.
+        // This is correct behaviour: we still attempt rmdir on the directory itself.
+        // Do NOT rethrow; log a diagnostic warning instead.
+        if (this.log) this.log('warn', `delete(): could not list "${normPath}" before deletion (${e.message}). Proceeding with empty children.`);
+      }
 
       const items = (res && res.files) ? res.files : [];
       for (const item of items) {
@@ -494,23 +525,23 @@ class SFTPService {
       }
 
       return new Promise((resolve, reject) => {
-        this.sftp.rmdir(normPath, async (err) => {
+        this.sftp.rmdir(normPath, (err) => {
           if (err) {
             // Retry directory deletion once in case of non-atomic file additions (Issue 10.2)
-            try {
+            (async () => {
               const retryRes = await this.list(normPath);
               const retryItems = (retryRes && retryRes.files) ? retryRes.files : [];
               for (const item of retryItems) {
                 const itemPath = `${normPath === '/' ? '' : normPath}/${item.name}`;
                 await this.delete(itemPath, item.isDir);
               }
-              this.sftp.rmdir(normPath, (retryErr) => {
-                if (retryErr) return reject(retryErr);
-                resolve(true);
+              return new Promise((rRes, rRej) => {
+                this.sftp.rmdir(normPath, (retryErr) => {
+                  if (retryErr) return rRej(retryErr);
+                  rRes(true);
+                });
               });
-            } catch (retryFailed) {
-              return reject(err);
-            }
+            })().then(() => resolve(true)).catch(() => reject(err));
           } else {
             resolve(true);
           }
@@ -562,11 +593,20 @@ class SFTPService {
         const escapedSrc = cleanSrc.replace(/'/g, "'\\''");
         const escapedDest = cleanDest.replace(/'/g, "'\\''");
 
+        // Fix 3 (LOW): Helper that only attempts stream copy if SFTP session is still alive.
+        const safeStreamCopy = () => {
+          if (!this.sftp) {
+            reject(new Error('copy(): SFTP session disconnected before stream fallback could run.'));
+            return;
+          }
+          this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+        };
+
         // Timeout after 3 seconds: fallback to streaming if command hangs
         const execTimeout = setTimeout(() => {
           if (!settled) {
             settled = true;
-            this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+            safeStreamCopy();
           }
         }, 3000);
 
@@ -575,7 +615,7 @@ class SFTPService {
             clearTimeout(execTimeout);
             if (!settled) {
               settled = true;
-              this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+              safeStreamCopy();
             }
             return;
           }
@@ -593,7 +633,7 @@ class SFTPService {
             clearTimeout(execTimeout);
             if (!settled) {
               settled = true;
-              this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+              safeStreamCopy();
             }
           });
 
@@ -604,12 +644,16 @@ class SFTPService {
               if (code === 0) {
                 resolve(true);
               } else {
-                this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
+                safeStreamCopy();
               }
             }
           });
         });
       } else {
+        // Fix 3 (LOW): Guard stream copy when no sshClient (sftp-only path)
+        if (!this.sftp) {
+          return reject(new Error('copy(): SFTP session is not connected.'));
+        }
         this._copyViaStream(cleanSrc, cleanDest).then(resolve).catch(reject);
       }
     });
@@ -639,9 +683,21 @@ class SFTPService {
       const readStream = this.sftp.createReadStream(src);
       const writeStream = this.sftp.createWriteStream(dest);
 
-      readStream.on('error', (err) => reject(err));
-      writeStream.on('error', (err) => reject(err));
-      writeStream.on('close', () => resolve(true));
+      let isDone = false;
+      const cleanup = (err) => {
+        if (isDone) return;
+        isDone = true;
+        try { readStream.unpipe(writeStream); } catch (e) {}
+        try { readStream.destroy(); } catch (e) {}
+        try { writeStream.destroy(); } catch (e) {}
+        if (err) reject(err);
+        else resolve(true);
+      };
+
+      readStream.on('error', (err) => cleanup(err));
+      writeStream.on('error', (err) => cleanup(err));
+      writeStream.on('close', () => cleanup(null));
+      writeStream.on('finish', () => cleanup(null));
 
       readStream.pipe(writeStream);
     });

@@ -22,7 +22,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const devsFTPApi = {
   isWindows: process.platform === 'win32',
-  appVersion: require('electron').app ? require('electron').app.getVersion() : '1.0.0',
+  appVersion: '1.0.0',
+  getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   // Saved Profiles
   profiles: {
     getAll: () => ipcRenderer.invoke('profiles:get-all'),
@@ -58,6 +59,7 @@ const devsFTPApi = {
   // Local Operations
   localList: (localPath) => ipcRenderer.invoke('local:list', localPath),
   localDrives: () => ipcRenderer.invoke('local:drives'),
+  localQuickLocations: () => ipcRenderer.invoke('local:quick-locations'),
   localHome: () => ipcRenderer.invoke('local:home'),
   localOpen: (localPath) => ipcRenderer.invoke('local:open', localPath),
   localCreateFile: (localPath) => ipcRenderer.invoke('local:create-file', localPath),
@@ -80,7 +82,9 @@ const devsFTPApi = {
   clearCompletedQueue: () => ipcRenderer.invoke('transfer:clear-completed'),
   removeItemFromQueue: (id) => ipcRenderer.invoke('transfer:remove-item', id),
   saveQueue: (queue) => ipcRenderer.invoke('transfer:save-queue', queue),
+  setTransferOptions: (options) => ipcRenderer.invoke('transfer:set-options', options),
   uploadBatchBackground: (items) => ipcRenderer.invoke('transfer:background-upload-batch', items),
+  remoteToRemoteTransfer: (params) => ipcRenderer.invoke('transfer:remote-to-remote', params),
   checkFileConflict: (data) => ipcRenderer.invoke('transfer:check-conflict', data),
   appendDebugLog: (msg) => ipcRenderer.send('debug:log-append', msg),
   diagnosticLog: (entry) => ipcRenderer.send('diagnostic:log', entry),
@@ -92,14 +96,22 @@ const devsFTPApi = {
   dismissBatch: (items) => ipcRenderer.invoke('cache:dismiss-batch', items),
 
   // Host Key Verification IPC
-  onHostKeyVerifyRequest: (callback) => ipcRenderer.on('ssh:host-key-verify-request', (_event, data) => callback(data)),
+  onHostKeyVerifyRequest: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('ssh:host-key-verify-request', handler);
+    return () => ipcRenderer.removeListener('ssh:host-key-verify-request', handler);
+  },
   respondHostKeyVerify: (response) => ipcRenderer.send('ssh:host-key-verify-response', response),
 
   // SSH Terminal IPC
   sshTerminalConnect: (config, sessionId) => ipcRenderer.invoke('ssh:terminal-connect', config, sessionId),
   sshTerminalWrite: (data, sessionId) => ipcRenderer.send('ssh:terminal-write', data, sessionId),
   sshTerminalResize: (cols, rows, sessionId) => ipcRenderer.send('ssh:terminal-resize', { cols, rows }, sessionId),
-  onSSHTerminalData: (callback) => ipcRenderer.on('ssh:terminal-data', (_event, payload) => callback(payload)),
+  onSSHTerminalData: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on('ssh:terminal-data', handler);
+    return () => ipcRenderer.removeListener('ssh:terminal-data', handler);
+  },
 
   // SSH Tunneling & Port Forwarding IPC
   tunnels: {
@@ -110,13 +122,37 @@ const devsFTPApi = {
   },
 
   // System Events & Logs
-  onLogMessage: (callback) => ipcRenderer.on('log:message', (_event, log) => callback(log)),
-  onReconnectStatus: (callback) => ipcRenderer.on('connection:reconnect-status', (_event, data) => callback(data)),
+  onLogMessage: (callback) => {
+    const handler = (_event, log) => callback(log);
+    ipcRenderer.on('log:message', handler);
+    return () => ipcRenderer.removeListener('log:message', handler);
+  },
+  onReconnectStatus: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('connection:reconnect-status', handler);
+    return () => ipcRenderer.removeListener('connection:reconnect-status', handler);
+  },
   sendOSNotification: (title, body) => ipcRenderer.send('notification:send', { title, body }),
-  onTransferProgress: (callback) => ipcRenderer.on('transfer:progress', (_event, data) => callback(data)),
-  onCacheFileSaved: (callback) => ipcRenderer.on('cache:file-saved', (_event, data) => callback(data)),
-  onCacheBatchFilesSaved: (callback) => ipcRenderer.on('cache:batch-files-saved', (_event, data) => callback(data)),
-  onCacheDebugEvent: (callback) => ipcRenderer.on('cache:debug-event', (_event, data) => callback(data)),
+  onTransferProgress: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('transfer:progress', handler);
+    return () => ipcRenderer.removeListener('transfer:progress', handler);
+  },
+  onCacheFileSaved: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('cache:file-saved', handler);
+    return () => ipcRenderer.removeListener('cache:file-saved', handler);
+  },
+  onCacheBatchFilesSaved: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('cache:batch-files-saved', handler);
+    return () => ipcRenderer.removeListener('cache:batch-files-saved', handler);
+  },
+  onCacheDebugEvent: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('cache:debug-event', handler);
+    return () => ipcRenderer.removeListener('cache:debug-event', handler);
+  },
   selectFileOrFolder: (options) => ipcRenderer.invoke('dialog:select-file', options),
   saveFileDialog: (options) => ipcRenderer.invoke('dialog:save-file', options),
 
@@ -128,7 +164,11 @@ const devsFTPApi = {
     runNow: (id) => ipcRenderer.invoke('jobs:run-now', id),
     toggle: (id, enabled) => ipcRenderer.invoke('jobs:toggle', id, enabled)
   },
-  onJobsUpdated: (callback) => ipcRenderer.on('jobs:updated', (_event, jobs) => callback(jobs)),
+  onJobsUpdated: (callback) => {
+    const handler = (_event, jobs) => callback(jobs);
+    ipcRenderer.on('jobs:updated', handler);
+    return () => ipcRenderer.removeListener('jobs:updated', handler);
+  },
 
   // Exclusion Rules & Ignore Filters IPC
   getExclusionPrefs: () => ipcRenderer.invoke('system:get-exclusion-prefs'),
@@ -138,7 +178,15 @@ const devsFTPApi = {
   calculateDirSize: (targetPath, isRemote, sessionId) => ipcRenderer.invoke('system:calculate-dir-size', targetPath, isRemote, sessionId),
   getDirSizePrefs: () => ipcRenderer.invoke('system:get-dir-size-prefs'),
   saveDirSizePrefs: (prefs) => ipcRenderer.invoke('system:save-dir-size-prefs', prefs),
-  onDirSizeUpdated: (callback) => ipcRenderer.on('dir-size:updated', (_event, data) => callback(data)),
+  onDirSizeUpdated: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('dir-size:updated', handler);
+    return () => ipcRenderer.removeListener('dir-size:updated', handler);
+  },
+
+  // Window Close Behavior IPC
+  getCloseBehavior: () => ipcRenderer.invoke('system:get-close-behavior'),
+  saveCloseBehavior: (behavior) => ipcRenderer.invoke('system:save-close-behavior', behavior),
 
   // App Control
   quit: () => ipcRenderer.send('system:quit')

@@ -26,10 +26,13 @@ try {
 
 console.log('3. Signing build outputs with GPG key ' + GPG_KEY + '...');
 
+const pkg = require(path.join(rootDir, 'package.json'));
+const version = pkg.version || '1.0.1';
+
 const targets = [
-  { file: 'DevsFTP-1.0.0.AppImage', label: 'AppImage' },
-  { file: 'devsftp_1.0.0_amd64.deb', label: 'DEB', deb: true },
-  { file: 'devsftp-1.0.0.tar.gz', label: 'tar.gz' }
+  { file: `DevsFTP-${version}.AppImage`, label: 'AppImage' },
+  { file: `devsftp_${version}_amd64.deb`, label: 'DEB', deb: true },
+  { file: `devsftp-${version}.tar.gz`, label: 'tar.gz' }
 ];
 
 let signingFailed = false;

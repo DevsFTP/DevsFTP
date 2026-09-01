@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { normalizePOSIXPath } = require('../pathUtils');
-const { Transform } = require('stream');
+const ThrottleTransform = require('./throttleTransform');
 
 class SFTPAdapter {
   constructor(sftpSession) {
@@ -32,15 +32,21 @@ class SFTPAdapter {
   /**
    * Streaming Download with Byte Offset Resume Support
    */
-  downloadStream(remotePath, localPath, offset = 0, onProgress) {
+  downloadStream(remotePath, localPath, offset = 0, onProgress, options = {}) {
     if (offset === 0) {
       return new Promise((resolve, reject) => {
         if (!this.session || !this.session.connected || !this.sftp) {
           return reject(new Error('SFTP client disconnected'));
         }
+        if (options.signal && options.signal.aborted) {
+          return reject(new Error('Transfer cancelled by user'));
+        }
         const normRemote = normalizePOSIXPath(remotePath);
         this.sftp.stat(normRemote, (statErr, stats) => {
-          const totalBytes = (stats && stats.size) ? stats.size : 1;
+          if (statErr || !stats) {
+            return reject(statErr || new Error(`Remote file stat failed for "${normRemote}"`));
+          }
+          const totalBytes = stats.size || 1;
           this.sftp.fastGet(normRemote, localPath, {
             step: (transferred, chunk) => {
               if (onProgress) {
@@ -55,6 +61,13 @@ class SFTPAdapter {
             if (err) reject(err);
             else resolve(true);
           });
+          // Fix 3: hook abort signal for the fastGet fast-path
+          if (options && options.signal) {
+            options.signal.addEventListener('abort', () => {
+              try { this.sftp.end(); } catch(e) {}
+              reject(new Error('Transfer cancelled'));
+            }, { once: true });
+          }
         });
       });
     }
@@ -62,6 +75,9 @@ class SFTPAdapter {
     return new Promise((resolve, reject) => {
       if (!this.session || !this.session.connected || !this.sftp) {
         return reject(new Error('SFTP client disconnected'));
+      }
+      if (options.signal && options.signal.aborted) {
+        return reject(new Error('Transfer cancelled by user'));
       }
 
       const normRemote = normalizePOSIXPath(remotePath);
@@ -97,21 +113,43 @@ class SFTPAdapter {
         const readStream = this.sftp.createReadStream(normRemote, readStreamOptions);
 
         let isDone = false;
+        let progressStream = null;
+
+        const onAbort = () => {
+          cleanup(new Error('Transfer cancelled by user'));
+        };
+        if (options.signal) {
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
+
         const cleanup = (err) => {
           if (isDone) return;
           isDone = true;
+          if (options.signal) {
+            try { options.signal.removeEventListener('abort', onAbort); } catch (e) {}
+          }
+          try { if (progressStream) progressStream.destroy(); } catch (e) {}
+          try { if (throttleStream) throttleStream.destroy(); } catch (e) {}
+          try { writeStream.destroy(); } catch (e) {}
+          try { readStream.destroy(); } catch (e) {}
           if (err) {
-            try { writeStream.destroy(); } catch (e) {}
-            try { readStream.destroy(); } catch (e) {}
             reject(err);
           } else {
             resolve({ transferred: bytesRead, total: totalBytes });
           }
         };
 
+        let throttleStream = null;
         let bodyStream = readStream;
+
+        if (options.speedLimitKBps > 0) {
+          throttleStream = new ThrottleTransform(options.speedLimitKBps);
+          bodyStream = bodyStream.pipe(throttleStream);
+        }
+
         if (onProgress) {
-          const progressStream = new Transform({
+          const { Transform } = require('stream');
+          progressStream = new Transform({
             transform(chunk, encoding, callback) {
               bytesRead += chunk.length;
               onProgress({
@@ -122,7 +160,7 @@ class SFTPAdapter {
               callback(null, chunk);
             }
           });
-          bodyStream = readStream.pipe(progressStream);
+          bodyStream = bodyStream.pipe(progressStream);
         }
 
         bodyStream.on('error', (err) => cleanup(err));
@@ -139,15 +177,21 @@ class SFTPAdapter {
   /**
    * Streaming Upload with Byte Offset Resume Support
    */
-  uploadStream(localPath, remotePath, offset = 0, onProgress) {
+  uploadStream(localPath, remotePath, offset = 0, onProgress, options = {}) {
     if (offset === 0) {
       return new Promise((resolve, reject) => {
         if (!this.session || !this.session.connected || !this.sftp) {
           return reject(new Error('SFTP client disconnected'));
         }
+        if (options.signal && options.signal.aborted) {
+          return reject(new Error('Transfer cancelled by user'));
+        }
         const normRemote = normalizePOSIXPath(remotePath);
         fs.stat(localPath, (statErr, stats) => {
-          const totalBytes = (stats && stats.size) ? stats.size : 1;
+          if (statErr || !stats) {
+            return reject(statErr || new Error(`Local file stat failed for "${localPath}"`));
+          }
+          const totalBytes = stats.size || 1;
           this.sftp.fastPut(localPath, normRemote, {
             step: (transferred, chunk) => {
               if (onProgress) {
@@ -162,6 +206,13 @@ class SFTPAdapter {
             if (err) reject(err);
             else resolve(true);
           });
+          // Fix 3: hook abort signal for the fastPut fast-path
+          if (options && options.signal) {
+            options.signal.addEventListener('abort', () => {
+              try { this.sftp.end(); } catch(e) {}
+              reject(new Error('Transfer cancelled'));
+            }, { once: true });
+          }
         });
       });
     }
@@ -169,6 +220,9 @@ class SFTPAdapter {
     return new Promise((resolve, reject) => {
       if (!this.session || !this.session.connected || !this.sftp) {
         return reject(new Error('SFTP client disconnected'));
+      }
+      if (options.signal && options.signal.aborted) {
+        return reject(new Error('Transfer cancelled by user'));
       }
 
       const normRemote = normalizePOSIXPath(remotePath);
@@ -189,21 +243,43 @@ class SFTPAdapter {
           const writeStream = this.sftp.createWriteStream(normRemote, writeStreamOptions);
 
           let isDone = false;
+          let progressStream = null;
+
+          const onAbort = () => {
+            cleanup(new Error('Transfer cancelled by user'));
+          };
+          if (options.signal) {
+            options.signal.addEventListener('abort', onAbort, { once: true });
+          }
+
           const cleanup = (err) => {
             if (isDone) return;
             isDone = true;
+            if (options.signal) {
+              try { options.signal.removeEventListener('abort', onAbort); } catch (e) {}
+            }
+            try { if (progressStream) progressStream.destroy(); } catch (e) {}
+            try { if (throttleStream) throttleStream.destroy(); } catch (e) {}
+            try { writeStream.destroy(); } catch (e) {}
+            try { readStream.destroy(); } catch (e) {}
             if (err) {
-              try { writeStream.destroy(); } catch (e) {}
-              try { readStream.destroy(); } catch (e) {}
               reject(err);
             } else {
               resolve({ transferred: bytesSent, total: totalBytes });
             }
           };
 
+          let throttleStream = null;
           let bodyStream = readStream;
+
+          if (options.speedLimitKBps > 0) {
+            throttleStream = new ThrottleTransform(options.speedLimitKBps);
+            bodyStream = bodyStream.pipe(throttleStream);
+          }
+
           if (onProgress) {
-            const progressStream = new Transform({
+            const { Transform } = require('stream');
+            progressStream = new Transform({
               transform(chunk, encoding, callback) {
                 bytesSent += chunk.length;
                 onProgress({
@@ -214,7 +290,7 @@ class SFTPAdapter {
                 callback(null, chunk);
               }
             });
-            bodyStream = readStream.pipe(progressStream);
+            bodyStream = bodyStream.pipe(progressStream);
           }
 
           bodyStream.on('error', (err) => cleanup(err));

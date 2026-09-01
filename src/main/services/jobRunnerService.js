@@ -5,10 +5,51 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Notification } = require('electron');
+let app = null;
+let Notification = null;
+try {
+  const electron = require('electron');
+  app = electron.app;
+  Notification = electron.Notification;
+} catch (e) {}
+
+function getNotificationIconPath() {
+  try {
+    if (!app) return undefined;
+    const userDataDir = app.getPath('userData');
+    if (!fs.existsSync(userDataDir)) fs.mkdirSync(userDataDir, { recursive: true });
+    const diskNotifPath = path.join(userDataDir, 'notification_icon.png');
+    const resPng = path.join(process.resourcesPath, 'assets/branding/notification_icon.png');
+    const asarPng = path.join(__dirname, '../../assets/branding/notification_icon.png');
+    
+    if (fs.existsSync(resPng)) {
+      fs.writeFileSync(diskNotifPath, fs.readFileSync(resPng));
+      return diskNotifPath;
+    } else if (fs.existsSync(asarPng)) {
+      fs.writeFileSync(diskNotifPath, fs.readFileSync(asarPng));
+      return diskNotifPath;
+    } else if (fs.existsSync(diskNotifPath)) {
+      return diskNotifPath;
+    }
+  } catch (e) {}
+  return undefined;
+}
+
+function sendOSNotification(title, body) {
+  if (!Notification || !Notification.isSupported()) return;
+  try {
+    const notif = new Notification({
+      title: title || 'DevsFTP',
+      body: body || '',
+      icon: getNotificationIconPath()
+    });
+    notif.show();
+  } catch (e) {}
+}
 const SFTPService = require('./sftpService');
 const FTPService = require('./ftpService');
 const WebDAVService = require('./webdavService');
+const S3Service = require('./s3Service'); // Fix 9 (HIGH): import S3 driver for s3 protocol jobs
 
 class JobRunnerService {
   constructor(ipcWindow, jobStore, profileStore, logFn, knownHostsStore) {
@@ -20,17 +61,20 @@ class JobRunnerService {
     this.knownHostsStore = knownHostsStore || null;
 
     this.timer = null;
+    this.startupTimer = null;
     this.runningJobs = new Set();
+    this.activeSessions = new Map();
   }
 
   start() {
     if (this.timer) clearInterval(this.timer);
-    
+    if (this.startupTimer) clearTimeout(this.startupTimer);
+
     // Check schedules every 10 seconds for high precision
     this.timer = setInterval(() => this.checkSchedules(), 10000);
 
     // Initial check after 3 seconds on startup
-    setTimeout(() => {
+    this.startupTimer = setTimeout(() => {
       this.checkSchedules();
       this.executeStartupJobs();
     }, 3000);
@@ -38,7 +82,24 @@ class JobRunnerService {
 
   stop() {
     if (this.timer) clearInterval(this.timer);
+    if (this.startupTimer) clearTimeout(this.startupTimer);
     this.timer = null;
+    this.startupTimer = null;
+    for (const [jobId, driver] of this.activeSessions.entries()) {
+      try {
+        if (driver && typeof driver.disconnect === 'function') {
+          driver.disconnect();
+        }
+      } catch (e) {}
+      const job = this.jobStore.getById(jobId);
+      if (job && job.lastStatus === 'Running') {
+        job.lastStatus = 'Stopped';
+        this.jobStore.upsert(job);
+      }
+    }
+    this.activeSessions.clear();
+    this.runningJobs.clear();
+    this.notifyWindow();
   }
 
   notifyWindow() {
@@ -117,7 +178,9 @@ class JobRunnerService {
       const nextRunDate = new Date(nextRunStr);
       if (nextRunDate <= now) {
         this.log('info', `⏰ Scheduled Job trigger fired: "${job.name}"`);
-        this.executeJob(job.id);
+        // Fix 10 (MEDIUM): executeJob is intentionally fire-and-forget here, but must have a
+        // .catch() to prevent unhandled rejection if the job throws unexpectedly.
+        this.executeJob(job.id).catch(err => this.log('error', 'executeJob unhandled: ' + err.message));
       }
     }
   }
@@ -129,7 +192,8 @@ class JobRunnerService {
     this.log('info', `⏰ Executing ${jobs.length} startup scheduled job(s)...`);
     for (const job of jobs) {
       if (!this.runningJobs.has(job.id)) {
-        this.executeJob(job.id);
+        // Fix 10 (MEDIUM): fire-and-forget but with .catch to prevent unhandled rejection
+        this.executeJob(job.id).catch(err => this.log('error', 'executeJob unhandled: ' + err.message));
       }
     }
   }
@@ -143,7 +207,9 @@ class JobRunnerService {
     this.jobStore.upsert(job);
     this.notifyWindow();
 
-    this.log('info', `⚡ Executing Scheduled Job [${job.name}] (${job.jobType.toUpperCase()})...`);
+    // Fix 11 (MEDIUM): Guard job.jobType before calling toUpperCase() — the field may be missing.
+    const jobTypeLabel = job.jobType ? job.jobType.toUpperCase() : 'UNKNOWN';
+    this.log('info', `⚡ Executing Scheduled Job [${job.name}] (${jobTypeLabel})...`);
 
     const profiles = this.profileStore.getAll();
     const profile = profiles.find(p => p.id === job.profileId);
@@ -163,10 +229,14 @@ class JobRunnerService {
       Driver = WebDAVService;
     } else if (profile.protocol === 'ftp' || profile.protocol === 'ftps') {
       Driver = FTPService;
+    } else if (profile.protocol === 's3') {
+      // Fix 9 (HIGH): Route S3 profiles to S3Service instead of falling through to SFTPService
+      Driver = S3Service;
     } else {
       Driver = SFTPService;
     }
     const driver = new Driver();
+    this.activeSessions.set(jobId, driver);
 
     try {
       // Build host key verifier using knownHostsStore if available (Fix B2)
@@ -225,14 +295,7 @@ class JobRunnerService {
       this.log('info', `✅ Scheduled Job [${job.name}] completed successfully.`);
 
       try {
-        if (Notification.isSupported()) {
-          const notif = new Notification({
-            title: 'Scheduled Job Complete',
-            body: `Job "${job.name}" executed successfully.`,
-            silent: false
-          });
-          notif.show();
-        }
+        sendOSNotification('Scheduled Job Complete', `Job "${job.name}" executed successfully.`);
       } catch (e) {}
     } catch (err) {
       const errMsg = err && err.message ? err.message : String(err);
@@ -249,16 +312,10 @@ class JobRunnerService {
       this.log('error', `❌ Scheduled Job [${job.name}] failed: ${errMsg}`);
 
       try {
-        if (Notification.isSupported()) {
-          const notif = new Notification({
-            title: 'Scheduled Job Failed',
-            body: `Job "${job.name}" failed: ${errMsg}`,
-            silent: false
-          });
-          notif.show();
-        }
+        sendOSNotification('Scheduled Job Failed', `Job "${job.name}" failed: ${errMsg}`);
       } catch (e) {}
     } finally {
+      this.activeSessions.delete(jobId);
       if (driver.disconnect) {
         try { await driver.disconnect(); } catch (e) {}
       }

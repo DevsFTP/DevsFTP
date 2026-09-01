@@ -217,14 +217,20 @@ class S3Service {
         response.Body.on('data', chunk => {
           downloadedBytes += chunk.length;
           if (onProgress && totalBytes > 0) {
-            onProgress(downloadedBytes, totalBytes);
+            onProgress({ transferred: downloadedBytes, total: totalBytes, percentage: totalBytes > 0 ? Math.round(downloadedBytes / totalBytes * 100) : 0 });
           }
         });
 
         response.Body.pipe(writeStream);
-        response.Body.on('error', reject);
+        response.Body.on('error', (err) => {
+          try { writeStream.destroy(); } catch(e) {}
+          reject(err);
+        });
         writeStream.on('finish', resolve);
-        writeStream.on('error', reject);
+        writeStream.on('error', (err) => {
+          try { response.Body.unpipe && response.Body.unpipe(); } catch(e) {}
+          reject(err);
+        });
       });
 
       return true;
@@ -246,8 +252,9 @@ class S3Service {
     const fileStats = fs.statSync(localPath);
     const totalBytes = fileStats.size;
 
+    let readStream = null;
     try {
-      const readStream = fs.createReadStream(localPath);
+      readStream = fs.createReadStream(localPath);
       let uploadedBytes = 0;
 
       // Real-time transform stream to intercept progress byte-by-byte
@@ -255,7 +262,7 @@ class S3Service {
         transform(chunk, encoding, callback) {
           uploadedBytes += chunk.length;
           if (onProgress) {
-            onProgress(uploadedBytes, totalBytes);
+            onProgress({ transferred: uploadedBytes, total: totalBytes, percentage: totalBytes > 0 ? Math.round(uploadedBytes / totalBytes * 100) : 0 });
           }
           callback(null, chunk);
         }
@@ -277,6 +284,9 @@ class S3Service {
       await parallelUpload.done();
       return true;
     } catch (err) {
+      if (readStream) {
+        try { readStream.destroy(); } catch(e) {}
+      }
       throw new Error(`S3 upload failed: ${err.message}`);
     }
   }

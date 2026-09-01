@@ -24,6 +24,9 @@ execSync('npx electron-builder --win nsis portable dir', { cwd: rootDir, stdio: 
 // rcedit brands dist/win-unpacked/DevsFTP.exe (the portable dev/run copy).
 // The NSIS/portable installers are already built above with their own bundled exe.
 console.log('3. Injecting DevsFTP icon & Win32 PE version metadata resources into DevsFTP.exe via rcedit...');
+const pkg = require(path.join(rootDir, 'package.json'));
+const version = pkg.version || '1.0.1';
+
 if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath)) {
   const rceditCmd = `"${rceditPath}" "${exePath}" ` +
     `--set-icon "${icoPath}" ` +
@@ -32,8 +35,9 @@ if (fs.existsSync(rceditPath) && fs.existsSync(exePath) && fs.existsSync(icoPath
     `--set-version-string "CompanyName" "DevsFTP.com" ` +
     `--set-version-string "LegalCopyright" "Copyright © 2026 DevsFTP.com" ` +
     `--set-version-string "OriginalFilename" "DevsFTP.exe" ` +
-    `--set-file-version "1.0.0.0" ` +
-    `--set-product-version "1.0.0.0"`;
+    `--set-version-string "ProductVersion" "${version}" ` +
+    `--set-file-version "${version}" ` +
+    `--set-product-version "${version}"`;
 
   execSync(rceditCmd, { cwd: rootDir, stdio: 'inherit' });
   console.log('✓ Win32 PE Header Icon & Version Metadata updated successfully!');

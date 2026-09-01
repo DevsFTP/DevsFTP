@@ -106,7 +106,7 @@ class TunnelService {
         if (this._startingTunnels) this._startingTunnels.delete(tunnelId);
         if (tunnelObj.status === 'active' || tunnelObj.status === 'connecting') {
           onLog('warning', `[SSH Tunnel] Connection closed for '${rule.name}'`);
-          tunnelObj.status = 'stopped';
+          this.stopTunnel(tunnelId, onLog);
         }
       });
 
@@ -126,7 +126,7 @@ class TunnelService {
         } catch (keyErr) {
           tunnelObj.status = 'error';
           tunnelObj.error = keyErr.message;
-          return reject(new Error(`Failed to read SSH private key: ${keyErr.message}`));
+          return cleanReject(new Error(`Failed to read SSH private key: ${keyErr.message}`));
         }
       } else {
         connectOpts.password = rule.profileConfig.password || '';
@@ -137,7 +137,7 @@ class TunnelService {
       } catch (connErr) {
         tunnelObj.status = 'error';
         tunnelObj.error = connErr.message;
-        reject(connErr);
+        cleanReject(connErr);
       }
     });
   }
@@ -273,6 +273,7 @@ class TunnelService {
         // Prevent socket leak on remote stream errors (Issue 8.2)
         remoteStream.on('error', (err) => {
           onLog('error', `[SSH Tunnel Remote Stream Error] ${err.message}`);
+          try { remoteStream.destroy(); } catch (e) {}
           if (localSocket) {
             try { localSocket.destroy(); } catch (e) {}
           }
@@ -294,6 +295,8 @@ class TunnelService {
             localSocket.statsCleanedUp = true;
             tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
             tunnelObj.activeSockets.delete(localSocket);
+            try { if (localSocket && !localSocket.destroyed) localSocket.destroy(); } catch (e) {}
+            try { if (remoteStream && !remoteStream.destroyed) remoteStream.destroy(); } catch (e) {}
           }
         };
 
@@ -301,6 +304,7 @@ class TunnelService {
         remoteStream.on('close', cleanup);
         localSocket.on('error', (err) => {
           onLog('error', `[SSH Tunnel Local Connect Error] ${err.message}`);
+          try { remoteStream.destroy(); } catch (e) {}
           cleanup();
         });
       });
@@ -326,6 +330,7 @@ class TunnelService {
       tunnelObj.activeConnections++;
       tunnelObj.activeSockets.add(socket);
       socket.statsCleanedUp = false;
+      socket.setTimeout(30000, () => socket.destroy());
 
       const preCleanup = (err) => {
         if (err) {
@@ -354,80 +359,90 @@ class TunnelService {
         socket.write(Buffer.from([0x05, 0x00]));
 
         socket.once('data', (request) => {
-          if (request[0] !== 0x05 || request[1] !== 0x01) { // 0x01 = CONNECT
-            socket.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0])); // Command not supported
-            preCleanup();
-            return;
-          }
-
-          let destHost = '';
-          let destPort = 0;
-          let offset = 4;
-
-          const addrType = request[3];
-          if (addrType === 0x01) { // IPv4
-            destHost = `${request[4]}.${request[5]}.${request[6]}.${request[7]}`;
-            offset = 8;
-          } else if (addrType === 0x03) { // Domain Name
-            const len = request[4];
-            destHost = request.toString('utf8', 5, 5 + len);
-            offset = 5 + len;
-          } else if (addrType === 0x04) { // IPv6
-            socket.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0]));
-            preCleanup();
-            return;
-          }
-
-          destPort = request.readUInt16BE(offset);
-
-          sshClient.forwardOut(
-            socket.remoteAddress || '127.0.0.1',
-            socket.remotePort || 0,
-            destHost,
-            destPort,
-            (err, stream) => {
-              if (err) {
-                onLog('error', `[SOCKS5 Error] Failed to forward to ${destHost}:${destPort}: ${err.message}`);
-                socket.write(Buffer.from([0x05, 0x04, 0x00, 0x01, 0,0,0,0, 0,0])); // Host unreachable
-                preCleanup();
-                return;
-              }
-
-              // Remove the temporary handlers now that we are piping
-              socket.off('error', preCleanup);
-              socket.off('close', preCleanup);
-
-              // Success response: 0x05 (ver), 0x00 (granted), 0x00 (rsv), 0x01 (ipv4)
-              socket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 127,0,0,1, 0,0]));
-
-              socket.on('data', (chunk) => { tunnelObj.bytesRead += chunk.length; });
-              stream.on('data', (chunk) => { tunnelObj.bytesWritten += chunk.length; });
-
-              socket.pipe(stream);
-              stream.pipe(socket);
-
-              const cleanup = () => {
-                socket.destroy();
-                stream.destroy();
-                if (!socket.statsCleanedUp) {
-                  socket.statsCleanedUp = true;
-                  tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
-                  tunnelObj.activeSockets.delete(socket);
-                }
-              };
-
-              socket.on('close', cleanup);
-              stream.on('close', cleanup);
-              socket.on('error', (e) => {
-                onLog('error', `[SOCKS5 Tunnel] Active socket error: ${e.message}`);
-                cleanup();
-              });
-              stream.on('error', (e) => {
-                onLog('error', `[SOCKS5 Tunnel] Active stream error: ${e.message}`);
-                cleanup();
-              });
+          try {
+            if (!request || request.length < 10) { socket.destroy(); return; }
+            if (request[0] !== 0x05 || request[1] !== 0x01) { // 0x01 = CONNECT
+              socket.write(Buffer.from([0x05, 0x07, 0x00, 0x01, 0,0,0,0, 0,0])); // Command not supported
+              preCleanup();
+              return;
             }
-          );
+
+            let destHost = '';
+            let destPort = 0;
+            let offset = 4;
+
+            const addrType = request[3];
+            if (addrType === 0x01) { // IPv4
+              if (request.length < 10) { socket.destroy(); return; }
+              destHost = `${request[4]}.${request[5]}.${request[6]}.${request[7]}`;
+              offset = 8;
+            } else if (addrType === 0x03) { // Domain Name
+              if (request.length < 6) { socket.destroy(); return; }
+              const len = request[4];
+              if (request.length < 5 + len + 2) { socket.destroy(); return; }
+              destHost = request.toString('utf8', 5, 5 + len);
+              offset = 5 + len;
+            } else if (addrType === 0x04) { // IPv6
+              socket.write(Buffer.from([0x05, 0x08, 0x00, 0x01, 0,0,0,0, 0,0]));
+              preCleanup();
+              return;
+            }
+
+            if (request.length < offset + 2) { socket.destroy(); return; }
+            destPort = request.readUInt16BE(offset);
+
+            sshClient.forwardOut(
+              socket.remoteAddress || '127.0.0.1',
+              socket.remotePort || 0,
+              destHost,
+              destPort,
+              (err, stream) => {
+                if (err) {
+                  onLog('error', `[SOCKS5 Error] Failed to forward to ${destHost}:${destPort}: ${err.message}`);
+                  socket.write(Buffer.from([0x05, 0x04, 0x00, 0x01, 0,0,0,0, 0,0])); // Host unreachable
+                  preCleanup();
+                  return;
+                }
+
+                // Remove the temporary handlers now that we are piping
+                socket.off('error', preCleanup);
+                socket.off('close', preCleanup);
+
+                // Success response: 0x05 (ver), 0x00 (granted), 0x00 (rsv), 0x01 (ipv4)
+                socket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 127,0,0,1, 0,0]));
+
+                socket.on('data', (chunk) => { tunnelObj.bytesRead += chunk.length; });
+                stream.on('data', (chunk) => { tunnelObj.bytesWritten += chunk.length; });
+
+                socket.pipe(stream);
+                stream.pipe(socket);
+
+                const cleanup = () => {
+                  socket.destroy();
+                  stream.destroy();
+                  if (!socket.statsCleanedUp) {
+                    socket.statsCleanedUp = true;
+                    tunnelObj.activeConnections = Math.max(0, tunnelObj.activeConnections - 1);
+                    tunnelObj.activeSockets.delete(socket);
+                  }
+                };
+
+                socket.on('close', cleanup);
+                stream.on('close', cleanup);
+                socket.on('error', (e) => {
+                  onLog('error', `[SOCKS5 Tunnel] Active socket error: ${e.message}`);
+                  cleanup();
+                });
+                stream.on('error', (e) => {
+                  onLog('error', `[SOCKS5 Tunnel] Active stream error: ${e.message}`);
+                  cleanup();
+                });
+              }
+            );
+          } catch(e) {
+            socket.destroy();
+            return;
+          }
         });
       });
     });
@@ -474,9 +489,10 @@ class TunnelService {
       for (const socket of tunnelObj.activeSockets) {
         try {
           socket.end();
-          setTimeout(() => {
-            try { socket.destroy(); } catch (e) {}
+          const timer = setTimeout(() => {
+            try { if (!socket.destroyed) socket.destroy(); } catch (e) {}
           }, 1000);
+          if (timer && typeof timer.unref === 'function') timer.unref();
         } catch (e) {}
       }
       tunnelObj.activeSockets.clear();

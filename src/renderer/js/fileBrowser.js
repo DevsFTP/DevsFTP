@@ -86,9 +86,759 @@ window.FileBrowser = {
     this.renderRemoteTable(this.remoteFiles);
   },
 
+  // =========================================================================
+  // Bookmarks Management System (Local, Profile & Global Manager Modal)
+  // =========================================================================
+  getLocalBookmarks() {
+    try {
+      const data = localStorage.getItem('devsftp_local_bookmarks');
+      return data ? JSON.parse(data) : [];
+    } catch (e) { return []; }
+  },
+
+  saveLocalBookmarks(items) {
+    localStorage.setItem('devsftp_local_bookmarks', JSON.stringify(items || []));
+  },
+
+  getGlobalBookmarks() {
+    try {
+      const data = localStorage.getItem('devsftp_global_bookmarks');
+      return data ? JSON.parse(data) : [];
+    } catch (e) { return []; }
+  },
+
+  saveGlobalBookmarks(items) {
+    localStorage.setItem('devsftp_global_bookmarks', JSON.stringify(items || []));
+  },
+
+  getProfileBookmarks(profileId) {
+    if (!profileId) return [];
+    try {
+      const data = localStorage.getItem(`devsftp_profile_bookmarks_${profileId}`);
+      return data ? JSON.parse(data) : [];
+    } catch (e) { return []; }
+  },
+
+  saveProfileBookmarks(profileId, items) {
+    if (!profileId) return;
+    localStorage.setItem(`devsftp_profile_bookmarks_${profileId}`, JSON.stringify(items || []));
+  },
+
+  getProfileBookmarksMap() {
+    const map = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('devsftp_profile_bookmarks_')) {
+          const profId = key.replace('devsftp_profile_bookmarks_', '');
+          const val = localStorage.getItem(key);
+          if (val) {
+            try { map[profId] = JSON.parse(val); } catch (e) {}
+          }
+        }
+      }
+      const legacy = localStorage.getItem('devsftp_profile_bookmarks');
+      if (legacy) {
+        try { Object.assign(map, JSON.parse(legacy)); } catch (e) {}
+      }
+    } catch (e) {}
+    return map;
+  },
+
+  addLocalBookmark(path) {
+    if (!path) return;
+    const items = this.getLocalBookmarks();
+    if (items.some(i => i.path.toLowerCase() === path.toLowerCase())) return;
+    const parts = path.replace(/[\\/]+$/, '').split(/[\\/]/);
+    const name = parts[parts.length - 1] || path;
+    items.push({ id: 'bm_l_' + Date.now(), name, path, isRemote: false });
+    this.saveLocalBookmarks(items);
+    this.renderLocalBookmarksDrawer();
+    this.renderLocalTable(this.localFiles);
+  },
+
+  deleteLocalBookmark(id) {
+    let items = this.getLocalBookmarks();
+    items = items.filter(i => i.id !== id);
+    this.saveLocalBookmarks(items);
+    this.renderLocalBookmarksDrawer();
+    this.renderLocalTable(this.localFiles);
+  },
+
+  addGlobalBookmark(path, isRemote = false, profileId = null) {
+    if (!path) return;
+    const items = this.getGlobalBookmarks();
+    if (items.some(i => i.path.toLowerCase() === path.toLowerCase())) return;
+    const parts = path.replace(/[\\/]+$/, '').split(/[\\/]/);
+    const name = parts[parts.length - 1] || path;
+    items.push({ id: 'bm_g_' + Date.now(), name, path, isRemote, profileId });
+    this.saveGlobalBookmarks(items);
+    this.renderGlobalBookmarksModal();
+  },
+
+  deleteGlobalBookmark(id) {
+    let items = this.getGlobalBookmarks();
+    items = items.filter(i => i.id !== id);
+    this.saveGlobalBookmarks(items);
+    this.renderGlobalBookmarksModal();
+  },
+
+  addProfileBookmark(profileId, path) {
+    if (!profileId || !path) return;
+    const items = this.getProfileBookmarks(profileId);
+    if (items.some(i => i.path.toLowerCase() === path.toLowerCase())) return;
+    const parts = path.replace(/\/+$/, '').split('/');
+    const name = parts[parts.length - 1] || path;
+    items.push({ id: 'bm_p_' + Date.now(), name, path, isRemote: true });
+    this.saveProfileBookmarks(profileId, items);
+    this.renderProfileBookmarksDrawer();
+    this.renderRemoteTable(this.remoteFiles);
+  },
+
+  deleteProfileBookmark(profileId, id) {
+    if (!profileId) return;
+    let items = this.getProfileBookmarks(profileId);
+    items = items.filter(i => i.id !== id);
+    this.saveProfileBookmarks(profileId, items);
+    this.renderProfileBookmarksDrawer();
+    this.renderRemoteTable(this.remoteFiles);
+  },
+
+  renderLocalBookmarksDrawer() {
+    const listEl = document.getElementById('local-bookmarks-list');
+    if (!listEl) return;
+    const items = this.getLocalBookmarks();
+    if (items.length === 0) {
+      listEl.innerHTML = '<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No local bookmarks saved yet. Click "+ Add Current Folder" to add one.</div>';
+      return;
+    }
+    listEl.innerHTML = items.map(item => `
+      <div class="bookmark-item-row" data-path="${item.path.replace(/"/g, '&quot;')}">
+        <div class="bookmark-item-info">
+          <span class="bookmark-item-name">💻 ${item.name}</span>
+          <span class="bookmark-item-path">${item.path}</span>
+        </div>
+        <button class="bookmark-delete-btn" title="Delete Bookmark" data-id="${item.id}">🗑️</button>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.bookmark-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.bookmark-delete-btn')) {
+          const id = e.target.closest('.bookmark-delete-btn').getAttribute('data-id');
+          this.deleteLocalBookmark(id);
+          return;
+        }
+        const path = row.getAttribute('data-path');
+        this.refreshLocal(path);
+      });
+    });
+  },
+
+  renderProfileBookmarksDrawer() {
+    const listEl = document.getElementById('profile-bookmarks-list');
+    const titleEl = document.getElementById('profile-bookmarks-title');
+    if (!listEl) return;
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const profile = activeSess ? activeSess.profile : null;
+    const profileId = profile ? (profile.id || profile.host) : null;
+    const profileName = profile ? (profile.name || profile.host) : 'Server Profile';
+
+    if (titleEl) titleEl.textContent = `🔖 Bookmarks - ${profileName}`;
+
+    if (!profileId) {
+      listEl.innerHTML = '<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No active remote server connection. Connect to a profile to view its bookmarks.</div>';
+      return;
+    }
+
+    const items = this.getProfileBookmarks(profileId);
+    if (items.length === 0) {
+      listEl.innerHTML = `<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No profile bookmarks saved for ${profileName}. Click "+ Add Current Folder" to add one.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map(item => `
+      <div class="bookmark-item-row" data-path="${item.path.replace(/"/g, '&quot;')}">
+        <div class="bookmark-item-info">
+          <span class="bookmark-item-name">🌐 ${item.name}</span>
+          <span class="bookmark-item-path">${item.path}</span>
+        </div>
+        <button class="bookmark-delete-btn" title="Delete Bookmark" data-id="${item.id}">🗑️</button>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.bookmark-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.bookmark-delete-btn')) {
+          const id = e.target.closest('.bookmark-delete-btn').getAttribute('data-id');
+          this.deleteProfileBookmark(profileId, id);
+          return;
+        }
+        const path = row.getAttribute('data-path');
+        this.refreshRemote(path);
+      });
+    });
+  },
+
+  getProfileDisplayName(profileId) {
+    if (!profileId || profileId === 'local') return 'Local System';
+    try {
+      if (window.SessionManager) {
+        const sessions = window.SessionManager.sessions || [];
+        for (const s of (sessions.values ? sessions.values() : Object.values(sessions))) {
+          if (s.profile && (s.profile.id === profileId || s.profile.host === profileId)) {
+            return s.profile.name || s.profile.host || profileId;
+          }
+        }
+      }
+      const raw = localStorage.getItem('devsftp_profiles');
+      if (raw) {
+        const profiles = JSON.parse(raw);
+        const found = profiles.find(p => p.id === profileId || p.host === profileId);
+        if (found) return found.name || found.host || profileId;
+      }
+    } catch (e) {}
+    return profileId;
+  },
+
+  getProfileColor(profileId) {
+    if (!profileId || profileId === 'local') return '#38BDF8';
+    try {
+      if (window.SessionManager) {
+        const sessions = window.SessionManager.sessions || [];
+        for (const s of (sessions.values ? sessions.values() : Object.values(sessions))) {
+          if (s.profile && (s.profile.id === profileId || s.profile.host === profileId)) {
+            return s.profile.profileColor || s.profile.color || s.profile.accentColor || '#68a063';
+          }
+        }
+      }
+      const raw = localStorage.getItem('devsftp_profiles');
+      if (raw) {
+        const profiles = JSON.parse(raw);
+        const found = profiles.find(p => p.id === profileId || p.host === profileId);
+        if (found) return found.profileColor || found.color || found.accentColor || '#68a063';
+      }
+    } catch (e) {}
+    return '#68a063';
+  },
+
+  getAllBookmarksCombined() {
+    const combined = [];
+    
+    // 1. Local Bookmarks
+    const localItems = this.getLocalBookmarks();
+    localItems.forEach(item => {
+      combined.push({
+        id: item.id,
+        source: 'local',
+        profileName: 'Local System',
+        profileColor: '#38BDF8',
+        typeLabel: '💻 Local',
+        name: item.name,
+        path: item.path,
+        isRemote: false
+      });
+    });
+
+    // 2. Global Bookmarks
+    const globalItems = this.getGlobalBookmarks();
+    globalItems.forEach(item => {
+      const profileName = item.isRemote ? (this.getProfileDisplayName(item.profileId) || 'Remote Server') : 'Local System';
+      const profileColor = item.isRemote ? this.getProfileColor(item.profileId) : '#38BDF8';
+      combined.push({
+        id: item.id,
+        source: 'global',
+        profileId: item.profileId || (item.isRemote ? 'remote' : 'local'),
+        profileName: profileName,
+        profileColor: profileColor,
+        typeLabel: item.isRemote ? `🌐 ${profileName}` : '💻 Local System',
+        name: item.name,
+        path: item.path,
+        isRemote: !!item.isRemote
+      });
+    });
+
+    // 3. Profile Bookmarks (scan localStorage keys)
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('devsftp_profile_bookmarks_')) {
+          const profileId = key.replace('devsftp_profile_bookmarks_', '');
+          const profileName = this.getProfileDisplayName(profileId);
+          const profileColor = this.getProfileColor(profileId);
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          items.forEach(item => {
+            combined.push({
+              id: item.id,
+              source: 'profile',
+              profileId: profileId,
+              profileName: profileName,
+              profileColor: profileColor,
+              typeLabel: `🌐 ${profileName}`,
+              name: item.name,
+              path: item.path,
+              isRemote: true
+            });
+          });
+        }
+      }
+    } catch (e) {}
+
+    return combined;
+  },
+
+  deleteBookmarkFromAnySource(item) {
+    if (!item) return;
+    if (item.source === 'local') {
+      this.deleteLocalBookmark(item.id);
+    } else if (item.source === 'global') {
+      this.deleteGlobalBookmark(item.id);
+    } else if (item.source === 'profile' && item.profileId) {
+      this.deleteProfileBookmark(item.profileId, item.id);
+    }
+  },
+
+  renderLocalBookmarksDrawer() {
+    const listEl = document.getElementById('local-bookmarks-list');
+    if (!listEl) return;
+    const items = this.getLocalBookmarks();
+    if (items.length === 0) {
+      listEl.innerHTML = '<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No local bookmarks saved yet. Click "+ Add Current Folder" to add one.</div>';
+      return;
+    }
+    listEl.innerHTML = items.map(item => `
+      <div class="bookmark-item-row" data-path="${item.path.replace(/"/g, '&quot;')}">
+        <div class="bookmark-item-info">
+          <span class="bookmark-item-name">📁 ${item.name}</span>
+          <span class="bookmark-item-path">${item.path}</span>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="bookmark-go-btn bookmark-jump-btn" title="Go to Folder" data-path="${item.path.replace(/"/g, '&quot;')}" data-is-remote="false">➡️</button>
+          <button class="bookmark-delete-btn" title="Delete Bookmark" data-id="${item.id}">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.bookmark-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.bookmark-delete-btn')) {
+          const id = e.target.closest('.bookmark-delete-btn').getAttribute('data-id');
+          this.deleteLocalBookmark(id);
+          return;
+        }
+        if (e.target.closest('.bookmark-jump-btn') || e.target.closest('.bookmark-item-info')) {
+          const path = row.getAttribute('data-path');
+          this.refreshLocal(path);
+          const drawer = document.getElementById('local-bookmarks-drawer');
+          if (drawer) drawer.classList.remove('open');
+        }
+      });
+    });
+  },
+
+  renderProfileBookmarksDrawer() {
+    const listEl = document.getElementById('profile-bookmarks-list');
+    const titleEl = document.getElementById('profile-bookmarks-title');
+    if (!listEl) return;
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const profile = activeSess ? activeSess.profile : null;
+    const profileId = profile ? (profile.id || profile.host) : null;
+    const profileName = profile ? (profile.name || profile.host) : 'Server Profile';
+
+    if (titleEl) titleEl.textContent = `🔖 Bookmarks - ${profileName}`;
+
+    if (!profileId) {
+      listEl.innerHTML = '<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No active remote server connection. Connect to a profile to view its bookmarks.</div>';
+      return;
+    }
+
+    const items = this.getProfileBookmarks(profileId);
+    if (items.length === 0) {
+      listEl.innerHTML = `<div style="font-size: 11px; color: hsl(var(--text-muted)); text-align: center; padding: 24px;">No profile bookmarks saved for ${profileName}. Click "+ Add Current Folder" to add one.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = items.map(item => `
+      <div class="bookmark-item-row" data-path="${item.path.replace(/"/g, '&quot;')}">
+        <div class="bookmark-item-info">
+          <span class="bookmark-item-name">📁 ${item.name}</span>
+          <span class="bookmark-item-path">${item.path}</span>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <button class="bookmark-go-btn bookmark-jump-btn" title="Go to Folder" data-path="${item.path.replace(/"/g, '&quot;')}" data-is-remote="true">➡️</button>
+          <button class="bookmark-delete-btn" title="Delete Bookmark" data-id="${item.id}">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+
+    listEl.querySelectorAll('.bookmark-item-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.bookmark-delete-btn')) {
+          const id = e.target.closest('.bookmark-delete-btn').getAttribute('data-id');
+          this.deleteProfileBookmark(profileId, id);
+          return;
+        }
+        if (e.target.closest('.bookmark-jump-btn') || e.target.closest('.bookmark-item-info')) {
+          const path = row.getAttribute('data-path');
+          this.refreshRemote(path);
+          const drawer = document.getElementById('profile-bookmarks-drawer');
+          if (drawer) drawer.classList.remove('open');
+        }
+      });
+    });
+  },
+
+  renderGlobalBookmarksModal() {
+    const tbody = document.getElementById('global-bookmarks-modal-tbody');
+    const summaryEl = document.getElementById('global-bookmarks-summary');
+    const searchInput = document.getElementById('global-bookmarks-search');
+    const typeSelect = document.getElementById('global-bookmarks-type-filter');
+    const profileSelect = document.getElementById('global-bookmarks-profile-filter');
+    if (!tbody) return;
+
+    let items = this.getAllBookmarksCombined();
+
+    // Populate profile filter options dynamically (matching PendingEditsManager L1740-1744)
+    if (profileSelect) {
+      const currentSelected = profileSelect.value || 'all';
+      const profileMap = new Map();
+      items.forEach(i => {
+        const profId = i.profileId || (i.isRemote ? 'remote' : 'local');
+        const profName = i.profileName || (i.isRemote ? 'Remote Server' : 'Local System');
+        const profColor = i.profileColor || (i.isRemote ? '#68a063' : null);
+        profileMap.set(profId, { name: profName, color: profColor, isRemote: i.isRemote });
+      });
+      let profileOpts = '<option value="all">All Server Profiles</option>';
+      for (const [pId, info] of profileMap.entries()) {
+        if (!info.isRemote) {
+          profileOpts += `<option value="${pId}" ${currentSelected === pId ? 'selected' : ''}>💻 ${info.name}</option>`;
+        } else {
+          profileOpts += `<option value="${pId}" ${currentSelected === pId ? 'selected' : ''} style="color: ${info.color || '#68a063'};">● ${info.name}</option>`;
+        }
+      }
+      profileSelect.innerHTML = profileOpts;
+    }
+
+    // Apply Filters
+    const typeVal = typeSelect ? typeSelect.value : 'all';
+    const profileVal = profileSelect ? profileSelect.value : 'all';
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+    if (typeVal === 'local') {
+      items = items.filter(i => !i.isRemote);
+    } else if (typeVal === 'remote') {
+      items = items.filter(i => i.isRemote);
+    }
+
+    if (profileVal !== 'all') {
+      items = items.filter(i => (i.profileId || (i.isRemote ? 'remote' : 'local')) === profileVal);
+    }
+
+    if (query) {
+      items = items.filter(i => 
+        (i.name && i.name.toLowerCase().includes(query)) ||
+        (i.path && i.path.toLowerCase().includes(query)) ||
+        (i.profileName && i.profileName.toLowerCase().includes(query))
+      );
+    }
+
+    if (summaryEl) {
+      summaryEl.innerHTML = `Bookmarks: <strong style="color: #F59E0B;">${items.length}</strong>`;
+    }
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: hsl(var(--text-muted)); padding: 40px;">No bookmarks found matching current filters.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = items.map(item => {
+      const icon = item.isDir ? '📁' : (item.path.includes('.') && !item.path.endsWith('/') ? '📄' : '📁');
+      const dotColor = item.profileColor || '#68a063';
+      const profileCellHtml = item.isRemote 
+        ? `<div style="display: flex; align-items: center; gap: 6px;">
+             <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${dotColor}; flex-shrink: 0;"></span>
+             <span>${item.profileName}</span>
+           </div>`
+        : `<div style="display: flex; align-items: center; gap: 6px;">
+             <span>💻 Local System</span>
+           </div>`;
+
+      return `
+        <tr class="file-row" style="border-bottom: 1px solid hsl(var(--border-subtle)); font-size: 12px;">
+          <td style="text-align: center; vertical-align: middle;">
+            <input type="checkbox" class="global-bm-checkbox" data-id="${item.id}" data-source="${item.source}" data-profile-id="${item.profileId || ''}" checked style="margin: 0; cursor: pointer;">
+          </td>
+          <td style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.name.replace(/"/g, '&quot;')}">
+            ${icon} ${item.name}
+          </td>
+          <td style="font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.profileName.replace(/"/g, '&quot;')}">
+            ${profileCellHtml}
+          </td>
+          <td style="font-family: var(--font-mono); font-size: 11px; color: hsl(var(--text-secondary)); vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.path.replace(/"/g, '&quot;')}">${item.path}</td>
+          <td style="text-align: center; vertical-align: middle;">
+            <div style="display: flex; gap: 6px; justify-content: center;">
+              <button class="bookmark-go-btn btn-jump-global-bm" title="Go to Folder" data-path="${item.path.replace(/"/g, '&quot;')}" data-is-remote="${item.isRemote}">➡️</button>
+              <button class="bookmark-delete-btn btn-delete-any-bm" title="Delete Bookmark" data-id="${item.id}" data-source="${item.source}" data-profile-id="${item.profileId || ''}">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('.btn-jump-global-bm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const path = btn.getAttribute('data-path');
+        const isRemote = btn.getAttribute('data-is-remote') === 'true';
+        this.toggleGlobalBookmarksModal(false);
+        if (isRemote) {
+          this.refreshRemote(path);
+        } else {
+          this.refreshLocal(path);
+        }
+      });
+    });
+
+    tbody.querySelectorAll('.btn-delete-any-bm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const source = btn.getAttribute('data-source');
+        const profileId = btn.getAttribute('data-profile-id');
+        this.deleteBookmarkFromAnySource({ id, source, profileId });
+        this.renderGlobalBookmarksModal();
+      });
+    });
+  },
+
+  toggleLocalBookmarksDrawer(openState) {
+    const drawer = document.getElementById('local-bookmarks-drawer');
+    if (!drawer) return;
+    const shouldOpen = openState !== undefined ? openState : !drawer.classList.contains('open');
+    drawer.classList.toggle('open', shouldOpen);
+    drawer.setAttribute('aria-hidden', (!shouldOpen).toString());
+    if (shouldOpen) {
+      this.renderLocalBookmarksDrawer();
+    }
+  },
+
+  toggleProfileBookmarksDrawer(openState) {
+    const drawer = document.getElementById('profile-bookmarks-drawer');
+    if (!drawer) return;
+    const shouldOpen = openState !== undefined ? openState : !drawer.classList.contains('open');
+    drawer.classList.toggle('open', shouldOpen);
+    drawer.setAttribute('aria-hidden', (!shouldOpen).toString());
+    if (shouldOpen) {
+      this.renderProfileBookmarksDrawer();
+    }
+  },
+
+  toggleGlobalBookmarksModal(openState) {
+    const modal = document.getElementById('global-bookmarks-modal');
+    if (!modal) return;
+    const shouldOpen = openState !== undefined ? openState : !modal.classList.contains('active');
+    modal.classList.toggle('active', shouldOpen);
+    if (shouldOpen) {
+      this.renderGlobalBookmarksModal();
+    }
+  },
+
+  async getSavedProfiles() {
+    let profiles = (window.ConnectionDialog && window.ConnectionDialog.profiles && window.ConnectionDialog.profiles.length > 0)
+      ? window.ConnectionDialog.profiles
+      : [];
+    if (profiles.length === 0) {
+      const api = this.getApi();
+      if (api && api.profiles && api.profiles.getAll) {
+        try {
+          profiles = await api.profiles.getAll();
+          if (window.ConnectionDialog) {
+            window.ConnectionDialog.profiles = profiles;
+          }
+        } catch (e) {}
+      }
+    }
+    return profiles || [];
+  },
+
+  async openRemoteTransferModal(sourceItems = [], defaultProfileId = '') {
+    const modal = document.getElementById('remote-transfer-modal');
+    if (!modal) return;
+
+    const summaryEl = document.getElementById('remote-transfer-source-summary');
+    const pathEl = document.getElementById('remote-transfer-source-path');
+    const selectEl = document.getElementById('remote-transfer-target-profile');
+    const targetPathInput = document.getElementById('remote-transfer-target-path');
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const currentProfileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : '';
+
+    if (summaryEl) {
+      const itemsCount = (sourceItems && sourceItems.length) ? sourceItems.length : 1;
+      summaryEl.textContent = `Source Items: ${itemsCount} selected item(s)`;
+    }
+    if (pathEl) {
+      pathEl.textContent = `From: ${this.remotePath || '/'}`;
+    }
+
+    if (selectEl) {
+      const profiles = await this.getSavedProfiles();
+      let options = '<option value="">Select Destination Server Profile...</option>';
+      profiles.forEach(p => {
+        const pId = p.id || p.host;
+        if (pId !== currentProfileId) {
+          const color = p.profileColor || p.color || '#68a063';
+          const pName = p.name || p.host;
+          const isSel = defaultProfileId === pId ? 'selected' : '';
+          options += `<option value="${pId}" ${isSel} style="color: ${color};">● ${pName}</option>`;
+        }
+      });
+      selectEl.innerHTML = options;
+    }
+
+    if (targetPathInput && !targetPathInput.value) {
+      targetPathInput.value = '/';
+    }
+
+    modal.classList.add('active');
+  },
+
+  closeRemoteTransferModal() {
+    const modal = document.getElementById('remote-transfer-modal');
+    if (modal) modal.classList.remove('active');
+  },
+
+  async populateRemoteTransferSubmenu() {
+    const submenu = document.getElementById('ctx-remote-transfer-submenu');
+    if (!submenu) return;
+
+    const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+    const currentProfileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : '';
+    const profiles = await this.getSavedProfiles();
+
+    const otherProfiles = profiles.filter(p => (p.id || p.host) !== currentProfileId);
+    if (otherProfiles.length === 0) {
+      submenu.innerHTML = '<div class="context-menu-item disabled">No other server profiles</div>';
+      return;
+    }
+
+    submenu.innerHTML = otherProfiles.map(p => {
+      const pId = p.id || p.host;
+      const pName = p.name || p.host;
+      const color = p.profileColor || p.color || '#68a063';
+      return `<div class="context-menu-item ctx-remote-transfer-opt" data-profile-id="${pId}">
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${color}; flex-shrink: 0; margin-right: 6px;"></span>
+        <span>${pName}</span>
+      </div>`;
+    }).join('');
+
+    submenu.querySelectorAll('.ctx-remote-transfer-opt').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pId = opt.getAttribute('data-profile-id');
+        this.openRemoteTransferModal(this.selectedRemoteFiles || [], pId);
+        const ctxMenu = document.getElementById('context-menu');
+        if (ctxMenu) ctxMenu.style.display = 'none';
+      });
+    });
+  },
+
   setupListeners() {
+    // Remote-to-Remote Transfer Modal Controls
+    const btnRemoteTransferClose = document.getElementById('btn-remote-transfer-close');
+    if (btnRemoteTransferClose) btnRemoteTransferClose.addEventListener('click', () => this.closeRemoteTransferModal());
+
+    const btnRemoteTransferCancel = document.getElementById('btn-remote-transfer-cancel');
+    if (btnRemoteTransferCancel) btnRemoteTransferCancel.addEventListener('click', () => this.closeRemoteTransferModal());
+
+    const btnRemoteTransferSubmit = document.getElementById('btn-remote-transfer-submit');
+    if (btnRemoteTransferSubmit) {
+      btnRemoteTransferSubmit.addEventListener('click', async () => {
+        const selectEl = document.getElementById('remote-transfer-target-profile');
+        const pathEl = document.getElementById('remote-transfer-target-path');
+        const targetProfileId = selectEl ? selectEl.value : '';
+        const targetDir = pathEl ? pathEl.value.trim() : '/';
+
+        if (!targetProfileId) {
+          alert('Please select a destination server profile.');
+          return;
+        }
+
+        const items = (this.selectedRemoteFiles && this.selectedRemoteFiles.length > 0)
+          ? this.selectedRemoteFiles
+          : (this.selectedRemote ? [this.selectedRemote] : []);
+
+        if (items.length === 0) {
+          alert('No source remote files selected to transfer.');
+          return;
+        }
+
+        const profiles = await this.getSavedProfiles();
+        const targetProf = profiles.find(p => (p.id || p.host) === targetProfileId);
+        const targetName = targetProf ? (targetProf.name || targetProf.host) : targetProfileId;
+
+        const api = this.getApi();
+        const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+        const sourceSessionId = activeSess ? activeSess.sessionId : null;
+        const sourceProfileId = activeSess && activeSess.profile ? activeSess.profile.id : 'default';
+
+        this.closeRemoteTransferModal();
+
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('info', `Starting Remote-to-Remote transfer of ${items.length} item(s) to ${targetName} (${targetDir})...`);
+        }
+
+        for (const item of items) {
+          const destPath = targetDir.endsWith('/') ? `${targetDir}${item.name}` : `${targetDir}/${item.name}`;
+          let taskId = null;
+          try {
+            if (window.TransferQueue) {
+              taskId = window.TransferQueue.addTransfer('remote-to-remote', item.path, destPath, targetProfileId, sourceProfileId);
+            }
+            if (api && api.remoteToRemoteTransfer) {
+              await api.remoteToRemoteTransfer({
+                taskId: taskId,
+                sourcePath: item.path,
+                targetProfileId: targetProfileId,
+                targetPath: destPath,
+                sourceSessionId: sourceSessionId,
+                isDir: item.isDir
+              });
+              if (window.TransferQueue && taskId) {
+                window.TransferQueue.handleProgress({ taskId: taskId, percentage: 100, status: 'Completed' });
+              }
+            }
+          } catch (err) {
+            if (window.TransferQueue && taskId) {
+              window.TransferQueue.handleProgress({ taskId: taskId, status: 'Failed' });
+            }
+            console.error(`Remote-to-Remote transfer error for ${item.name}:`, err);
+            alert(`Remote transfer failed for ${item.name}: ${err.message}`);
+          }
+        }
+      });
+    }
     // Local Controls
     document.getElementById('btn-local-refresh').addEventListener('click', () => this.refreshLocal(this.localPath));
+    const btnLocalHome = document.getElementById('btn-local-home');
+    if (btnLocalHome) {
+      btnLocalHome.addEventListener('click', async () => {
+        const api = this.getApi();
+        let homePath = 'C:\\';
+        if (api && api.localHome) {
+          try { homePath = await api.localHome(); } catch (e) {}
+        }
+        this.refreshLocal(homePath);
+      });
+    }
+    const btnLocalRoot = document.getElementById('btn-local-root');
+    if (btnLocalRoot) {
+      btnLocalRoot.addEventListener('click', () => {
+        const driveMatch = (this.localPath || '').match(/^([a-zA-Z]:)/);
+        const rootPath = driveMatch ? `${driveMatch[1]}\\` : 'C:\\';
+        this.refreshLocal(rootPath);
+      });
+    }
     document.getElementById('btn-local-up').addEventListener('click', () => this.localUp());
     document.getElementById('local-path-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.refreshLocal(e.target.value);
@@ -97,6 +847,20 @@ window.FileBrowser = {
 
     // Remote Controls
     document.getElementById('btn-remote-refresh').addEventListener('click', () => this.refreshRemote(this.remotePath));
+    const btnRemoteHome = document.getElementById('btn-remote-home');
+    if (btnRemoteHome) {
+      btnRemoteHome.addEventListener('click', () => {
+        const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+        const initialPath = (activeSess && activeSess.profile && activeSess.profile.initialPath) ? activeSess.profile.initialPath : '/';
+        this.refreshRemote(initialPath || '/');
+      });
+    }
+    const btnRemoteRoot = document.getElementById('btn-remote-root');
+    if (btnRemoteRoot) {
+      btnRemoteRoot.addEventListener('click', () => {
+        this.refreshRemote('/');
+      });
+    }
     const btnRemoteDisconnect = document.getElementById('btn-remote-disconnect');
     if (btnRemoteDisconnect) {
       btnRemoteDisconnect.addEventListener('click', () => {
@@ -121,6 +885,88 @@ window.FileBrowser = {
       if (e.key === 'Enter') this.refreshRemote(e.target.value);
     });
     document.getElementById('remote-filter').addEventListener('input', (e) => this.filterRemote(e.target.value));
+
+    // Local Bookmarks Listeners
+    const btnLocalBm = document.getElementById('btn-local-bookmarks');
+    const btnCloseLocalBm = document.getElementById('btn-close-local-bookmarks');
+    const btnAddLocalBm = document.getElementById('btn-add-local-bookmark');
+
+    if (btnLocalBm) btnLocalBm.addEventListener('click', () => this.toggleLocalBookmarksDrawer());
+    if (btnCloseLocalBm) btnCloseLocalBm.addEventListener('click', () => this.toggleLocalBookmarksDrawer(false));
+    if (btnAddLocalBm) btnAddLocalBm.addEventListener('click', () => this.addLocalBookmark(this.localPath));
+
+    // Global Bookmarks Manager Modal Listeners
+    const btnHeaderGlobalBm = document.getElementById('btn-header-global-bookmarks');
+    const btnCloseGlobalModalBm = document.getElementById('btn-global-bookmarks-modal-close');
+    const btnAddGlobalLocalFolder = document.getElementById('btn-add-global-local-folder');
+    const btnAddGlobalRemoteFolder = document.getElementById('btn-add-global-remote-folder');
+    const searchGlobalBm = document.getElementById('global-bookmarks-search');
+
+    if (btnHeaderGlobalBm) btnHeaderGlobalBm.addEventListener('click', () => this.toggleGlobalBookmarksModal());
+    if (btnCloseGlobalModalBm) btnCloseGlobalModalBm.addEventListener('click', () => this.toggleGlobalBookmarksModal(false));
+    if (btnAddGlobalLocalFolder) btnAddGlobalLocalFolder.addEventListener('click', () => this.addGlobalBookmark(this.localPath, false));
+    if (btnAddGlobalRemoteFolder) {
+      btnAddGlobalRemoteFolder.addEventListener('click', () => {
+        const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+        const profileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : null;
+        if (this.remotePath && this.remotePath !== '/') {
+          this.addGlobalBookmark(this.remotePath, true, profileId);
+        } else {
+          alert('⚠️ Please select or open a remote directory before bookmarking.');
+        }
+      });
+    }
+    if (searchGlobalBm) {
+      searchGlobalBm.addEventListener('input', () => this.renderGlobalBookmarksModal());
+    }
+
+    // Global Bookmarks Select All & Bulk Delete Listeners
+    const selectAllBm = document.getElementById('global-bookmarks-select-all');
+    if (selectAllBm) {
+      selectAllBm.addEventListener('change', (e) => {
+        document.querySelectorAll('.global-bm-checkbox').forEach(cb => cb.checked = e.target.checked);
+      });
+    }
+
+    const btnDeleteSelectedBm = document.getElementById('btn-global-bookmarks-delete-selected');
+    if (btnDeleteSelectedBm) {
+      btnDeleteSelectedBm.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('.global-bm-checkbox:checked');
+        if (checkboxes.length === 0) {
+          alert('Please check at least one bookmark to delete.');
+          return;
+        }
+        checkboxes.forEach(cb => {
+          const id = cb.getAttribute('data-id');
+          const source = cb.getAttribute('data-source');
+          const profileId = cb.getAttribute('data-profile-id');
+          this.deleteBookmarkFromAnySource({ id, source, profileId });
+        });
+        this.renderGlobalBookmarksModal();
+      });
+    }
+
+    const btnCancelGlobalModalBm = document.getElementById('btn-global-bookmarks-cancel');
+    if (btnCancelGlobalModalBm) btnCancelGlobalModalBm.addEventListener('click', () => this.toggleGlobalBookmarksModal(false));
+
+    // Profile Bookmarks Toggle & Drawer Listeners
+    const btnRemoteBm = document.getElementById('btn-remote-bookmarks');
+    const btnCloseProfileBm = document.getElementById('btn-close-profile-bookmarks');
+    const btnAddProfileBm = document.getElementById('btn-add-profile-bookmark');
+
+    if (btnRemoteBm) btnRemoteBm.addEventListener('click', () => this.toggleProfileBookmarksDrawer());
+    if (btnCloseProfileBm) btnCloseProfileBm.addEventListener('click', () => this.toggleProfileBookmarksDrawer(false));
+    if (btnAddProfileBm) {
+      btnAddProfileBm.addEventListener('click', () => {
+        const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+        const profileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : null;
+        if (profileId) {
+          this.addProfileBookmark(profileId, this.remotePath);
+        } else {
+          alert('⚠️ Please connect to a server profile before adding profile bookmarks.');
+        }
+      });
+    }
 
     // Global click listener to hide context menu
     document.addEventListener('click', (e) => {
@@ -149,6 +995,12 @@ window.FileBrowser = {
     });
     document.getElementById('ctx-chmod').addEventListener('click', (e) => {
       this.handleContextAction('chmod');
+    });
+    document.getElementById('ctx-bookmark-add').addEventListener('click', (e) => {
+      this.handleContextAction('bookmark-add');
+    });
+    document.getElementById('ctx-bookmark-remove').addEventListener('click', (e) => {
+      this.handleContextAction('bookmark-remove');
     });
     document.getElementById('ctx-new-file').addEventListener('click', (e) => {
       this.handleContextAction('new-file');
@@ -192,6 +1044,29 @@ window.FileBrowser = {
     document.getElementById('ssh-cmd-du').addEventListener('click', (e) => {
       e.stopPropagation();
       this.handleContextAction('ssh-du');
+    });
+
+    document.getElementById('ctx-download-as').addEventListener('click', (e) => {
+      this.handleContextAction('download-as');
+    });
+    document.getElementById('ctx-sort-name').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('sort-name');
+    });
+    document.getElementById('ctx-sort-size').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('sort-size');
+    });
+    document.getElementById('ctx-sort-date').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('sort-date');
+    });
+    document.getElementById('ctx-sort-type').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleContextAction('sort-type');
+    });
+    document.getElementById('ctx-properties').addEventListener('click', (e) => {
+      this.handleContextAction('properties');
     });
 
     // Drive selector
@@ -463,7 +1338,8 @@ window.FileBrowser = {
 
     // Sortable Headers Event Listeners
     document.querySelectorAll('.sortable-header').forEach(th => {
-      th.addEventListener('click', () => {
+      th.addEventListener('click', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('col-resizer')) return;
         const pane = th.getAttribute('data-pane');
         const key = th.getAttribute('data-sort-key');
         
@@ -490,6 +1366,9 @@ window.FileBrowser = {
 
     // Drag & Drop Dual-Pane Listeners
     this.setupDragAndDrop();
+
+    // Initialize Column Resizing
+    this.initColumnResizing();
 
     // Search Drawer Panel Listeners
     const btnCloseSearch = document.getElementById('btn-close-search-tab');
@@ -531,11 +1410,13 @@ window.FileBrowser = {
         }
       });
 
-      localPane.addEventListener('drop', (e) => {
+      localPane.addEventListener('drop', async (e) => {
         e.preventDefault();
         e.stopPropagation();
         localPane.classList.remove('dropzone-active');
         if (this.dragSourcePane === 'local') return;
+
+        if (window.FileConflictDialog) window.FileConflictDialog.resetBatch();
 
         try {
           const raw = e.dataTransfer.getData('application/json');
@@ -543,15 +1424,16 @@ window.FileBrowser = {
             const data = JSON.parse(raw);
             if (data && data.sourcePane === 'remote') {
               if (data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                  if (item.path) this.downloadFile(item.path);
-                });
+                await this.downloadBatchItems(data.items);
               } else if (data.path) {
-                this.downloadFile(data.path);
+                await this.downloadBatchItems([{ path: data.path, name: data.name }]);
               }
             }
           }
-        } catch (err) {}
+        } catch (err) {
+          if (window.LogViewer) window.LogViewer.addEntry('error', `Drop download failed: ${err.message || err}`);
+          alert(`Failed to complete drop download: ${err.message || err}`);
+        }
       });
     }
 
@@ -574,38 +1456,38 @@ window.FileBrowser = {
         }
       });
 
-      remotePane.addEventListener('drop', (e) => {
+      remotePane.addEventListener('drop', async (e) => {
         e.preventDefault();
         e.stopPropagation();
         remotePane.classList.remove('dropzone-active');
         if (this.dragSourcePane === 'remote') return;
 
-        // External OS Desktop/Explorer Drag & Drop Files
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          Array.from(e.dataTransfer.files).forEach(file => {
-            if (file.path) {
-              this.uploadFile(file.path);
-            }
-          });
-          return;
-        }
+        if (window.FileConflictDialog) window.FileConflictDialog.resetBatch();
 
-        // Internal Pane Drag & Drop
         try {
+          // External OS Desktop/Explorer Drag & Drop Files
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const files = Array.from(e.dataTransfer.files).filter(f => f.path).map(f => ({ path: f.path, name: f.name || f.path.replace(/\\/g, '/').split('/').pop(), size: f.size }));
+            await this.uploadBatchItems(files);
+            return;
+          }
+
+          // Internal Pane Drag & Drop
           const raw = e.dataTransfer.getData('application/json');
           if (raw) {
             const data = JSON.parse(raw);
             if (data && data.sourcePane === 'local') {
               if (data.items && data.items.length > 0) {
-                data.items.forEach(item => {
-                  if (item.path) this.uploadFile(item.path);
-                });
+                await this.uploadBatchItems(data.items);
               } else if (data.path) {
-                this.uploadFile(data.path);
+                await this.uploadBatchItems([{ path: data.path, name: data.name }]);
               }
             }
           }
-        } catch (err) {}
+        } catch (err) {
+          if (window.LogViewer) window.LogViewer.addEntry('error', `Drop upload failed: ${err.message || err}`);
+          alert(`Failed to complete drop upload: ${err.message || err}`);
+        }
       });
     }
   },
@@ -1170,22 +2052,40 @@ window.FileBrowser = {
 
     if (!modal) return;
 
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
     if (itemList.length === 1) {
       const item = itemList[0];
       const icon = item.isDir ? '📁' : '📄';
       const typeLabel = item.isDir ? 'Directory' : 'File';
       if (title) title.textContent = `🗑 Delete ${typeLabel} (${pane === 'remote' ? 'Remote' : 'Local'})`;
-      if (pathVal) pathVal.textContent = item.path;
+      if (pathVal) {
+        pathVal.innerHTML = `<span style="font-family: var(--font-mono); font-size: 11px;">${escapeHtml(item.path)}</span>`;
+      }
       if (warningVal) {
         warningVal.textContent = `Are you sure you want to delete ${icon} "${item.name}" from your ${pane} filesystem? This action cannot be undone.`;
       }
     } else {
       if (title) title.textContent = `🗑 Delete ${itemList.length} Items (${pane === 'remote' ? 'Remote' : 'Local'})`;
-      if (pathVal) pathVal.textContent = `${itemList.length} selected items`;
-      const itemNames = itemList.slice(0, 5).map(i => `• ${i.name}`).join('\n');
-      const moreText = itemList.length > 5 ? `\n...and ${itemList.length - 5} more.` : '';
+      if (pathVal) {
+        const listHtml = `
+          <div class="delete-target-list" style="max-height: 90px; overflow-y: auto; border: 1px solid hsl(var(--border-subtle)); padding: 6px 10px; border-radius: 4px; background-color: rgba(0,0,0,0.15); margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
+            ${itemList.map(i => `
+              <div style="font-family: var(--font-mono); font-size: 11px; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <input type="checkbox" class="delete-target-checkbox" data-path="${escapeHtml(i.path)}" checked style="margin: 0; cursor: pointer;">
+                <span>${i.isDir ? '📁' : '📄'}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(i.name)}">${escapeHtml(i.name)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        pathVal.innerHTML = listHtml;
+      }
       if (warningVal) {
-        warningVal.textContent = `Are you sure you want to delete these ${itemList.length} items from your ${pane} filesystem? This action cannot be undone.\n\n${itemNames}${moreText}`;
+        warningVal.textContent = `Are you sure you want to delete the checked item(s) from your ${pane} filesystem? This action cannot be undone.`;
       }
     }
 
@@ -1201,8 +2101,27 @@ window.FileBrowser = {
   },
 
   async submitDelete() {
-    const items = (this.deleteTargetItems && this.deleteTargetItems.length > 0) ? this.deleteTargetItems : (this.deleteTargetItem ? [this.deleteTargetItem] : []);
-    if (items.length === 0) return;
+    const rawItems = (this.deleteTargetItems && this.deleteTargetItems.length > 0) ? this.deleteTargetItems : (this.deleteTargetItem ? [this.deleteTargetItem] : []);
+    if (rawItems.length === 0) return;
+
+    // Filter by checked checkboxes in the UI target list if multiple items
+    const checkboxes = document.querySelectorAll('.delete-target-checkbox');
+    const checkedPaths = new Set();
+    checkboxes.forEach(cb => {
+      if (cb.checked) {
+        checkedPaths.add(cb.getAttribute('data-path'));
+      }
+    });
+
+    const items = checkboxes.length > 0
+      ? rawItems.filter(item => checkedPaths.has(item.path))
+      : rawItems;
+
+    if (!items.length) {
+      alert('Please check at least one item to delete.');
+      return;
+    }
+
     const pane = this.deleteTargetPane || 'remote';
     const api = this.getApi();
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
@@ -1210,8 +2129,9 @@ window.FileBrowser = {
     this.closeDeleteConfirmModal();
 
     let successCount = 0;
-    try {
-      for (const item of items) {
+    const errors = [];
+    for (const item of items) {
+      try {
         if (pane === 'remote') {
           await api.remoteDelete(item.path, item.isDir, sessId);
           successCount++;
@@ -1221,21 +2141,24 @@ window.FileBrowser = {
             successCount++;
           }
         }
+      } catch (err) {
+        errors.push({ item: item.name || item.path, msg: err && err.message ? err.message : String(err) });
       }
-      if (window.LogViewer) window.LogViewer.addEntry('warning', `🗑 Deleted ${successCount} ${pane} item(s).`);
-      if (pane === 'remote') this.refreshRemote(this.remotePath);
-      else this.refreshLocal(this.localPath);
-    } catch (err) {
-      const cleanMsg = err && err.message ? err.message : String(err);
+    }
+    if (successCount > 0 && window.LogViewer) {
+      window.LogViewer.addEntry('warning', `🗑 Deleted ${successCount} ${pane} item(s).`);
+    }
+    if (errors.length > 0) {
+      const cleanMsg = errors.map(e => `${e.item}: ${e.msg}`).join('\n');
       this.showErrorModal(
-        '⚠️ Delete Failed',
-        `${items.length} item(s)`,
+        '⚠️ Delete Failed for Some Item(s)',
+        `${errors.length} of ${items.length} item(s) failed`,
         cleanMsg,
         'Please check item permissions, or verify the file/folder is not locked by another process.'
       );
-      if (pane === 'remote') this.refreshRemote(this.remotePath);
-      else this.refreshLocal(this.localPath);
     }
+    if (pane === 'remote') this.refreshRemote(this.remotePath);
+    else this.refreshLocal(this.localPath);
   },
 
   parsePermissionsToOctal(permStr) {
@@ -1475,20 +2398,120 @@ window.FileBrowser = {
     }
   },
 
+  initColumnResizing() {
+    const setupTableResizing = (tableId, storageKey) => {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+
+      const cols = table.querySelectorAll('thead th');
+      if (!cols || cols.length === 0) return;
+
+      try {
+        const savedWidths = JSON.parse(localStorage.getItem(storageKey));
+        if (Array.isArray(savedWidths) && savedWidths.length === cols.length) {
+          cols.forEach((col, idx) => {
+            if (savedWidths[idx]) col.style.width = savedWidths[idx];
+          });
+        }
+      } catch (e) {}
+
+      cols.forEach((col, idx) => {
+        const resizer = col.querySelector('.col-resizer');
+        if (!resizer) return;
+
+        const nextCol = cols[idx + 1];
+        let startX = 0;
+        let startWidth = 0;
+        let nextStartWidth = 0;
+
+        const onMouseMove = (e) => {
+          const dx = e.clientX - startX;
+          if (nextCol) {
+            const minW = 35;
+            let newWidth = startWidth + dx;
+            let newNextWidth = nextStartWidth - dx;
+
+            if (newWidth < minW) {
+              newWidth = minW;
+              newNextWidth = startWidth + nextStartWidth - minW;
+            } else if (newNextWidth < minW) {
+              newNextWidth = minW;
+              newWidth = startWidth + nextStartWidth - minW;
+            }
+
+            col.style.width = `${newWidth}px`;
+            nextCol.style.width = `${newNextWidth}px`;
+          } else {
+            const newWidth = Math.max(40, startWidth + dx);
+            col.style.width = `${newWidth}px`;
+          }
+        };
+
+        const onMouseUp = () => {
+          resizer.classList.remove('resizing');
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+
+          const currentWidths = Array.from(cols).map(c => c.style.width || `${c.offsetWidth}px`);
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(currentWidths));
+          } catch (e) {}
+        };
+
+        resizer.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          startX = e.clientX;
+          startWidth = col.offsetWidth;
+          nextStartWidth = nextCol ? nextCol.offsetWidth : 0;
+          resizer.classList.add('resizing');
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+      });
+    };
+
+    setupTableResizing('local-file-table', 'devsftp_col_widths_local');
+    setupTableResizing('remote-file-table', 'devsftp_col_widths_remote');
+
+    const pendingTable = document.querySelector('#pending-edits-modal table');
+    if (pendingTable) {
+      if (!pendingTable.id) pendingTable.id = 'pending-edits-table';
+      setupTableResizing('pending-edits-table', 'devsftp_col_widths_pending');
+    }
+
+    const compareTable = document.querySelector('#dir-compare-modal table');
+    if (compareTable) {
+      if (!compareTable.id) compareTable.id = 'dir-compare-table';
+      setupTableResizing('dir-compare-table', 'devsftp_col_widths_compare');
+    }
+  },
+
   async loadDrives() {
     const api = this.getApi();
     if (!api) return;
     try {
       const drives = await api.localDrives();
       const select = document.getElementById('local-drive-select');
-      if (select) {
+      if (select && Array.isArray(drives)) {
         select.innerHTML = '';
         drives.forEach(d => {
           const opt = document.createElement('option');
-          opt.value = d;
-          opt.textContent = `${d} Drive`;
+          const val = typeof d === 'object' ? d.path : d;
+          const lbl = typeof d === 'object' ? d.label : `${d} Drive`;
+          opt.value = val;
+          opt.textContent = lbl;
           select.appendChild(opt);
         });
+        if (this.localPath) {
+          const match = drives.find(d => {
+            const val = typeof d === 'object' ? d.path : d;
+            return this.localPath.startsWith(val);
+          });
+          if (match) {
+            select.value = typeof match === 'object' ? match.path : match;
+          }
+        }
       }
     } catch (e) {}
   },
@@ -1516,6 +2539,17 @@ window.FileBrowser = {
       }
       this.triggerAutoCalcLocal();
     } catch (err) {
+      const errStr = String(err && err.message ? err.message : err).toLowerCase();
+      const isNotFound = errStr.includes('no such file') || errStr.includes('enoent') || errStr.includes('cannot find');
+      const isWin = typeof process !== 'undefined' && process.platform === 'win32';
+      const defaultHome = isWin ? 'C:\\' : '/';
+      if (isNotFound && targetPath && targetPath !== defaultHome) {
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('warning', `⚠️ Local directory "${targetPath}" no longer exists. Navigating to default home: "${defaultHome}"`);
+        }
+        this._refreshingLocal = false;
+        return this.refreshLocal(defaultHome);
+      }
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read local directory: ${err.message}`);
     } finally {
       this._refreshingLocal = false;
@@ -1546,7 +2580,24 @@ window.FileBrowser = {
       }
       this.triggerAutoCalcRemote();
     } catch (err) {
+      const errStr = String(err && err.message ? err.message : err).toLowerCase();
+      const isNotFound = errStr.includes('no such file') || errStr.includes('not found') || errStr.includes('550') || errStr.includes('450') || errStr.includes('enoent');
+      if (isNotFound && targetPath && targetPath !== '/') {
+        const lastSlash = targetPath.lastIndexOf('/');
+        const parentPath = lastSlash <= 0 ? '/' : targetPath.substring(0, lastSlash);
+        if (window.LogViewer) {
+          window.LogViewer.addEntry('warning', `⚠️ Remote directory "${targetPath}" no longer exists. Falling back to parent: "${parentPath}"`);
+        }
+        this._refreshingRemote = false;
+        return this.refreshRemote(parentPath);
+      }
       if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to read remote directory: ${err.message}`);
+      this.showErrorModal(
+        '⚠️ Remote Directory Read Failed',
+        targetPath,
+        err.message || 'Could not list remote directory contents.',
+        'Please verify server connection status and remote directory permissions.'
+      );
     } finally {
       this._refreshingRemote = false;
     }
@@ -1676,10 +2727,15 @@ window.FileBrowser = {
       tr.draggable = true;
       const icon = f.isDir ? '📁' : '📄';
 
+      const localBms = this.getLocalBookmarks();
+      const isBookmarked = localBms.some(b => b.path.toLowerCase() === f.path.toLowerCase() || b.path.toLowerCase() === f.path.replace(/[\\/]+$/, '').toLowerCase());
+
       tr.innerHTML = `
-        <td class="file-name-cell">
-          <span class="file-icon">${icon}</span>
-          <span>${f.name}</span>
+        <td class="file-name-cell" title="${f.name.replace(/"/g, '&quot;')}">
+          <div class="file-name-wrapper">
+            <span class="file-icon">${icon}</span>
+            <span class="file-name-text">${f.name}</span>${isBookmarked ? ' <span class="bookmark-star-badge" title="Bookmarked">⭐</span>' : ''}
+          </div>
         </td>
         <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td>${new Date(f.modifyTime).toLocaleDateString()}</td>
@@ -1814,10 +2870,17 @@ window.FileBrowser = {
       tr.draggable = true;
       const icon = f.isDir ? '📁' : '📄';
 
+      const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      const profileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : null;
+      const profileBms = this.getProfileBookmarks(profileId);
+      const isBookmarked = profileBms.some(b => b.path.toLowerCase() === f.path.toLowerCase() || b.path.toLowerCase() === f.path.replace(/\/+$/, '').toLowerCase());
+
       tr.innerHTML = `
-        <td class="file-name-cell">
-          <span class="file-icon">${icon}</span>
-          <span>${f.name}</span>
+        <td class="file-name-cell" title="${f.name.replace(/"/g, '&quot;')}">
+          <div class="file-name-wrapper">
+            <span class="file-icon">${icon}</span>
+            <span class="file-name-text">${f.name}</span>${isBookmarked ? ' <span class="bookmark-star-badge" title="Bookmarked">⭐</span>' : ''}
+          </div>
         </td>
         <td>${f.isDir ? (this.calculatedDirSizes.get(f.path) || '--') : this.formatSize(f.size)}</td>
         <td class="permissions-cell">${f.permissions || 'rwxr-xr-x'}</td>
@@ -1943,6 +3006,7 @@ window.FileBrowser = {
     const ctxOpen = document.getElementById('ctx-open');
     const ctxEdit = document.getElementById('ctx-edit');
     const ctxDownload = document.getElementById('ctx-download');
+    const ctxDownloadAs = document.getElementById('ctx-download-as');
     const ctxUpload = document.getElementById('ctx-upload');
     const ctxChmod = document.getElementById('ctx-chmod');
     const ctxRename = document.getElementById('ctx-rename');
@@ -1952,6 +3016,8 @@ window.FileBrowser = {
     const ctxDelete = document.getElementById('ctx-delete');
     const ctxCopyPath = document.getElementById('ctx-copy-path');
     const ctxCalculateSize = document.getElementById('ctx-calculate-size');
+    const ctxGroupSort = document.getElementById('ctx-group-sort');
+    const ctxProperties = document.getElementById('ctx-properties');
     const ctxNewFile = document.getElementById('ctx-new-file');
     const ctxMkdir = document.getElementById('ctx-mkdir');
     const ctxSshTools = document.getElementById('ctx-ssh-tools');
@@ -1993,6 +3059,7 @@ window.FileBrowser = {
       if (ctxOpen) ctxOpen.style.display = 'none';
       if (ctxEdit) ctxEdit.style.display = 'none';
       if (ctxDownload) ctxDownload.style.display = 'none';
+      if (ctxDownloadAs) ctxDownloadAs.style.display = 'none';
       if (ctxUpload) ctxUpload.style.display = 'none';
       if (ctxChmod) ctxChmod.style.display = 'none';
       if (ctxRename) ctxRename.style.display = 'none';
@@ -2003,6 +3070,8 @@ window.FileBrowser = {
       if (ctxCopyPath) ctxCopyPath.style.display = 'none';
       if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
       if (ctxSshTools) ctxSshTools.style.display = 'none';
+      if (ctxGroupSort) ctxGroupSort.style.display = 'flex';
+      if (ctxProperties) ctxProperties.style.display = 'none';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else if (selectedList.length === 1) {
@@ -2014,6 +3083,9 @@ window.FileBrowser = {
         ctxDownload.style.display = pane === 'remote' ? 'flex' : 'none';
         const label = ctxDownload.querySelector('span:last-child');
         if (label) label.textContent = 'Download';
+      }
+      if (ctxDownloadAs) {
+        ctxDownloadAs.style.display = pane === 'remote' && !isDir ? 'flex' : 'none';
       }
       if (ctxUpload) {
         ctxUpload.style.display = pane === 'local' ? 'flex' : 'none';
@@ -2055,6 +3127,8 @@ window.FileBrowser = {
         ctxCalculateSize.style.display = isDir ? 'flex' : 'none';
       }
       if (ctxSshTools) ctxSshTools.style.display = showTools ? 'flex' : 'none';
+      if (ctxGroupSort) ctxGroupSort.style.display = 'flex';
+      if (ctxProperties) ctxProperties.style.display = 'flex';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
     } else {
@@ -2066,6 +3140,9 @@ window.FileBrowser = {
         const label = ctxDownload.querySelector('span:last-child');
         if (label) label.textContent = `Download (${count} items)`;
       }
+      if (ctxDownloadAs) {
+        ctxDownloadAs.style.display = pane === 'remote' ? 'flex' : 'none';
+      }
       if (ctxUpload) {
         ctxUpload.style.display = pane === 'local' ? 'flex' : 'none';
         const label = ctxUpload.querySelector('span:last-child');
@@ -2075,18 +3152,18 @@ window.FileBrowser = {
         ctxChmod.style.display = pane === 'remote' ? 'flex' : 'none';
         const label = ctxChmod.querySelector('span:last-child');
         if (label) {
-          label.textContent = `Permissions (${count} items)`;
+          label.textContent = 'Permissions (chmod)';
         } else {
-          ctxChmod.textContent = `🔐 Permissions (${count} items)`;
+          ctxChmod.textContent = '🔐 Permissions (chmod)';
         }
       }
       if (ctxRename) {
         ctxRename.style.display = 'flex';
         const label = ctxRename.querySelector('span:last-child');
         if (label) {
-          label.textContent = `Rename (${count} items)`;
+          label.textContent = 'Rename';
         } else {
-          ctxRename.textContent = `✏️ Rename (${count} items)`;
+          ctxRename.textContent = '✏️ Rename';
         }
       }
       if (ctxMove) ctxMove.style.display = 'none';
@@ -2104,8 +3181,19 @@ window.FileBrowser = {
       }
       if (ctxCalculateSize) ctxCalculateSize.style.display = 'none';
       if (ctxSshTools) ctxSshTools.style.display = showTools ? 'flex' : 'none';
+      if (ctxProperties) ctxProperties.style.display = 'flex';
       if (ctxNewFile) ctxNewFile.style.display = 'flex';
       if (ctxMkdir) ctxMkdir.style.display = 'flex';
+    }
+
+    const ctxGroupRemoteTransfer = document.getElementById('ctx-group-remote-transfer');
+    if (ctxGroupRemoteTransfer) {
+      if (pane === 'remote' && selectedList.length > 0) {
+        ctxGroupRemoteTransfer.style.display = 'flex';
+        this.populateRemoteTransferSubmenu();
+      } else {
+        ctxGroupRemoteTransfer.style.display = 'none';
+      }
     }
 
     // Helper to toggle parent group display based on children visibility
@@ -2145,6 +3233,28 @@ window.FileBrowser = {
       menu.classList.remove('submenu-left');
     }
 
+    // Dynamic Submenu Boundary Detection (Auto-Flip Up & Auto-Flip Left)
+    menu.querySelectorAll('.trigger-submenu').forEach(trigger => {
+      const submenu = trigger.querySelector('.context-submenu');
+      if (!submenu) return;
+
+      submenu.classList.remove('flip-up', 'flip-left');
+
+      trigger.onmouseenter = () => {
+        submenu.classList.remove('flip-up', 'flip-left');
+        const triggerRect = trigger.getBoundingClientRect();
+        const submenuHeight = submenu.offsetHeight || 160;
+        const submenuWidth = submenu.offsetWidth || 180;
+
+        if (triggerRect.top + submenuHeight > window.innerHeight - 15) {
+          submenu.classList.add('flip-up');
+        }
+        if (triggerRect.right + submenuWidth > window.innerWidth - 15) {
+          submenu.classList.add('flip-left');
+        }
+      };
+    });
+
     menu.style.left = `${posX}px`;
     menu.style.top = `${posY}px`;
   },
@@ -2169,6 +3279,61 @@ window.FileBrowser = {
       return;
     }
 
+    if (action === 'bookmark-add') {
+      const item = items[0];
+      if (item) {
+        if (pane === 'local') {
+          this.addLocalBookmark(item.path);
+        } else {
+          const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+          const profileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : null;
+          if (profileId) {
+            this.addProfileBookmark(profileId, item.path);
+          } else {
+            this.addGlobalBookmark(item.path, true);
+          }
+        }
+      }
+      return;
+    }
+
+    if (action === 'bookmark-remove') {
+      const item = items[0];
+      if (item) {
+        if (pane === 'local') {
+          const bms = this.getLocalBookmarks();
+          const found = bms.find(b => b.path.toLowerCase() === item.path.toLowerCase());
+          if (found) this.deleteLocalBookmark(found.id);
+        } else {
+          const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+          const profileId = activeSess && activeSess.profile ? (activeSess.profile.id || activeSess.profile.host) : null;
+          if (profileId) {
+            const bms = this.getProfileBookmarks(profileId);
+            const found = bms.find(b => b.path.toLowerCase() === item.path.toLowerCase());
+            if (found) this.deleteProfileBookmark(profileId, found.id);
+          }
+        }
+      }
+      return;
+    }
+
+    if (action === 'sort-name') {
+      this.sortCurrentPane('name');
+      return;
+    }
+    if (action === 'sort-size') {
+      this.sortCurrentPane('size');
+      return;
+    }
+    if (action === 'sort-date') {
+      this.sortCurrentPane('modified');
+      return;
+    }
+    if (action === 'sort-type') {
+      this.sortCurrentPane('name');
+      return;
+    }
+
     if (items.length === 0) return;
 
     if (action === 'open' && items.length === 1) {
@@ -2178,21 +3343,30 @@ window.FileBrowser = {
         else this.refreshLocal(item.path);
       }
     } else if (action === 'download' && pane === 'remote') {
-      for (const item of items) {
-        if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) break;
-        await this.downloadFile(item.path);
+      await this.downloadBatchItems(items);
+    } else if (action === 'download-as' && pane === 'remote') {
+      if (items.length === 1) {
+        this.downloadFileAs(items[0]);
+      } else {
+        this.downloadBatchItems(items);
       }
+    } else if (action === 'properties' && items.length > 0) {
+      this.showFileProperties(items[0]);
     } else if (action === 'upload' && pane === 'local') {
-      for (const item of items) {
-        if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) break;
-        await this.uploadFile(item.path);
-      }
+      await this.uploadBatchItems(items);
     } else if (action === 'edit' && pane === 'remote' && items.length === 1) {
       this.editRemoteFile(items[0].path);
     } else if (action === 'copy-path') {
       const pathsText = items.map(i => i.path).join('\n');
-      navigator.clipboard.writeText(pathsText);
-      if (window.LogViewer) window.LogViewer.addEntry('info', `Copied ${items.length} path(s) to clipboard.`);
+      try {
+        navigator.clipboard.writeText(pathsText).then(() => {
+          if (window.LogViewer) window.LogViewer.addEntry('info', `Copied ${items.length} path(s) to clipboard.`);
+        }).catch(err => {
+          if (window.LogViewer) window.LogViewer.addEntry('error', `Clipboard write failed: ${err.message}`);
+        });
+      } catch (err) {
+        if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to copy paths to clipboard: ${err.message}`);
+      }
     } else if (action === 'chmod' && pane === 'remote') {
       this.openChmodModal(items);
     } else if (action === 'delete') {
@@ -2477,7 +3651,7 @@ window.FileBrowser = {
     }
 
     let transferOptions = { ...options };
-    if (api && api.checkFileConflict) {
+    if (!options.skipConflictCheck && api && api.checkFileConflict) {
       try {
         const conflictInfo = await api.checkFileConflict({ type: 'download', localPath: localDest, remotePath: remoteFilePath, sessionId: sessId });
         if (conflictInfo && conflictInfo.conflict) {
@@ -2498,7 +3672,15 @@ window.FileBrowser = {
             const dotIdx = fname.lastIndexOf('.');
             const nameOnly = dotIdx > 0 ? fname.substring(0, dotIdx) : fname;
             const ext = dotIdx > 0 ? fname.substring(dotIdx) : '';
-            localDest = [...parts, `${nameOnly} (1)${ext}`].join(separator);
+            let counter = 1;
+            let candidate = [...parts, `${nameOnly} (${counter})${ext}`].join(separator);
+            if (api.localExists) {
+              while (await api.localExists(candidate)) {
+                counter++;
+                candidate = [...parts, `${nameOnly} (${counter})${ext}`].join(separator);
+              }
+            }
+            localDest = candidate;
           }
           if (action === 'newer') {
             const srcTime = conflictInfo.remoteStat ? new Date(conflictInfo.remoteStat.modifyTime).getTime() : 0;
@@ -2509,11 +3691,15 @@ window.FileBrowser = {
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        if (window.LogViewer) window.LogViewer.addEntry('warning', `Conflict check error for ${localDest}: ${e.message || e}`);
+        this.showErrorModal('⚠️ Conflict Check Failed', localDest, e.message || 'Could not verify destination file state.', 'Transfer aborted to prevent unexpected file overwrites.');
+        return;
+      }
     }
 
     if (window.TransferQueue) {
-      window.TransferQueue.addTransfer('download', remoteFilePath, localDest);
+      window.TransferQueue.addTransfer('download', remoteFilePath, localDest, options.size || options.totalBytes || 0);
     }
 
     try {
@@ -2572,7 +3758,7 @@ window.FileBrowser = {
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
 
     let transferOptions = { ...options };
-    if (api && api.checkFileConflict) {
+    if (!options.skipConflictCheck && api && api.checkFileConflict) {
       try {
         const conflictInfo = await api.checkFileConflict({ type: 'upload', localPath: localFilePath, remotePath: remoteDest, sessionId: sessId });
         if (conflictInfo && conflictInfo.conflict) {
@@ -2591,7 +3777,15 @@ window.FileBrowser = {
             const dotIdx = fname.lastIndexOf('.');
             const nameOnly = dotIdx > 0 ? fname.substring(0, dotIdx) : fname;
             const ext = dotIdx > 0 ? fname.substring(dotIdx) : '';
-            remoteDest = [...parts, `${nameOnly} (1)${ext}`].join('/');
+            let counter = 1;
+            let candidate = [...parts, `${nameOnly} (${counter})${ext}`].join('/');
+            if (api.remoteExists) {
+              while (await api.remoteExists(candidate, sessId)) {
+                counter++;
+                candidate = [...parts, `${nameOnly} (${counter})${ext}`].join('/');
+              }
+            }
+            remoteDest = candidate;
           }
           if (action === 'newer') {
             const srcTime = conflictInfo.localStat ? new Date(conflictInfo.localStat.modifyTime).getTime() : 0;
@@ -2602,32 +3796,90 @@ window.FileBrowser = {
             }
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        if (window.LogViewer) window.LogViewer.addEntry('warning', `Conflict check error for ${remoteDest}: ${e.message || e}`);
+        this.showErrorModal('⚠️ Conflict Check Failed', remoteDest, e.message || 'Could not verify destination file state.', 'Transfer aborted to prevent unexpected file overwrites.');
+        return;
+      }
     }
 
     if (window.TransferQueue) {
-      window.TransferQueue.addTransfer('upload', localFilePath, remoteDest);
+      window.TransferQueue.addTransfer('upload', localFilePath, remoteDest, options.size || options.totalBytes || 0);
     }
-    await api.uploadFile(localFilePath, remoteDest, sessId, transferOptions);
-    this.refreshRemote(this.remotePath);
+    try {
+      await api.uploadFile(localFilePath, remoteDest, sessId, transferOptions);
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('info', `✅ Upload completed: ${remoteDest}`);
+      }
+      this.refreshRemote(this.remotePath);
+    } catch (err) {
+      if (window.LogViewer) {
+        window.LogViewer.addEntry('error', `❌ Upload failed: ${err.message || err}`);
+      }
+      this.showErrorModal(
+        '⚠️ Upload Error',
+        remoteDest,
+        err.message || 'An unexpected error occurred during file upload.',
+        'Please verify remote permissions and network connection.'
+      );
+    }
   },
 
   async openLocalFile(localFilePath) {
-    const api = this.getApi();
-    if (window.LogViewer) window.LogViewer.addEntry('info', `Opening local file in default editor: ${localFilePath}`);
-    if (api && api.localOpen) {
-      await api.localOpen(localFilePath);
+    try {
+      const api = this.getApi();
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Opening local file in default editor: ${localFilePath}`);
+      if (api && api.localOpen) {
+        await api.localOpen(localFilePath);
+      }
+    } catch (err) {
+      if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to open local file: ${err.message || err}`);
+      alert(`Could not open file ${localFilePath}: ${err.message || err}`);
     }
   },
 
   async editRemoteFile(remoteFilePath) {
     const api = this.getApi();
     const sessId = window.SessionManager ? window.SessionManager.activeSessionId : null;
-    if (api && api.appendDebugLog) api.appendDebugLog(`[TRACE editRemoteFile ENTERED] remote file path: ${remoteFilePath} | sessionId: ${sessId}`);
-    console.log('[CHECKPOINT 3] editRemoteFile() called');
-    console.log('[CHECKPOINT 4] Arguments passed to api.editRemoteFile:', { remoteFilePath, sessId });
-    if (window.LogViewer) window.LogViewer.addEntry('info', `Opening remote file in default editor: ${remoteFilePath}`);
-    await api.editRemoteFile(remoteFilePath, sessId);
+    try {
+      if (api && api.appendDebugLog) api.appendDebugLog(`[TRACE editRemoteFile ENTERED] remote file path: ${remoteFilePath} | sessionId: ${sessId}`);
+      console.log('[CHECKPOINT 3] editRemoteFile() called');
+      console.log('[CHECKPOINT 4] Arguments passed to api.editRemoteFile:', { remoteFilePath, sessId });
+      if (window.LogViewer) window.LogViewer.addEntry('info', `Opening remote file in default editor: ${remoteFilePath}`);
+      await api.editRemoteFile(remoteFilePath, sessId);
+    } catch (err) {
+      if (window.LogViewer) window.LogViewer.addEntry('error', `Edit remote file error: ${err.message}`);
+    }
+  },
+
+  async uploadBatchItems(items) {
+    if (!items || items.length === 0) return;
+    if (window.FileConflictDialog) window.FileConflictDialog.resetBatch();
+    const batchTargetRemoteDir = this.remotePath;
+    for (const item of items) {
+      if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) break;
+      if (item && item.path) {
+        const fileName = item.name || item.path.replace(/\\/g, '/').split('/').pop();
+        const customRemoteDest = `${batchTargetRemoteDir}/${fileName}`;
+        await this.uploadFile(item.path, customRemoteDest);
+      }
+    }
+  },
+
+  async downloadBatchItems(items) {
+    if (!items || items.length === 0) return;
+    if (window.FileConflictDialog) window.FileConflictDialog.resetBatch();
+    const batchTargetLocalDir = this.localPath;
+    for (const item of items) {
+      if (window.TransferQueue && window.TransferQueue.isBatchCancelled()) break;
+      if (item && item.path) {
+        const fileName = item.name || item.path.replace(/\\/g, '/').split('/').pop();
+        const isWindows = batchTargetLocalDir && (batchTargetLocalDir.includes('\\') || !batchTargetLocalDir.includes('/'));
+        const separator = isWindows ? '\\' : '/';
+        const customLocalDest = `${batchTargetLocalDir}${separator}${fileName}`;
+        await this.downloadFile(item.path, customLocalDest);
+      }
+    }
   },
 
   async handleRemoteDrop(e) {
@@ -2637,30 +3889,26 @@ window.FileBrowser = {
       if (raw) {
         const data = JSON.parse(raw);
         if (data && data.items && Array.isArray(data.items)) {
-          for (const item of data.items) {
-            await this.uploadFile(item.path);
-          }
+          await this.uploadBatchItems(data.items);
           return;
         } else if (data && data.path) {
-          await this.uploadFile(data.path);
+          await this.uploadBatchItems([{ path: data.path, name: data.name }]);
           return;
         }
       }
     } catch (err) {}
     if (this.selectedLocalFiles && this.selectedLocalFiles.length > 0) {
-      for (const item of this.selectedLocalFiles) {
-        await this.uploadFile(item.path);
-      }
+      await this.uploadBatchItems(this.selectedLocalFiles);
     } else if (this.selectedLocal) {
-      await this.uploadFile(this.selectedLocal.path);
+      await this.uploadBatchItems([this.selectedLocal]);
     }
   },
 
   formatSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   },
 
@@ -2766,15 +4014,19 @@ window.FileBrowser = {
         `;
 
         tr.addEventListener('dblclick', async () => {
-          const api = this.getApi();
-          if (!api) return;
+          try {
+            const api = this.getApi();
+            if (!api) return;
 
-          if (isRemote) {
-            if (window.LogViewer) window.LogViewer.addEntry('info', `📥 Opening remote file in default editor: ${item.path}`);
-            await api.editRemoteFile(item.path, window.SessionManager ? window.SessionManager.activeSessionId : null);
-          } else {
-            if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Opening local file in default editor: ${item.path}`);
-            await api.localOpen(item.path);
+            if (isRemote) {
+              if (window.LogViewer) window.LogViewer.addEntry('info', `📥 Opening remote file in default editor: ${item.path}`);
+              await api.editRemoteFile(item.path, window.SessionManager ? window.SessionManager.activeSessionId : null);
+            } else {
+              if (window.LogViewer) window.LogViewer.addEntry('info', `📄 Opening local file in default editor: ${item.path}`);
+              await api.localOpen(item.path);
+            }
+          } catch (err) {
+            if (window.LogViewer) window.LogViewer.addEntry('error', `Failed to open search result item: ${err.message}`);
           }
         });
 
@@ -2784,5 +4036,89 @@ window.FileBrowser = {
 
     // Switch focus to search results tab
     if (tabBtn) tabBtn.click();
+  },
+
+  async downloadFileAs(item) {
+    if (!item) return;
+    const cleanPath = item.path.replace(/\/+$/, '');
+    const fileName = item.name || cleanPath.split('/').pop() || 'downloaded_item';
+    const sep = this.getLocalSeparator();
+    const defaultLocalPath = `${this.localPath.replace(/[\\/]+$/, '')}${sep}${fileName}`;
+
+    this.showSshPromptModal(
+      '📥 Download As...',
+      'Enter destination local path & filename:',
+      defaultLocalPath,
+      '',
+      async (destPath) => {
+        if (!destPath) return;
+        await this.downloadFile(item.path, destPath.trim());
+      }
+    );
+  },
+
+  sortCurrentPane(sortKey) {
+    const pane = this.contextPane || 'remote';
+    if (pane === 'remote') {
+      if (this.remoteSortKey === sortKey) {
+        this.remoteSortOrder = this.remoteSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.remoteSortKey = sortKey;
+        this.remoteSortOrder = 'asc';
+      }
+      this.renderRemoteTable(this.remoteFiles);
+    } else {
+      if (this.localSortKey === sortKey) {
+        this.localSortOrder = this.localSortOrder === 'asc' ? 'desc' : 'asc';
+      } else {
+        this.localSortKey = sortKey;
+        this.localSortOrder = 'asc';
+      }
+      this.renderLocalTable(this.localFiles);
+    }
+    this.updateSortHeaders();
+  },
+
+  showFileProperties(item) {
+    if (!item) return;
+    const modal = document.getElementById('file-properties-modal');
+    if (!modal) return;
+
+    const iconEl = document.getElementById('file-props-icon');
+    const nameEl = document.getElementById('file-props-name');
+    const typeEl = document.getElementById('file-props-type-badge');
+    const pathEl = document.getElementById('file-props-path');
+    const sizeEl = document.getElementById('file-props-size');
+    const mtimeEl = document.getElementById('file-props-mtime');
+    const chmodEl = document.getElementById('file-props-chmod');
+    const paneEl = document.getElementById('file-props-pane');
+    const closeBtn = document.getElementById('btn-file-props-close');
+    const okBtn = document.getElementById('btn-file-props-ok');
+
+    const isRemote = (this.contextPane || 'remote') === 'remote';
+    const isDir = item.isDir;
+
+    if (iconEl) iconEl.textContent = isDir ? '📁' : '📄';
+    if (nameEl) nameEl.textContent = item.name || item.path.split(/[\\/]/).pop();
+    if (typeEl) typeEl.textContent = isDir ? 'Folder / Directory' : 'File';
+    if (pathEl) pathEl.textContent = item.path;
+    if (sizeEl) sizeEl.textContent = isDir ? (this.calculatedDirSizes.get(item.path) || '--') : this.formatSize(item.size || 0);
+    if (mtimeEl) {
+      const d = item.mtime || item.modifyTime;
+      mtimeEl.textContent = d ? new Date(d).toLocaleString() : '-';
+    }
+    if (chmodEl) chmodEl.textContent = item.permissions ? `${item.permissions}` : (isRemote ? 'rwxr-xr-x (0755)' : 'N/A (Local)');
+    if (paneEl) paneEl.textContent = isRemote ? 'Remote Server' : 'Local System';
+
+    const closeModal = () => {
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    };
+
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (okBtn) okBtn.onclick = closeModal;
+
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('active');
   }
 };

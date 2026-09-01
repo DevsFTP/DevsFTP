@@ -1,6 +1,6 @@
 {
-  "name": "devsftp",
-  "version": "1.0.0",
+  "name": "DevsFTP",
+  "version": "1.0.1",
   "description": "DevsFTP — An FTP/SFTP client that works with you, not against you.",
   "main": "src/main/main.js",
   "author": "DevsFTP Support <support@devsftp.com>",
@@ -58,15 +58,26 @@
         "dir"
       ]
     },
+    "protocols": [
+      {
+        "name": "SFTP & Remote Protocol",
+        "schemes": [
+          "sftp",
+          "ftp",
+          "webdav"
+        ]
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "DevsFTP"
+      "shortcutName": "DevsFTP",
+      "runAfterFinish": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
     },
     "linux": {
       "icon": "assets/branding/icon_512.png",

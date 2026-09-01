@@ -73,7 +73,75 @@ window.TransferQueue = {
       api.onTransferProgress((data) => this.handleProgress(data));
     }
 
+    this.initOptionsAndSync();
     await this.loadSavedQueue();
+  },
+
+  initOptionsAndSync() {
+    const queueConcurrencySelect = document.getElementById('queue-max-concurrency');
+    const queueSpeedSelect = document.getElementById('queue-speed-limit');
+    const prefConcurrencySelect = document.getElementById('pref-max-concurrency');
+    const prefSpeedSelect = document.getElementById('pref-speed-limit');
+
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem('devsftp_transfer_settings'));
+    } catch (e) {}
+
+    const defaultMaxConcurrency = saved && saved.maxConcurrency ? String(saved.maxConcurrency) : '3';
+    const defaultSpeedLimit = saved && saved.speedLimitKBps ? String(saved.speedLimitKBps) : '0';
+
+    if (queueConcurrencySelect) queueConcurrencySelect.value = defaultMaxConcurrency;
+    if (prefConcurrencySelect) prefConcurrencySelect.value = defaultMaxConcurrency;
+    if (queueSpeedSelect) queueSpeedSelect.value = defaultSpeedLimit;
+    if (prefSpeedSelect) prefSpeedSelect.value = defaultSpeedLimit;
+
+    const updateSettings = (maxConcurrencyVal, speedLimitVal, source) => {
+      if (queueConcurrencySelect && source !== 'queue-concurrency') queueConcurrencySelect.value = maxConcurrencyVal;
+      if (prefConcurrencySelect && source !== 'pref-concurrency') prefConcurrencySelect.value = maxConcurrencyVal;
+      if (queueSpeedSelect && source !== 'queue-speed') queueSpeedSelect.value = speedLimitVal;
+      if (prefSpeedSelect && source !== 'pref-speed') prefSpeedSelect.value = speedLimitVal;
+
+      const maxConcurrency = parseInt(maxConcurrencyVal, 10) || 3;
+      const speedLimitKBps = parseInt(speedLimitVal, 10) || 0;
+
+      try {
+        localStorage.setItem('devsftp_transfer_settings', JSON.stringify({ maxConcurrency, speedLimitKBps }));
+      } catch (e) {}
+
+      const api = window.devsFTP || window.pulseFTP;
+      if (api && api.setTransferOptions) {
+        api.setTransferOptions({ maxConcurrency, speedLimitKBps });
+      }
+
+      if (window.LogViewer && source !== 'init') {
+        const limitText = speedLimitKBps > 0 ? `${speedLimitKBps} KB/s` : 'Unlimited';
+        window.LogViewer.addEntry('info', `⚙️ Transfer settings updated: Max Concurrency: ${maxConcurrency} | Speed Limit: ${limitText}`);
+      }
+    };
+
+    if (queueConcurrencySelect) {
+      queueConcurrencySelect.addEventListener('change', (e) => {
+        updateSettings(e.target.value, queueSpeedSelect ? queueSpeedSelect.value : '0', 'queue-concurrency');
+      });
+    }
+    if (prefConcurrencySelect) {
+      prefConcurrencySelect.addEventListener('change', (e) => {
+        updateSettings(e.target.value, prefSpeedSelect ? prefSpeedSelect.value : '0', 'pref-concurrency');
+      });
+    }
+    if (queueSpeedSelect) {
+      queueSpeedSelect.addEventListener('change', (e) => {
+        updateSettings(queueConcurrencySelect ? queueConcurrencySelect.value : '3', e.target.value, 'queue-speed');
+      });
+    }
+    if (prefSpeedSelect) {
+      prefSpeedSelect.addEventListener('change', (e) => {
+        updateSettings(prefConcurrencySelect ? prefConcurrencySelect.value : '3', e.target.value, 'pref-speed');
+      });
+    }
+
+    updateSettings(defaultMaxConcurrency, defaultSpeedLimit, 'init');
   },
 
   async loadSavedQueue() {
@@ -199,7 +267,7 @@ window.TransferQueue = {
     });
   },
 
-  addTransfer(type, sourcePath, destPath, profileId = null) {
+  addTransfer(type, sourcePath, destPath, profileId = null, sourceProfileId = null) {
     this.resetCancellationState();
 
     // Resolve profileId before dedup check so we can compare correctly
@@ -207,6 +275,12 @@ window.TransferQueue = {
     if (!targetProfileId) {
       const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
       targetProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+    }
+
+    let srcProfileId = sourceProfileId;
+    if (!srcProfileId) {
+      const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      srcProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
     }
 
     // Dedup check is profile-aware to prevent cross-tab collision
@@ -225,10 +299,11 @@ window.TransferQueue = {
     const id = 'tr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     const item = {
       id,
-      type, // 'download' or 'upload'
+      type, // 'download', 'upload', or 'remote-to-remote'
       source: sourcePath,
       dest: destPath,
       profileId: targetProfileId,
+      sourceProfileId: srcProfileId,
       percentage: 0,
       transferred: 0,
       total: 1,
@@ -436,15 +511,8 @@ window.TransferQueue = {
   },
 
   async clearCompleted() {
-    const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
-    const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
+    this.queue = this.queue.filter(q => q.status !== 'Completed');
 
-    this.queue = this.queue.filter(q => {
-      if ((q.profileId || 'default') === activeProfileId) {
-        return q.status === 'In Progress' || q.status === 'Paused' || q.status === 'Queued' || q.status === 'Waiting to Resume';
-      }
-      return true;
-    });
     const api = window.devsFTP || window.pulseFTP;
     if (api && api.clearCompletedQueue) {
       await api.clearCompletedQueue();
@@ -465,30 +533,35 @@ window.TransferQueue = {
     }
 
     if (item) {
-      item.status = 'In Progress';
-      const now = Date.now();
-      const timeDiff = (now - item.lastTime) / 1000;
-      if (timeDiff >= 0.5) {
-        const bytesDiff = data.transferred - item.lastTransferred;
-        const bps = bytesDiff / timeDiff;
-        item.speed = this.formatSpeed(bps);
-        item.lastTransferred = data.transferred;
-        item.lastTime = now;
-      }
-
-      item.percentage = data.percentage;
-      item.transferred = data.transferred;
-      item.total = data.total;
-
-      if (data.percentage >= 100) {
-        if (item.status !== 'Completed') {
-          item.status = 'Completed';
-          item.speed = '0 KB/s';
-          this.notifyCompletion(item);
+      if (data.status === 'Completed' || (data.percentage !== undefined && data.percentage >= 100)) {
+        item.status = 'Completed';
+        item.percentage = 100;
+        item.speed = '0 KB/s';
+        if (data.transferred) item.transferred = data.transferred;
+        if (data.total) item.total = data.total;
+        this.notifyCompletion(item);
+      } else if (data.status === 'Failed') {
+        item.status = 'Failed';
+        item.speed = '0 KB/s';
+      } else {
+        item.status = data.status || 'In Progress';
+        const now = Date.now();
+        const timeDiff = (now - item.lastTime) / 1000;
+        if (timeDiff >= 0.5 && data.transferred !== undefined) {
+          const bytesDiff = data.transferred - item.lastTransferred;
+          const bps = bytesDiff / timeDiff;
+          item.speed = this.formatSpeed(bps);
+          item.lastTransferred = data.transferred;
+          item.lastTime = now;
         }
+
+        if (data.percentage !== undefined) item.percentage = data.percentage;
+        if (data.transferred !== undefined) item.transferred = data.transferred;
+        if (data.total !== undefined) item.total = data.total;
       }
 
       this.render();
+      this.syncQueue();
     }
   },
 
@@ -601,10 +674,11 @@ window.TransferQueue = {
     const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
     const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
 
-    // Filter queue to show only tasks belonging to the active profile/session (Option A)
+    // Filter queue to show tasks belonging to active profile or remote-to-remote tasks
     const filteredQueue = this.queue.filter(q => {
       const taskProfileId = q.profileId || 'default';
-      return taskProfileId === activeProfileId;
+      const taskSourceProfileId = q.sourceProfileId || 'default';
+      return q.type === 'remote-to-remote' || taskProfileId === activeProfileId || taskSourceProfileId === activeProfileId;
     });
 
     const activeCount = filteredQueue.filter(q => q.status === 'In Progress' || q.status === 'Queued' || q.status === 'Waiting to Resume').length;
@@ -628,8 +702,8 @@ window.TransferQueue = {
     const totalSpeedBps = filteredQueue
       .filter(q => q.status === 'In Progress')
       .reduce((sum, item) => {
-        if (item.speed.includes('MB/s')) return sum + parseFloat(item.speed) * 1024 * 1024;
-        if (item.speed.includes('KB/s')) return sum + parseFloat(item.speed) * 1024;
+        if (item.speed && item.speed.includes('MB/s')) return sum + parseFloat(item.speed) * 1024 * 1024;
+        if (item.speed && item.speed.includes('KB/s')) return sum + parseFloat(item.speed) * 1024;
         return sum;
       }, 0);
 
@@ -652,7 +726,9 @@ window.TransferQueue = {
     // Targeted DOM updates per row (prevents action button hover strobing)
     filteredQueue.forEach(item => {
       let tr = this.tbody.querySelector(`tr[data-id="${item.id}"]`);
-      const arrow = item.type === 'download' ? '⬇' : '⬆';
+      let arrow = '⬆';
+      if (item.type === 'download') arrow = '⬇';
+      else if (item.type === 'remote-to-remote') arrow = '🌐';
 
       if (!tr) {
         tr = document.createElement('tr');
@@ -785,6 +861,8 @@ window.TransferQueue = {
   },
 
   notifyCompletion(item) {
+    if (!item || item._notifiedCompletion) return;
+    item._notifiedCompletion = true;
     this.batchNotifyCount++;
     this.lastSingleFile = item;
 
@@ -809,8 +887,8 @@ window.TransferQueue = {
     const notifyPref = localStorage.getItem('devsftp_pref_notify_transfers');
     const chimePref = localStorage.getItem('devsftp_pref_notify_chime');
 
-    const shouldNotify = notifyPref === null || notifyPref === 'true';
-    const shouldChime = chimePref === null || chimePref === 'true';
+    const shouldNotify = window.shouldSendNotification ? window.shouldSendNotification('transfers') : (notifyPref === null || notifyPref === 'true');
+    const shouldChime = window.shouldSendNotification ? window.shouldSendNotification('chime') : (chimePref === null || chimePref === 'true');
 
     const fileName = item.source ? item.source.split(/[/\\]/).pop() : 'file';
     const actionText = item.type === 'download' ? 'downloaded' : 'uploaded';
@@ -845,7 +923,10 @@ window.TransferQueue = {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      if (!this._audioCtx || this._audioCtx.state === 'closed') {
+        this._audioCtx = new AudioCtx();
+      }
+      const ctx = this._audioCtx;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
