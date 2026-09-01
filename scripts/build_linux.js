@@ -35,21 +35,24 @@ const targets = [
   { file: `devsftp-${version}.tar.gz`, label: 'tar.gz' }
 ];
 
-let signingFailed = false;
+const distFiles = fs.existsSync(distDir) ? fs.readdirSync(distDir) : [];
 
 for (const target of targets) {
-  const filePath = path.join(distDir, target.file);
+  // Find file in dist directory case-insensitively
+  const matchingFileName = distFiles.find(f => f.toLowerCase() === target.file.toLowerCase());
+  const filePath = matchingFileName ? path.join(distDir, matchingFileName) : path.join(distDir, target.file);
+
   if (!fs.existsSync(filePath)) {
     console.warn('⚠️ Skipping ' + target.label + ' signing — file not found: ' + filePath);
     continue;
   }
   try {
     if (target.deb) {
-      execSync('dpkg-sig --sign builder -k ' + GPG_KEY + ' ' + filePath, { stdio: 'inherit' });
+      execSync('dpkg-sig --sign builder -k ' + GPG_KEY + ' "' + filePath + '"', { stdio: 'inherit' });
     } else {
-      execSync('gpg --batch --yes --detach-sign --armor -u ' + GPG_KEY + ' ' + filePath, { stdio: 'inherit' });
+      execSync('gpg --batch --yes --detach-sign --armor -u ' + GPG_KEY + ' "' + filePath + '"', { stdio: 'inherit' });
     }
-    console.log('✓ Signed: ' + target.file);
+    console.log('✓ Signed: ' + (matchingFileName || target.file));
   } catch (e) {
     console.warn('⚠️ Signing failed for ' + target.label + ' — ' + e.message);
     signingFailed = true;

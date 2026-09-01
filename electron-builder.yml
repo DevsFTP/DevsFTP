@@ -29,12 +29,15 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  allowElevation: true
   installerIcon: assets/icon.ico
   uninstallerIcon: assets/icon.ico
   installerHeaderIcon: assets/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: DevsFTP
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
 
 linux:
   icon: assets/branding/icon_512.png
