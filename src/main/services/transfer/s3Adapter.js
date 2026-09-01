@@ -52,14 +52,28 @@ class S3Adapter {
   async downloadStream(remotePath, localPath, offset = 0, onProgress, options = {}) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
     if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
-    const adapterProgress = (transferred, total) => {
+    
+    let totalBytes = 0;
+    try {
+      const remoteStat = await this.stat(remotePath);
+      totalBytes = remoteStat ? (remoteStat.size || 0) : 0;
+    } catch(e) {}
+
+    const adapterProgress = (progress) => {
       if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
-        onProgress({
-          transferred,
-          total,
-          percentage: total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0
-        });
+        if (typeof progress === 'object' && progress !== null) {
+          onProgress(progress);
+        } else {
+          const transferred = (progress || 0) + offset;
+          const total = Math.max(totalBytes, transferred);
+          const percentage = total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0;
+          onProgress({
+            transferred,
+            total,
+            percentage
+          });
+        }
       }
     };
     return await this.service.downloadFile(remotePath, localPath, adapterProgress, offset);
@@ -68,14 +82,28 @@ class S3Adapter {
   async uploadStream(localPath, remotePath, offset = 0, onProgress, options = {}) {
     if (!this.service || !this.service.connected) throw new Error('S3 client disconnected');
     if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
-    const adapterProgress = (transferred, total) => {
+
+    const fs = require('fs');
+    let totalBytes = 0;
+    try {
+      if (fs.existsSync(localPath)) totalBytes = fs.statSync(localPath).size || 0;
+    } catch(e) {}
+
+    const adapterProgress = (progress) => {
       if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
-        onProgress({
-          transferred,
-          total,
-          percentage: total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0
-        });
+        if (typeof progress === 'object' && progress !== null) {
+          onProgress(progress);
+        } else {
+          const transferred = (progress || 0) + offset;
+          const total = Math.max(totalBytes, transferred);
+          const percentage = total > 0 ? Math.min(100, parseFloat(((transferred / total) * 100).toFixed(1))) : 0;
+          onProgress({
+            transferred,
+            total,
+            percentage
+          });
+        }
       }
     };
     return await this.service.uploadFile(localPath, remotePath, adapterProgress);

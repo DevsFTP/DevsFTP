@@ -10,6 +10,7 @@ const SFTPAdapter = require('./sftpAdapter');
 const FTPAdapter = require('./ftpAdapter');
 const WebDAVAdapter = require('./webdavAdapter');
 const S3Adapter = require('./s3Adapter');
+const { normalizePOSIXPath } = require('../pathUtils');
 
 let app = null;
 try {
@@ -301,6 +302,12 @@ class TransferEngine {
       options.speedLimitKBps = this.speedLimitKBps;
     }
 
+    if (task.type === 'upload' && task.dest) {
+      task.dest = normalizePOSIXPath(task.dest);
+    } else if (task.type === 'download' && task.source) {
+      task.source = normalizePOSIXPath(task.source);
+    }
+
     const lockKey = `${task.dest}`;
     if (this.activeDestinationLocks.has(lockKey)) {
       throw new Error(`A transfer to destination "${task.dest}" is already in progress.`);
@@ -308,11 +315,16 @@ class TransferEngine {
     this.activeDestinationLocks.add(lockKey);
 
     // Reuse existing task object in queue if available (Issue 3.3)
-    const existingIndex = this.queue.findIndex(q => q.source === task.source && q.dest === task.dest && q.profileId === task.profileId && q.status !== 'Completed');
+    const existingIndex = this.queue.findIndex(q => 
+      (options.taskId && q.id === options.taskId) ||
+      (q.source === task.source && q.dest === task.dest && q.profileId === task.profileId && q.status !== 'Completed')
+    );
     let targetTask = task;
     if (existingIndex >= 0) {
       targetTask = this.queue[existingIndex];
+      if (options.taskId) targetTask.id = options.taskId;
     } else {
+      if (options.taskId) targetTask.id = options.taskId;
       this.queue.push(targetTask);
     }
 
@@ -495,6 +507,14 @@ class TransferEngine {
       targetTask.status = 'Verifying';
       targetTask.verificationState = 'VerifyingSize';
       this.upsertQueueTask(targetTask);
+      this.notifyWindow('transfer:progress', { 
+        taskId: targetTask.id, 
+        status: 'Verifying', 
+        verificationState: 'VerifyingSize',
+        localPath: targetTask.source, 
+        remotePath: targetTask.dest, 
+        type: targetTask.type 
+      });
       this.logFn('info', `🔍 [Verification Pipeline] Verifying transfer completeness for ${targetTask.dest}...`);
 
       const verifyCheck = await this.checkConflict(targetTask.type, targetTask.type === 'download' ? targetTask.dest : targetTask.source, targetTask.type === 'download' ? targetTask.source : targetTask.dest, session);
@@ -506,6 +526,14 @@ class TransferEngine {
         targetTask.status = 'Failed';
         targetTask.verificationState = 'VerificationFailed';
         this.upsertQueueTask(targetTask);
+        this.notifyWindow('transfer:progress', { 
+          taskId: targetTask.id, 
+          status: 'Failed', 
+          error: 'Verification failed: could not stat source or destination files',
+          localPath: targetTask.source, 
+          remotePath: targetTask.dest, 
+          type: targetTask.type 
+        });
         this.logHistory(targetTask, 'Failed', `Verification failed: could not stat source or destination files.`);
         throw new Error(`Verification failed: could not stat source or destination files.`);
       }
@@ -514,6 +542,14 @@ class TransferEngine {
         targetTask.status = 'Failed';
         targetTask.verificationState = 'Mismatch';
         this.upsertQueueTask(targetTask);
+        this.notifyWindow('transfer:progress', { 
+          taskId: targetTask.id, 
+          status: 'Failed', 
+          error: `Size mismatch: expected ${srcStat.size} B, got ${destStat.size} B`,
+          localPath: targetTask.source, 
+          remotePath: targetTask.dest, 
+          type: targetTask.type 
+        });
         this.logHistory(targetTask, 'Failed', `Size mismatch after transfer: Expected ${srcStat.size} B, got ${destStat.size} B`);
         throw new Error(`Size verification mismatch: expected ${srcStat.size} bytes, got ${destStat.size} bytes.`);
       }
@@ -521,7 +557,18 @@ class TransferEngine {
       targetTask.status = 'Completed';
       targetTask.verificationState = 'Verified';
       targetTask.percentage = 100;
+      targetTask.transferred = targetTask.totalBytes;
       this.upsertQueueTask(targetTask);
+      this.notifyWindow('transfer:progress', { 
+        taskId: targetTask.id, 
+        status: 'Completed', 
+        percentage: 100, 
+        transferred: targetTask.totalBytes, 
+        total: targetTask.totalBytes,
+        localPath: targetTask.source, 
+        remotePath: targetTask.dest, 
+        type: targetTask.type 
+      });
       this.logHistory(targetTask, 'Success');
       if (targetTask.type === 'upload' && this.cacheWatcherService) {
         this.cacheWatcherService.markUploaded(targetTask.source);
@@ -543,6 +590,14 @@ class TransferEngine {
         }
       }
       this.upsertQueueTask(targetTask);
+      this.notifyWindow('transfer:progress', { 
+        taskId: targetTask.id, 
+        status: targetTask.status, 
+        error: err.message,
+        localPath: targetTask.source, 
+        remotePath: targetTask.dest, 
+        type: targetTask.type 
+      });
       throw err;
     } finally {
       this.activeDestinationLocks.delete(lockKey);

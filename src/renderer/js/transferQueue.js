@@ -267,32 +267,50 @@ window.TransferQueue = {
     });
   },
 
-  addTransfer(type, sourcePath, destPath, profileId = null, sourceProfileId = null) {
+  normalizePath(p) {
+    if (!p) return '';
+    return String(p).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  },
+
+  addTransfer(type, sourcePath, destPath, options = {}, sourceProfileId = null) {
     this.resetCancellationState();
 
-    // Resolve profileId before dedup check so we can compare correctly
-    let targetProfileId = profileId;
+    let targetProfileId = null;
+    let srcProfileId = sourceProfileId;
+    let totalBytes = 1;
+
+    if (typeof options === 'object' && options !== null) {
+      targetProfileId = options.profileId || null;
+      if (options.sourceProfileId) srcProfileId = options.sourceProfileId;
+      if (options.totalBytes || options.size) totalBytes = options.totalBytes || options.size;
+    } else if (typeof options === 'string') {
+      targetProfileId = options;
+    } else if (typeof options === 'number') {
+      totalBytes = options;
+    }
+
     if (!targetProfileId) {
       const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
       targetProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
     }
 
-    let srcProfileId = sourceProfileId;
     if (!srcProfileId) {
       const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
       srcProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
     }
 
-    // Dedup check is profile-aware to prevent cross-tab collision
+    const normSrc = this.normalizePath(sourcePath);
+    const normDst = this.normalizePath(destPath);
+
     const existing = this.queue.find(q =>
-      q.source === sourcePath &&
-      q.dest === destPath &&
+      this.normalizePath(q.source) === normSrc &&
+      this.normalizePath(q.dest) === normDst &&
       (q.profileId || 'default') === (targetProfileId || 'default') &&
       q.status !== 'Completed'
     );
     if (existing) {
       existing.status = 'In Progress';
-      this.render();
+      this.scheduleRender();
       return existing.id;
     }
 
@@ -306,15 +324,16 @@ window.TransferQueue = {
       sourceProfileId: srcProfileId,
       percentage: 0,
       transferred: 0,
-      total: 1,
+      total: totalBytes || 1,
       speed: '0 KB/s',
+      rawSpeedBps: 0,
       status: 'In Progress', // 'In Progress' | 'Paused' | 'Queued' | 'Waiting to Resume' | 'Verifying' | 'Completed' | 'Failed' | 'Cancelled'
       startTime: Date.now(),
       lastTransferred: 0,
       lastTime: Date.now()
     };
     this.queue.push(item);
-    this.render();
+    this.scheduleRender();
     return id;
   },
 
@@ -521,14 +540,18 @@ window.TransferQueue = {
   },
 
   handleProgress(data) {
+    if (!data) return;
     let item = null;
     if (data.taskId) {
       item = this.queue.find(q => q.id === data.taskId);
     }
     if (!item) {
+      const normLocal = this.normalizePath(data.localPath);
+      const normRemote = this.normalizePath(data.remotePath);
       item = this.queue.find(q => 
-        (q.source === data.remotePath || q.source === data.localPath || q.dest === data.localPath || q.dest === data.remotePath) &&
-        (q.status === 'In Progress' || q.status === 'Running' || q.status === 'Waiting to Resume')
+        (this.normalizePath(q.source) === normRemote || this.normalizePath(q.source) === normLocal || 
+         this.normalizePath(q.dest) === normLocal || this.normalizePath(q.dest) === normRemote) &&
+        (q.status === 'In Progress' || q.status === 'Running' || q.status === 'Waiting to Resume' || q.status === 'Verifying')
       );
     }
 
@@ -537,36 +560,77 @@ window.TransferQueue = {
         item.status = 'Completed';
         item.percentage = 100;
         item.speed = '0 KB/s';
+        item.rawSpeedBps = 0;
         if (data.transferred) item.transferred = data.transferred;
         if (data.total) item.total = data.total;
         this.notifyCompletion(item);
+        this.syncQueueThrottled(true);
       } else if (data.status === 'Failed') {
         item.status = 'Failed';
         item.speed = '0 KB/s';
+        item.rawSpeedBps = 0;
+        this.syncQueueThrottled(true);
       } else {
         item.status = data.status || 'In Progress';
         const now = Date.now();
         const timeDiff = (now - item.lastTime) / 1000;
-        if (timeDiff >= 0.5 && data.transferred !== undefined) {
-          const bytesDiff = data.transferred - item.lastTransferred;
-          const bps = bytesDiff / timeDiff;
-          item.speed = this.formatSpeed(bps);
+        if (timeDiff >= 0.5 && data.transferred !== undefined && !isNaN(data.transferred)) {
+          const bytesDiff = Math.max(0, data.transferred - item.lastTransferred);
+          const currentBps = bytesDiff / timeDiff;
+          if (isFinite(currentBps) && !isNaN(currentBps) && currentBps >= 0) {
+            // Exponential Moving Average (EMA) with alpha = 0.3 for smooth speed updates
+            item.rawSpeedBps = item.rawSpeedBps ? (0.3 * currentBps + 0.7 * item.rawSpeedBps) : currentBps;
+            item.speed = this.formatSpeed(item.rawSpeedBps);
+          }
           item.lastTransferred = data.transferred;
           item.lastTime = now;
         }
 
-        if (data.percentage !== undefined) item.percentage = data.percentage;
-        if (data.transferred !== undefined) item.transferred = data.transferred;
-        if (data.total !== undefined) item.total = data.total;
+        // Monotonic Percentage Guard
+        if (data.percentage !== undefined && !isNaN(data.percentage)) {
+          item.percentage = Math.min(100, Math.max(item.percentage || 0, data.percentage));
+        }
+        if (data.transferred !== undefined && !isNaN(data.transferred)) {
+          item.transferred = Math.max(item.transferred || 0, data.transferred);
+        }
+        if (data.total !== undefined && !isNaN(data.total) && data.total > 0) {
+          item.total = data.total;
+        }
       }
 
-      this.render();
-      this.syncQueue();
+      this.scheduleRender();
+      this.syncQueueThrottled(false);
     }
   },
 
+  scheduleRender() {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    requestAnimationFrame(() => {
+      this._renderScheduled = false;
+      this.render();
+    });
+  },
+
+  syncQueueThrottled(immediate = false) {
+    if (immediate) {
+      if (this._syncTimer) clearTimeout(this._syncTimer);
+      this._syncTimer = null;
+      this.syncQueue();
+      return;
+    }
+    if (this._syncTimer) return;
+    this._syncTimer = setTimeout(() => {
+      this._syncTimer = null;
+      this.syncQueue();
+    }, 2000);
+  },
+
   formatSpeed(bytesPerSec) {
-    if (bytesPerSec > 1024 * 1024) {
+    if (!isFinite(bytesPerSec) || isNaN(bytesPerSec) || bytesPerSec <= 0) {
+      return '0 KB/s';
+    }
+    if (bytesPerSec >= 1024 * 1024) {
       return (bytesPerSec / (1024 * 1024)).toFixed(1) + ' MB/s';
     }
     return (bytesPerSec / 1024).toFixed(0) + ' KB/s';
@@ -701,11 +765,7 @@ window.TransferQueue = {
     // Update bottom status bar total transfer speed metrics for this profile
     const totalSpeedBps = filteredQueue
       .filter(q => q.status === 'In Progress')
-      .reduce((sum, item) => {
-        if (item.speed && item.speed.includes('MB/s')) return sum + parseFloat(item.speed) * 1024 * 1024;
-        if (item.speed && item.speed.includes('KB/s')) return sum + parseFloat(item.speed) * 1024;
-        return sum;
-      }, 0);
+      .reduce((sum, item) => sum + (item.rawSpeedBps || 0), 0);
 
     const formattedTotalSpeed = this.formatSpeed(totalSpeedBps);
     if (this.speedIndicator) {

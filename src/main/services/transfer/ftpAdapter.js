@@ -35,11 +35,11 @@ class FTPAdapter {
     this.client.trackProgress(info => {
       if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
-        // If the bytes transferred in this call exceeds the expected remaining bytes,
-        // it means the server did not resume and is sending the file from the beginning.
-        const expectedRemaining = info.bytesOverall - actualOffset;
-        if (info.bytes > expectedRemaining) {
-          actualOffset = 0; // Reset offset to 0 because we are transferring from the start
+        if (info.bytesOverall > 0 && actualOffset > 0) {
+          const expectedRemaining = info.bytesOverall - actualOffset;
+          if (expectedRemaining > 0 && info.bytes > expectedRemaining) {
+            actualOffset = 0;
+          }
         }
 
         const transferred = actualOffset + info.bytes;
@@ -54,8 +54,8 @@ class FTPAdapter {
     });
 
     try {
-      if (typeof this.client.executeSequentially === 'function') {
-        await this.client.executeSequentially(() => this.client.downloadTo(localPath, normRemote, offset));
+      if (typeof this.session.executeSequentially === 'function') {
+        await this.session.executeSequentially(() => this.client.downloadTo(localPath, normRemote, offset));
       } else {
         await this.client.downloadTo(localPath, normRemote, offset);
       }
@@ -73,11 +73,11 @@ class FTPAdapter {
     this.client.trackProgress(info => {
       if (options.signal && options.signal.aborted) throw new Error('Transfer cancelled');
       if (onProgress) {
-        // If the bytes transferred in this call exceeds the expected remaining bytes,
-        // it means the server did not resume and is sending the file from the beginning.
-        const expectedRemaining = info.bytesOverall - actualOffset;
-        if (info.bytes > expectedRemaining) {
-          actualOffset = 0; // Reset offset to 0 because we are transferring from the start
+        if (info.bytesOverall > 0 && actualOffset > 0) {
+          const expectedRemaining = info.bytesOverall - actualOffset;
+          if (expectedRemaining > 0 && info.bytes > expectedRemaining) {
+            actualOffset = 0;
+          }
         }
 
         const transferred = actualOffset + info.bytes;
@@ -92,8 +92,8 @@ class FTPAdapter {
     });
 
     try {
-      if (typeof this.client.executeSequentially === 'function') {
-        await this.client.executeSequentially(() => this.client.uploadFrom(localPath, normRemote, offset));
+      if (typeof this.session.executeSequentially === 'function') {
+        await this.session.executeSequentially(() => this.client.uploadFrom(localPath, normRemote, offset));
       } else {
         await this.client.uploadFrom(localPath, normRemote, offset);
       }

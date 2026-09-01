@@ -771,6 +771,7 @@ class SFTPService {
           stream.stderr.on('data', (data) => {
             stderr += data.toString();
           });
+          stream.stderr.on('error', () => {});
         }
         
         stream.on('close', (code) => {

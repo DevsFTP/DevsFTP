@@ -185,7 +185,7 @@ class WebDAVService {
     const totalBytes = fs.statSync(localPath).size || 1;
     let transferred = 0;
 
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const readStream = fs.createReadStream(localPath);
 
       // Track progress via stream data events
@@ -205,16 +205,13 @@ class WebDAVService {
         reject(err);
       });
 
-      try {
-        await this.client.putFileContents(remotePath, readStream, {
-          overwrite: true,
-          contentLength: totalBytes
-        });
-        resolve(true);
-      } catch (err) {
+      this.client.putFileContents(remotePath, readStream, {
+        overwrite: true,
+        contentLength: totalBytes
+      }).then(() => resolve(true)).catch((err) => {
         try { readStream.destroy(); } catch (e) {}
         reject(new Error(`WebDAV upload failed for "${remotePath}": ${err.message}`));
-      }
+      });
     });
   }
 

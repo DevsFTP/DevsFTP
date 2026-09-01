@@ -3698,9 +3698,16 @@ window.FileBrowser = {
       }
     }
 
+    let taskId = null;
     if (window.TransferQueue) {
-      window.TransferQueue.addTransfer('download', remoteFilePath, localDest, options.size || options.totalBytes || 0);
+      const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      const targetProfileId = activeSess && activeSess.profile ? activeSess.profile.id : 'default';
+      taskId = window.TransferQueue.addTransfer('download', remoteFilePath, localDest, {
+        profileId: targetProfileId,
+        totalBytes: options.size || options.totalBytes || 0
+      });
     }
+    transferOptions.taskId = taskId;
 
     try {
       await api.downloadFile(remoteFilePath, localDest, sessId, transferOptions);
@@ -3803,9 +3810,17 @@ window.FileBrowser = {
       }
     }
 
+    let taskId = null;
     if (window.TransferQueue) {
-      window.TransferQueue.addTransfer('upload', localFilePath, remoteDest, options.size || options.totalBytes || 0);
+      const activeSess = window.SessionManager ? window.SessionManager.getActiveSession() : null;
+      const targetProfileId = activeSess && activeSess.profile ? activeSess.profile.id : 'default';
+      taskId = window.TransferQueue.addTransfer('upload', localFilePath, remoteDest, {
+        profileId: targetProfileId,
+        totalBytes: options.size || options.totalBytes || 0
+      });
     }
+    transferOptions.taskId = taskId;
+
     try {
       await api.uploadFile(localFilePath, remoteDest, sessId, transferOptions);
       if (window.LogViewer) {
