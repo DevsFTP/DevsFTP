@@ -2171,7 +2171,17 @@ document.addEventListener('DOMContentLoaded', () => {
         this.remove(item.localPath);
         if (window.LogViewer) window.LogViewer.addEntry('info', `✓ Upload complete for pending edit: ${item.fileName}`);
         if (window.FileBrowser) window.FileBrowser.refreshRemote(window.FileBrowser.remotePath);
-        this.openModal();
+        
+        // Only refresh modal if it's currently open by the user; close it if empty
+        const modalPending = document.getElementById('pending-edits-modal');
+        if (modalPending && modalPending.classList.contains('active')) {
+          if (this.getAll().length > 0) {
+            this.openModal();
+          } else {
+            modalPending.classList.remove('active');
+            modalPending.setAttribute('aria-hidden', 'true');
+          }
+        }
       } catch (err) {
         if (window.LogViewer) window.LogViewer.addEntry('error', `Upload error for pending file ${item.fileName}: ${err.message}`);
       }
