@@ -408,8 +408,20 @@ class SFTPService {
         };
 
         this.sftp.fastPut(localPath, remotePath, options, (err) => {
-          if (err) return reject(err);
-          resolve(true);
+          if (err) {
+            if (err && (err.message === 'Failure' || err.code === 4 || String(err.message).includes('Failure'))) {
+              this.sftp.stat(remotePath, (statErr, remoteStats) => {
+                if (!statErr && remoteStats && remoteStats.size === totalBytes) {
+                  return resolve({ success: true, localPath, remotePath });
+                }
+                reject(err);
+              });
+            } else {
+              reject(err);
+            }
+          } else {
+            resolve({ success: true, localPath, remotePath });
+          }
         });
       });
     });
@@ -570,9 +582,22 @@ class SFTPService {
   rename(oldPath, newPath) {
     return new Promise((resolve, reject) => {
       if (!this.connected || !this.sftp) return reject(new Error('SFTP not connected'));
-      this.sftp.rename(normalizePOSIXPath(oldPath), normalizePOSIXPath(newPath), (err) => {
-        if (err) return reject(err);
-        resolve(true);
+      const normOld = normalizePOSIXPath(oldPath);
+      const normNew = normalizePOSIXPath(newPath);
+
+      this.sftp.rename(normOld, normNew, (err) => {
+        if (err) {
+          // OpenSSH SFTP rename fails with SSH_FX_FAILURE if destination file already exists.
+          // Unlink destination file and retry rename.
+          this.sftp.unlink(normNew, () => {
+            this.sftp.rename(normOld, normNew, (retryErr) => {
+              if (retryErr) return reject(err);
+              resolve(true);
+            });
+          });
+        } else {
+          resolve(true);
+        }
       });
     });
   }

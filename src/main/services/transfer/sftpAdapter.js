@@ -203,8 +203,20 @@ class SFTPAdapter {
               }
             }
           }, (err) => {
-            if (err) reject(err);
-            else resolve(true);
+            if (err) {
+              if (err && (err.message === 'Failure' || err.code === 4 || String(err.message).includes('Failure'))) {
+                this.sftp.stat(normRemote, (statErr, remoteStats) => {
+                  if (!statErr && remoteStats && remoteStats.size === totalBytes) {
+                    return resolve(true);
+                  }
+                  reject(err);
+                });
+              } else {
+                reject(err);
+              }
+            } else {
+              resolve(true);
+            }
           });
           // Fix 3: hook abort signal for the fastPut fast-path
           if (options && options.signal) {
