@@ -6,26 +6,12 @@ const rootDir = path.join(__dirname, '..');
 const distDir = path.join(rootDir, 'dist');
 const GPG_KEY = '7DA36A4AD371D675';
 
-console.log('=== DevsFTP Linux Distribution Build Pipeline ===');
-console.log('1. Verifying Linux branding assets...');
-const linuxIcon = path.join(rootDir, 'assets', 'branding', 'icon_512.png');
+console.log('=== DevsFTP Linux Build & Signing Pipeline ===');
 
-if (!fs.existsSync(linuxIcon)) {
-  console.warn('⚠️ 512x512 PNG icon missing at assets/branding/icon_512.png; fallback icon will be used.');
-} else {
-  console.log('✓ Found Linux desktop icon: assets/branding/icon_512.png');
-}
+console.log('1. Building Linux targets (AppImage, deb, tar.gz)...');
+execSync('npx electron-builder --linux AppImage deb tar.gz', { cwd: rootDir, stdio: 'inherit' });
 
-console.log('2. Building Linux AppImage, DEB, and tar.gz targets via electron-builder...');
-try {
-  execSync('npx electron-builder --linux AppImage deb tar.gz', { cwd: rootDir, stdio: 'inherit' });
-} catch (err) {
-  console.error('⚠️ Linux build failed. Ensure fpm/docker/AppImage tools are available if cross-compiling from Windows.');
-  process.exit(1);
-}
-
-console.log('3. Signing build outputs with GPG key ' + GPG_KEY + '...');
-
+console.log('2. Signing Linux release packages with GPG Key: ' + GPG_KEY);
 const pkg = require(path.join(rootDir, 'package.json'));
 const version = pkg.version || '1.0.1';
 
@@ -38,7 +24,7 @@ const targets = [
 const distFiles = fs.existsSync(distDir) ? fs.readdirSync(distDir) : [];
 
 for (const target of targets) {
-  // Find file in dist directory case-insensitively
+  // Case-insensitive file matching to prevent casing mismatches on Linux
   const matchingFileName = distFiles.find(f => f.toLowerCase() === target.file.toLowerCase());
   const filePath = matchingFileName ? path.join(distDir, matchingFileName) : path.join(distDir, target.file);
 
@@ -55,14 +41,7 @@ for (const target of targets) {
     console.log('✓ Signed: ' + (matchingFileName || target.file));
   } catch (e) {
     console.warn('⚠️ Signing failed for ' + target.label + ' — ' + e.message);
-    signingFailed = true;
   }
 }
 
-if (signingFailed) {
-  console.warn('⚠️ Some files could not be signed. Ensure gpg and dpkg-sig are installed and your key is in the keyring.');
-} else {
-  console.log('✅ All outputs signed successfully.');
-}
-
-console.log('✅ Linux Build Complete: ' + distDir);
+console.log('=== Linux Build & Signing Complete ===');
