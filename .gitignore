@@ -2,6 +2,7 @@
 **/node_modules/
 **/dist/
 **/build/
+!build/installer.nsh
 **/out/
 **/devsftp-debug.log
 **/package-lock.json

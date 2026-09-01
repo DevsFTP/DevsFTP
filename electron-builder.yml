@@ -38,6 +38,7 @@ nsis:
   shortcutName: DevsFTP
   runAfterFinish: true
   deleteAppDataOnUninstall: false
+  include: build/installer.nsh
 
 linux:
   icon: assets/branding/icon_512.png
