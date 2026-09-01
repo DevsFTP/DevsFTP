@@ -23,3 +23,6 @@ Thumbs.db
 # Large release binaries (> 100MB)
 releases/DevsFTP-1.0.0.AppImage
 releases/devsftp-1.0.0.tar.gz
+
+# Test Suite
+tests/
