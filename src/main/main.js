@@ -1496,6 +1496,14 @@ registerLoggedHandle('transfer:upload', async (_event, localPath, remotePath, se
   return result;
 });
 
+registerLoggedHandle('transfer:cancel', async (_event, taskId) => {
+  if (transferEngine && taskId) {
+    sendLog('warn', `Cancelling transfer task via IPC: ${taskId}`);
+    return transferEngine.cancelTransfer(taskId);
+  }
+  return false;
+});
+
 registerLoggedHandle('transfer:remote-to-remote', async (_event, { taskId, sourcePath, targetProfileId, targetPath, sourceSessionId, isDir }) => {
   const sourceSession = getActiveSessionInstance(sourceSessionId);
   if (!sourceSession || !sourceSession.connected) {

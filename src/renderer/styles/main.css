@@ -953,35 +953,32 @@ select option:hover, select option:focus, select option:active, select option:ch
 
 #terminal-container {
   width: 100%;
-  height: calc(100% - 20px) !important;
+  height: calc(100% - 10px) !important;
   background-color: var(--bg-terminal, #111315);
-  padding: 6px 12px 0 12px;
   box-sizing: border-box;
+  overflow: hidden;
+  margin-bottom: 6px;
 }
 
-#terminal-container .xterm-viewport {
-  overflow-y: auto !important;
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px !important;
 }
 
-#terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: 10px;
+.xterm-viewport::-webkit-scrollbar-button {
+  display: none !important;
 }
 
-#terminal-container .xterm-viewport::-webkit-scrollbar-button {
-  display: none;
+.xterm-viewport::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2) !important;
 }
 
-#terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-color)) !important;
+  border-radius: 4px !important;
 }
 
-#terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: hsl(var(--border-color));
-  border-radius: 4px;
-}
-
-#terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-primary-hex, #68a063);
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary-hex, #68a063) !important;
 }
 
 /* Transfer Queue Panel */

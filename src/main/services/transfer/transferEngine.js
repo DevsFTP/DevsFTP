@@ -582,7 +582,11 @@ class TransferEngine {
         try { fs.unlinkSync(workingLocalDest); } catch (e) {}
       }
       // Preserve terminal states: Cancelled and Failed must not be overwritten
-      if (targetTask.status !== 'Cancelled' && targetTask.status !== 'Failed') {
+      const isCancelled = targetTask.status === 'Cancelled' || String(err.message || '').toLowerCase().includes('cancel');
+      if (isCancelled) {
+        targetTask.status = 'Cancelled';
+        targetTask.speed = '0 KB/s';
+      } else if (targetTask.status !== 'Failed') {
         targetTask.status = 'Waiting to Resume';
         targetTask.speed = '0 KB/s';
         if (!targetTask.resumeOffset && targetTask.bytesTransferred) {

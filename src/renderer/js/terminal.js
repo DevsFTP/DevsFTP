@@ -25,6 +25,7 @@ window.SSHTerminal = {
       return;
     }
 
+    const savedScrollback = parseInt(localStorage.getItem('devsftp_pref_term_scrollback'), 10) || 5000;
     this.term = new TerminalClass({
       cursorBlink: true,
       cursorStyle: 'block',
@@ -32,6 +33,7 @@ window.SSHTerminal = {
       fontFamily: 'Cascadia Code, Consolas, monospace',
       fontSize: 13,
       convertEol: true,
+      scrollback: savedScrollback,
       theme: {
         background: '#111315',
         foreground: '#E6E6E6',
@@ -99,13 +101,6 @@ window.SSHTerminal = {
     this._resizeHandler = () => this.resize();
     window.addEventListener('resize', this._resizeHandler);
     this.initialized = true;
-
-    // Read app version dynamically from preload API (Fix C8)
-    const appVersion = (api && api.appVersion) ? api.appVersion : '1.0.0';
-    this.term.writeln('\x1b[36m=================================================\x1b[0m');
-    this.term.writeln('\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m');
-    this.term.writeln(`\x1b[36m                 v${appVersion}                          \x1b[0m`);
-    this.term.writeln('\x1b[36m=================================================\x1b[0m\r\n');
     this.focus();
   },
 
@@ -149,15 +144,10 @@ window.SSHTerminal = {
   switchSession(sessionId) {
     if (!this.term) return;
     this.term.clear();
-    const api = window.devsFTP || window.pulseFTP;
-    const appVersion = (api && api.appVersion) ? api.appVersion : '1.0.0';
-    const buffer = this.buffers[sessionId] ||
-      '\x1b[36m=================================================\x1b[0m\r\n' +
-      '\x1b[36m       DevsFTP Embedded SSH Terminal             \x1b[0m\r\n' +
-      `\x1b[36m                 v${appVersion}                          \x1b[0m\r\n` +
-      '\x1b[36m=================================================\x1b[0m\r\n\r\n' +
-      '\x1b[36mDevsFTP Active SSH Session Terminal\x1b[0m\r\n\r\n';
-    this.term.write(buffer);
+    const buffer = this.buffers[sessionId] || '';
+    if (buffer) {
+      this.term.write(buffer);
+    }
     this.resize();
   },
 

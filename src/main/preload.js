@@ -77,6 +77,7 @@ const devsFTPApi = {
   // Transfer Queue & Live Edit
   downloadFile: (remotePath, localPath, sessionId, options = {}) => ipcRenderer.invoke('transfer:download', remotePath, localPath, sessionId, options),
   uploadFile: (localPath, remotePath, sessionId, options = {}) => ipcRenderer.invoke('transfer:upload', localPath, remotePath, sessionId, options),
+  cancelTransfer: (taskId) => ipcRenderer.invoke('transfer:cancel', taskId),
   getHistory: () => ipcRenderer.invoke('history:get-all'),
   getQueue: () => ipcRenderer.invoke('transfer:get-queue'),
   clearCompletedQueue: () => ipcRenderer.invoke('transfer:clear-completed'),

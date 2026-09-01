@@ -43,6 +43,8 @@ nsis:
 linux:
   icon: assets/branding/icon_512.png
   category: Network
+  executableArgs:
+    - "--no-sandbox"
   synopsis: DevsFTP — High-Performance SFTP & FTP Client
   description: An FTP/SFTP client that works with you, not against you.
   target:
@@ -64,3 +66,6 @@ deb:
     - libfuse2t64 | libfuse2
     - libnotify4
     - libnss3
+    - libasound2
+    - libgbm1
+    - libgtk-3-0

@@ -25,11 +25,13 @@ window.TransferQueue = {
 
     // Toolbar Event Listeners
     const btnClear = document.getElementById('btn-clear-queue');
+    const btnClearCancelled = document.getElementById('btn-clear-cancelled');
     const btnPauseAll = document.getElementById('btn-queue-pause-all');
     const btnResumeAll = document.getElementById('btn-queue-resume-all');
     const btnCancelAll = document.getElementById('btn-queue-cancel-all');
 
     if (btnClear) btnClear.addEventListener('click', () => this.clearCompleted());
+    if (btnClearCancelled) btnClearCancelled.addEventListener('click', () => this.clearCancelled());
     if (btnPauseAll) btnPauseAll.addEventListener('click', () => this.pauseAll());
     if (btnResumeAll) btnResumeAll.addEventListener('click', () => this.resumeAll());
     if (btnCancelAll) btnCancelAll.addEventListener('click', () => this.cancelAll());
@@ -75,6 +77,19 @@ window.TransferQueue = {
 
     this.initOptionsAndSync();
     await this.loadSavedQueue();
+  },
+
+  getMaxConcurrency() {
+    const el = document.getElementById('queue-max-concurrency') || document.getElementById('pref-max-concurrency');
+    if (el && el.value) {
+      const val = parseInt(el.value, 10);
+      if (val > 0) return val;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem('devsftp_transfer_settings'));
+      if (saved && saved.maxConcurrency) return parseInt(saved.maxConcurrency, 10) || 3;
+    } catch(e) {}
+    return 3;
   },
 
   initOptionsAndSync() {
@@ -327,7 +342,7 @@ window.TransferQueue = {
       total: totalBytes || 1,
       speed: '0 KB/s',
       rawSpeedBps: 0,
-      status: 'In Progress', // 'In Progress' | 'Paused' | 'Queued' | 'Waiting to Resume' | 'Verifying' | 'Completed' | 'Failed' | 'Cancelled'
+      status: (typeof options === 'object' && options && options.status) ? options.status : 'In Progress', // 'In Progress' | 'Paused' | 'Queued' | 'Waiting to Resume' | 'Verifying' | 'Completed' | 'Failed' | 'Cancelled'
       startTime: Date.now(),
       lastTransferred: 0,
       lastTime: Date.now()
@@ -374,12 +389,20 @@ window.TransferQueue = {
     }
   },
 
-  cancelTransfer(id) {
+  async cancelTransfer(id) {
     const item = this.getItem(id);
     if (item && item.status !== 'Completed' && item.status !== 'Cancelled') {
       item.status = 'Cancelled';
       item.speed = '0 KB/s';
       this.cancelledIds.add(id);
+      
+      const api = window.devsFTP || window.pulseFTP;
+      if (api && api.cancelTransfer) {
+        try {
+          await api.cancelTransfer(id);
+        } catch (e) {}
+      }
+
       if (window.LogViewer) window.LogViewer.addEntry('error', `⏹️ Transfer cancelled: ${item.source}`);
       this.render();
       this.syncQueue();
@@ -508,22 +531,29 @@ window.TransferQueue = {
     this.syncQueue();
   },
 
-  cancelAll() {
+  async cancelAll() {
     const activeSession = window.SessionManager ? window.SessionManager.getActiveSession() : null;
     const activeProfileId = activeSession && activeSession.profile ? activeSession.profile.id : 'default';
 
     let count = 0;
     this.batchCancelled = true;
-    this.queue.forEach(item => {
+    const api = window.devsFTP || window.pulseFTP;
+
+    for (const item of this.queue) {
       if ((item.profileId || 'default') === activeProfileId) {
-        if (item.status === 'In Progress' || item.status === 'Paused' || item.status === 'Queued' || item.status === 'Waiting to Resume') {
+        if (item.status === 'In Progress' || item.status === 'Paused' || item.status === 'Queued' || item.status === 'Waiting to Resume' || item.status === 'Running') {
           item.status = 'Cancelled';
           item.speed = '0 KB/s';
           this.cancelledIds.add(item.id);
           count++;
+          if (api && api.cancelTransfer) {
+            try {
+              await api.cancelTransfer(item.id);
+            } catch (e) {}
+          }
         }
       }
-    });
+    }
     if (count > 0 && window.LogViewer) window.LogViewer.addEntry('error', `⏹️ Cancelled ${count} transfer task(s) for this profile.`);
     this.render();
     this.syncQueue();
@@ -537,6 +567,12 @@ window.TransferQueue = {
       await api.clearCompletedQueue();
     }
     this.render();
+  },
+
+  async clearCancelled() {
+    this.queue = this.queue.filter(q => q.status !== 'Cancelled');
+    this.render();
+    await this.syncQueue();
   },
 
   handleProgress(data) {
@@ -556,6 +592,9 @@ window.TransferQueue = {
     }
 
     if (item) {
+      if (item.status === 'Cancelled' || this.cancelledIds.has(item.id)) {
+        return;
+      }
       if (data.status === 'Completed' || (data.percentage !== undefined && data.percentage >= 100)) {
         item.status = 'Completed';
         item.percentage = 100;
